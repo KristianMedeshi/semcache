@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ServiceName } from '@semcache/shared-types';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -17,6 +18,19 @@ describe('AppController', () => {
   describe('root', () => {
     it('should return "Hello World!"', () => {
       expect(appController.getHello()).toBe('Hello World!');
+    });
+  });
+
+  describe('health', () => {
+    it('should return health status for the service', () => {
+      const result = appController.getHealth();
+
+      expect(result).toEqual({
+        service: ServiceName.AUTH_SERVICE,
+        status: 'ok',
+        timestamp: expect.any(String),
+      });
+      expect(Number.isNaN(Date.parse(result.timestamp))).toBe(false);
     });
   });
 });
