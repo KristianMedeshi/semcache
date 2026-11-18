@@ -1,0 +1,8 @@
+{
+  "plugins": ["typescript", "oxc"],
+  "ignorePatterns": ["dist/**", "build/**", "node_modules/**", "coverage/**", ".turbo/**"],
+  "rules": {
+    "typescript/no-explicit-any": "warn",
+    "no-unused-vars": "error"
+  }
+}

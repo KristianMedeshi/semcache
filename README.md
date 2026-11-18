@@ -1,0 +1,161 @@
+# SemCache
+
+A microservice-based customer support system featuring semantic caching of Large Language Model (LLM) responses.
+
+This project is developed as part of a master's thesis. The primary goal of the system is to reduce calls to external LLMs and lower response latency using semantic caching with an adaptive semantic similarity threshold that accounts for query category and local embedding cluster density.
+
+---
+
+## Monorepo Architecture
+
+The project is organized as a monorepo powered by **pnpm Workspaces** and **Turborepo**:
+
+```text
+semcache/
+├── apps/
+│   ├── api-gateway/              # Single REST API entry point for clients
+│   ├── auth-service/             # Authentication and user management service
+│   ├── dialog-service/           # Dialog orchestration and conversation history service
+│   ├── semantic-cache-service/   # Semantic caching service (pgvector, HNSW, adaptive threshold)
+│   ├── llm-service/              # LLM provider integration and embedding generation service
+│   ├── knowledge-base-service/   # Knowledge base and contextual search (RAG) service
+│   └── frontend/                 # User web interface and analytics dashboard (React + Vite)
+│
+├── packages/
+│   ├── shared-types/             # Shared domain TypeScript types and enums
+│   ├── shared-dtos/              # Contracts and DTOs for inter-service REST communication
+│   ├── shared-config/            # Shared configuration utilities and port constants
+│   └── eslint-config/            # Shared linter configurations (Oxlint)
+│
+├── infrastructure/
+│   ├── docker/                   # Additional Docker configurations
+│   ├── postgres/                 # PostgreSQL + pgvector SQL initialization scripts
+│   └── monitoring/               # Monitoring and metrics configurations
+│
+├── datasets/
+│   ├── raw/                      # Raw customer support inquiry datasets
+│   ├── processed/                # Cleaned and normalized datasets
+│   └── labeled/                  # Labeled datasets with categories and clusters
+│
+├── tests/
+│   ├── integration/              # Inter-service integration tests
+│   ├── e2e/                      # End-to-end system tests
+│   └── load/                     # Load tests and caching benchmarks
+│
+├── docs/                         # Technical and research documentation
+│
+├── docker-compose.yml            # Local PostgreSQL 17 + pgvector environment
+├── pnpm-workspace.yaml           # pnpm Workspaces configuration
+├── turbo.json                    # Turborepo build and verification pipelines
+├── package.json                  # Root monorepo manifest and scripts
+├── tsconfig.base.json            # Base TypeScript configuration
+├── .oxlintrc.json                # Root Oxlint configuration
+├── .env.example                  # Environment variables template
+├── .gitignore                    # Git ignore rules
+├── AGENTS.md                     # Architectural rules and guidelines for developers/agents
+└── README.md                     # Project overview and setup instructions
+```
+
+---
+
+## Applications (`apps/`)
+
+| Application                | Package                            | Default Port | Purpose                                                                                                                                                      |
+| :------------------------- | :--------------------------------- | :----------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **API Gateway**            | `@semcache/api-gateway`            |    `3000`    | Routes external client requests to internal microservices via REST API.                                                                                      |
+| **Auth Service**           | `@semcache/auth-service`           |    `3001`    | Manages user accounts, sessions, and access permissions.                                                                                                     |
+| **Dialog Service**         | `@semcache/dialog-service`         |    `3002`    | Orchestrates client dialogs, persists message history, and coordinates query processing.                                                                     |
+| **Semantic Cache Service** | `@semcache/semantic-cache-service` |    `3003`    | Searches semantically similar queries in PostgreSQL (`pgvector`, HNSW, Cosine distance), calculates local cluster density, and computes adaptive thresholds. |
+| **LLM Service**            | `@semcache/llm-service`            |    `3004`    | Integrates with LLM providers to generate responses and embedding vectors.                                                                                   |
+| **Knowledge Base Service** | `@semcache/knowledge-base-service` |    `3005`    | Manages support documentation and retrieves relevant context.                                                                                                |
+| **Frontend**               | `@semcache/frontend`               |    `5173`    | Client web application built with React, TypeScript, and Vite.                                                                                               |
+
+---
+
+## Shared Packages (`packages/`)
+
+- **`@semcache/shared-types`** — contains shared immutable enums (`ServiceName`, `QueryCategory`, `CacheHitStatus`) and base interfaces for semantic evaluation metadata.
+- **`@semcache/shared-dtos`** — contains exclusively data contracts (DTOs) for inter-service communication over REST API.
+- **`@semcache/shared-config`** — contains helper functions for safely reading environment variables (`getRequiredEnv`, `getOptionalEnv`, `getNumericEnv`) and the default service port mapping.
+- **`@semcache/eslint-config`** — contains shared static code analysis (**Oxlint**) configurations for base packages (`base.json`), NestJS services (`nestjs.json`), and the React application (`react.json`).
+
+---
+
+## Local Prerequisites
+
+- **Node.js**: `>= 20.0.0` (v22 or v24 LTS recommended)
+- **pnpm**: `>= 9.0.0` (v12+ installed)
+- **Docker** and **Docker Compose** (for running PostgreSQL 17 with `pgvector`)
+
+---
+
+## Quick Start
+
+### 1. Configure Environment Variables
+
+Copy the `.env.example` template to `.env`:
+
+```bash
+cp .env.example .env
+```
+
+### 2. Install Dependencies
+
+```bash
+pnpm install
+```
+
+### 3. Start PostgreSQL + pgvector
+
+Start the database container in the background:
+
+```bash
+pnpm db:up
+```
+
+Check database status and logs:
+
+```bash
+docker compose ps
+pnpm db:logs
+```
+
+On first startup, `infrastructure/postgres/init.sql` runs automatically to enable `CREATE EXTENSION IF NOT EXISTS vector;`.
+
+Stop the database:
+
+```bash
+pnpm db:down
+```
+
+---
+
+## Development, Build, and Verification Commands
+
+All primary commands are executed from the monorepo root via **Turborepo**:
+
+| Command             | Description                                                                                     |
+| :------------------ | :---------------------------------------------------------------------------------------------- |
+| `pnpm build`        | Builds all shared packages and applications respecting the dependency graph.                    |
+| `pnpm dev`          | Starts all services and the frontend in parallel in development (`watch`) mode.                 |
+| `pnpm lint`         | Runs static analysis across all packages and apps using **Oxlint** (`--type-aware` for NestJS). |
+| `pnpm typecheck`    | Runs TypeScript type checking (`tsc --noEmit`) across the entire monorepo.                      |
+| `pnpm test`         | Runs unit tests (Jest) across all packages and microservices.                                   |
+| `pnpm test:e2e`     | Runs microservice end-to-end tests.                                                             |
+| `pnpm format`       | Automatically formats repository files using **Prettier**.                                      |
+| `pnpm format:check` | Verifies that all matched files conform to Prettier formatting rules.                           |
+
+### Running a Single Application
+
+To run a specific microservice or the frontend, use the `pnpm --filter` flag:
+
+```bash
+# Run only API Gateway in development mode
+pnpm --filter @semcache/api-gateway dev
+
+# Run only Semantic Cache Service
+pnpm --filter @semcache/semantic-cache-service dev
+
+# Run only Frontend
+pnpm --filter @semcache/frontend dev
+```

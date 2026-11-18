@@ -1,0 +1,30 @@
+{
+  "name": "@semcache/frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "oxlint src/",
+    "test": "echo \"No unit tests configured yet for frontend\"",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@semcache/shared-dtos": "workspace:*",
+    "@semcache/shared-types": "workspace:*",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@semcache/eslint-config": "workspace:*",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "^1.90.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.6"
+  }
+}
