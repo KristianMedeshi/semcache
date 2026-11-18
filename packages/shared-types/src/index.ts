@@ -11,6 +11,36 @@ export enum ServiceName {
 }
 
 /**
+ * Role-based access control roles.
+ */
+export enum UserRole {
+  CUSTOMER = 'customer',
+  ADMIN = 'admin',
+}
+
+/**
+ * Authenticated user principal attached to verified requests.
+ */
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  sessionId: string;
+}
+
+/**
+ * Internal HTTP headers used exclusively between API Gateway and backend microservices.
+ * External requests carrying these headers must have them stripped at the gateway boundary.
+ */
+export const INTERNAL_AUTH_HEADERS = {
+  USER_ID: 'x-internal-user-id',
+  USER_EMAIL: 'x-internal-user-email',
+  USER_ROLE: 'x-internal-user-role',
+  SESSION_ID: 'x-internal-session-id',
+  SIGNATURE: 'x-internal-auth-signature',
+} as const;
+
+/**
  * High-level customer support query categories used for adaptive semantic threshold tuning.
  */
 export enum QueryCategory {

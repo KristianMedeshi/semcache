@@ -17,6 +17,26 @@ export interface ServiceEndpointConfig {
 }
 
 /**
+ * Configuration parameters for session-based authentication and security controls.
+ */
+export interface AuthEnvironmentConfig {
+  internalServiceSecret: string;
+  sessionCookieName: string;
+  sessionTtlMs: number;
+  sessionIdleTimeoutMs: number;
+  corsOrigin: string[];
+  loginRateLimitWindowMs: number;
+  loginRateLimitMaxAttempts: number;
+  secureCookies: boolean;
+}
+
+export const DEFAULT_SESSION_COOKIE_NAME = 'semcache_sid';
+export const DEFAULT_SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const DEFAULT_SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+export const DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+export const DEFAULT_LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
+
+/**
  * Default port mapping for local development across microservices.
  */
 export const DEFAULT_SERVICE_PORTS: Record<ServiceName, number> = {

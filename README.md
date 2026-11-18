@@ -128,6 +128,20 @@ Stop the database:
 pnpm db:down
 ```
 
+### 4. Apply Database Migrations (`auth-service`)
+
+After starting PostgreSQL, apply the Drizzle ORM migrations for `auth-service`:
+
+```bash
+pnpm --filter @semcache/auth-service db:migrate
+```
+
+---
+
+## Authentication & Authorization
+
+Detailed documentation for session-based authentication, CSRF protection, rate limiting, RBAC policies, API Gateway identity headers, and React integration is available in [docs/authentication-and-authorization.md](./docs/authentication-and-authorization.md).
+
 ---
 
 ## Development, Build, and Verification Commands
