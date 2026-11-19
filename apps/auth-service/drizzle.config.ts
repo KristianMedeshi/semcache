@@ -1,5 +1,7 @@
-import { getRequiredEnv } from '@semcache/shared-config';
+import { getRequiredEnv, loadEnv } from '@semcache/shared-config';
 import { defineConfig } from 'drizzle-kit';
+
+loadEnv();
 
 export default defineConfig({
   dialect: 'postgresql',

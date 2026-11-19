@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { ServiceName } from '@semcache/shared-types';
 
 export type NodeEnvironment = 'development' | 'production' | 'test';
@@ -80,4 +82,32 @@ export function getNumericEnv(key: string, fallback: number): number {
     throw new Error(`Environment variable ${key} must be a valid integer, received: "${raw}"`);
   }
   return parsed;
+}
+
+/**
+ * Walks up from `startDir` to the workspace root and loads `.env` files
+ * without overwriting already-defined environment variables.
+ */
+export function loadEnv(startDir: string = process.cwd()): void {
+  if (typeof process.loadEnvFile !== 'function') {
+    return;
+  }
+
+  let currentDir = resolve(startDir);
+  while (true) {
+    const envPath = join(currentDir, '.env');
+    if (existsSync(envPath)) {
+      process.loadEnvFile(envPath);
+    }
+
+    if (existsSync(join(currentDir, 'pnpm-workspace.yaml'))) {
+      break;
+    }
+
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+    currentDir = parentDir;
+  }
 }
