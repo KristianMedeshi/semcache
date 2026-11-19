@@ -166,8 +166,24 @@
       "sourceSkillPath": "skills/turborepo/SKILL.md",
       "sourceBranch": "main",
       "sourceCommitSha": "9e884b49f67f11bd449ea4e2d54dffa7a04afb6d"
+    },
+    "web-design-guidelines": {
+      "version": "1.0.0",
+      "sha": "f4647ca866a3accf763777f83e7682954f0187cd6bea7eea0399796652414e8f",
+      "tier": "VERIFIED",
+      "installedAt": "2026-11-18T12:05:00.519Z",
+      "source": "github:vercel-labs/agent-skills",
+      "scope": "project",
+      "files": [
+        "SKILL.md"
+      ],
+      "sourceType": "github",
+      "sourceRepoUrl": "https://github.com/vercel-labs/agent-skills",
+      "sourceSkillPath": "skills/web-design-guidelines/SKILL.md",
+      "sourceBranch": "main",
+      "sourceCommitSha": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62"
     }
   },
   "createdAt": "2026-11-18T10:12:44.125Z",
-  "updatedAt": "2026-11-18T10:18:58.954Z"
+  "updatedAt": "2026-11-18T12:05:00.520Z"
 }
