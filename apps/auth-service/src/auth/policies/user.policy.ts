@@ -9,23 +9,11 @@ export class UserPolicy {
   }
 
   viewProfile(user: UserResponseDto | null, targetUserId: string): boolean {
-    if (!user) {
-      return false;
-    }
-    if (user.role === UserRole.ADMIN) {
-      return true;
-    }
-    return user.role === UserRole.CUSTOMER && user.id === targetUserId;
+    return this.isOwnerOrAdmin(user, targetUserId);
   }
 
   updateProfile(user: UserResponseDto | null, targetUserId: string): boolean {
-    if (!user) {
-      return false;
-    }
-    if (user.role === UserRole.ADMIN) {
-      return true;
-    }
-    return user.role === UserRole.CUSTOMER && user.id === targetUserId;
+    return this.isOwnerOrAdmin(user, targetUserId);
   }
 
   manageUsers(user: UserResponseDto | null): boolean {
@@ -34,5 +22,14 @@ export class UserPolicy {
 
   hasRole(user: UserResponseDto | null, allowedRoles: readonly UserRole[]): boolean {
     return user !== null && allowedRoles.includes(user.role);
+  }
+
+  private isOwnerOrAdmin(user: UserResponseDto | null, targetUserId: string): boolean {
+    if (!user) {
+      return false;
+    }
+    return (
+      user.role === UserRole.ADMIN || (user.role === UserRole.CUSTOMER && user.id === targetUserId)
+    );
   }
 }

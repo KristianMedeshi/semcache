@@ -1,61 +1,50 @@
-import type {
-  LoginRequestDto,
-  RegisterRequestDto,
-  UpdateUserProfileRequestDto,
+import {
+  AUTH_VALIDATION_LIMITS,
+  type LoginRequestDto,
+  PASSWORD_COMPLEXITY_MESSAGE,
+  PASSWORD_COMPLEXITY_REGEX,
+  type RegisterRequestDto,
+  type UpdateUserProfileRequestDto,
 } from '@semcache/shared-dtos';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
-const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[\d\W]).{8,128}$/;
+const normalizeGatewayEmail = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim().normalize('NFC').toLowerCase() : value;
 
-export class GatewayRegisterDto implements RegisterRequestDto {
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().normalize('NFC').toLowerCase() : value,
-  )
+class GatewayEmailBodyDto {
+  @Transform(normalizeGatewayEmail)
   @IsEmail()
-  @MaxLength(255)
+  @MaxLength(AUTH_VALIDATION_LIMITS.EMAIL_MAX_LENGTH)
   email!: string;
+}
 
+export class GatewayRegisterDto extends GatewayEmailBodyDto implements RegisterRequestDto {
   @IsString()
-  @MinLength(8)
-  @MaxLength(128)
-  @Matches(PASSWORD_COMPLEXITY_REGEX, {
-    message:
-      'Password must be 8-128 characters and include uppercase, lowercase, and a number or special character',
-  })
+  @MinLength(AUTH_VALIDATION_LIMITS.PASSWORD_MIN_LENGTH)
+  @MaxLength(AUTH_VALIDATION_LIMITS.PASSWORD_MAX_LENGTH)
+  @Matches(PASSWORD_COMPLEXITY_REGEX, { message: PASSWORD_COMPLEXITY_MESSAGE })
   password!: string;
 }
 
-export class GatewayLoginDto implements LoginRequestDto {
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().normalize('NFC').toLowerCase() : value,
-  )
-  @IsEmail()
-  @MaxLength(255)
-  email!: string;
-
+export class GatewayLoginDto extends GatewayEmailBodyDto implements LoginRequestDto {
   @IsString()
-  @MinLength(1)
-  @MaxLength(128)
+  @MinLength(AUTH_VALIDATION_LIMITS.PASSWORD_LOGIN_MIN_LENGTH)
+  @MaxLength(AUTH_VALIDATION_LIMITS.PASSWORD_MAX_LENGTH)
   password!: string;
 }
 
 export class GatewayUpdateProfileDto implements UpdateUserProfileRequestDto {
   @IsOptional()
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().normalize('NFC').toLowerCase() : value,
-  )
+  @Transform(normalizeGatewayEmail)
   @IsEmail()
-  @MaxLength(255)
+  @MaxLength(AUTH_VALIDATION_LIMITS.EMAIL_MAX_LENGTH)
   email?: string;
 
   @IsOptional()
   @IsString()
-  @MinLength(8)
-  @MaxLength(128)
-  @Matches(PASSWORD_COMPLEXITY_REGEX, {
-    message:
-      'Password must be 8-128 characters and include uppercase, lowercase, and a number or special character',
-  })
+  @MinLength(AUTH_VALIDATION_LIMITS.PASSWORD_MIN_LENGTH)
+  @MaxLength(AUTH_VALIDATION_LIMITS.PASSWORD_MAX_LENGTH)
+  @Matches(PASSWORD_COMPLEXITY_REGEX, { message: PASSWORD_COMPLEXITY_MESSAGE })
   password?: string;
 }

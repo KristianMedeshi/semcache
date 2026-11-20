@@ -47,6 +47,27 @@ export interface SemanticCacheLookupResponseDto {
 export type HealthCheckResponseDto = HealthCheckStatus;
 
 /**
+ * Shared validation constraints for authentication and user profile payloads.
+ */
+export const AUTH_VALIDATION_LIMITS = {
+  EMAIL_MAX_LENGTH: 255,
+  PASSWORD_MIN_LENGTH: 8,
+  PASSWORD_LOGIN_MIN_LENGTH: 1,
+  PASSWORD_MAX_LENGTH: 128,
+} as const;
+
+/**
+ * Password complexity pattern requiring lowercase, uppercase, and digit or special character (8-128 chars).
+ */
+export const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[\d\W]).{8,128}$/;
+
+/**
+ * Standard validation error message for password complexity failures.
+ */
+export const PASSWORD_COMPLEXITY_MESSAGE =
+  'Password must be 8-128 characters and include uppercase, lowercase, and a number or special character';
+
+/**
  * DTO contract for customer registration.
  */
 export interface RegisterRequestDto {

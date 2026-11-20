@@ -1,17 +1,10 @@
 import type { LoginRequestDto } from '@semcache/shared-dtos';
-import { Transform } from 'class-transformer';
-import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsLoginPassword, IsNormalizedEmail } from './auth-field.decorators';
 
 export class LoginDto implements LoginRequestDto {
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().normalize('NFC').toLowerCase() : value,
-  )
-  @IsEmail()
-  @MaxLength(255)
+  @IsNormalizedEmail()
   email!: string;
 
-  @IsString()
-  @MinLength(1)
-  @MaxLength(128)
+  @IsLoginPassword()
   password!: string;
 }
