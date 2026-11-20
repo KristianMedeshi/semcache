@@ -1,0 +1,33 @@
+{
+  "enableTerminalSandbox": true,
+  "toolPermission": "proceed-in-sandbox",
+  "allowNonWorkspaceAccess": false,
+  "permissions": {
+    "allow": [
+      "command(grep)",
+      "command(rg)",
+      "command(find)",
+      "command(ls)",
+      "command(cat)",
+      "command(head)",
+      "command(tail)",
+      "command(wc)",
+      "command(git status)",
+      "command(git diff)",
+      "command(git log)",
+      "command(pnpm build)",
+      "command(pnpm lint)",
+      "command(pnpm typecheck)",
+      "command(pnpm test)"
+    ],
+    "ask": [
+      "command(rm -rf)"
+    ],
+    "deny": [
+      "command(sudo)",
+      "write_file(.env)",
+      "write_file(.git/)",
+      "write_file(.agents/agy-settings.json)"
+    ]
+  }
+}
