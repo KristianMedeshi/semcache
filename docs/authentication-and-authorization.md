@@ -60,6 +60,8 @@ All DTO contracts live in `@semcache/shared-dtos` (`packages/shared-dtos/src/ind
 | `DELETE` | `/admin/users/:id/sessions` | `ADMIN` only                              | —                             | `RevokeUserSessionsResponseDto` (`200`) |
 
 > **Note**: `role` is rejected (`400 Bad Request`) on all public registration and profile update payloads via strict `ValidationPipe` (`whitelist: true`, `forbidNonWhitelisted: true`).
+>
+> Shared validation constants (`AUTH_VALIDATION_LIMITS`, `PASSWORD_COMPLEXITY_REGEX`, `PASSWORD_COMPLEXITY_MESSAGE`) are also exported from `@semcache/shared-dtos` so `api-gateway`, `auth-service`, and `frontend` enforce identical email length (`255`) and password complexity/length bounds (`8–128` for registration/updates, `1–128` for login).
 
 ---
 
@@ -88,7 +90,7 @@ pnpm --filter @semcache/auth-service db:migrate
 
 ## 6. React Frontend Client
 
-`apps/frontend/src/api/auth.client.ts` provides a typed `fetch` client configured with `credentials: 'include'` (`registerCustomer`, `login`, `logout`, `getCurrentUser`, `getUserProfile`, `updateUserProfile`, `listUsers`, `revokeUserSessions`, `isCustomer`, `isAdmin`). Session tokens are kept strictly in `HttpOnly` cookies and never stored in `localStorage` or `sessionStorage`.
+`apps/frontend/src/features/auth/api/auth.client.ts` provides a typed `fetch` client configured with `credentials: 'include'` (`registerCustomer`, `login`, `logout`, `getCurrentUser`, `getUserProfile`, `updateUserProfile`, `listUsers`, `revokeUserSessions`, `isCustomer`, `isAdmin`). Session tokens are kept strictly in `HttpOnly` cookies and never stored in `localStorage` or `sessionStorage`.
 
 ---
 

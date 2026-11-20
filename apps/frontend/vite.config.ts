@@ -12,11 +12,11 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@semcache/shared-types'],
+    include: ['@semcache/shared-types', '@semcache/shared-dtos'],
   },
   build: {
     commonjsOptions: {
-      include: [/shared-types/, /node_modules/],
+      include: [/shared-types/, /shared-dtos/, /node_modules/],
     },
   },
 });

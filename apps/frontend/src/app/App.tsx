@@ -1,0 +1,40 @@
+import { QueryClientProvider } from '@tanstack/react-query';
+import { RouterProvider } from '@tanstack/react-router';
+import { useEffect } from 'react';
+import { createAppRouter } from '@/app/router';
+import { getCurrentUser } from '@/features/auth/api/auth.client';
+import { applyThemeToDocument, useUiStore } from '@/features/theme/model/ui.store';
+import { onUnauthorizedResponse } from '@/shared/api/api-client';
+import { queryClient, queryKeys } from '@/shared/api/query-client';
+
+const appRouter = createAppRouter({
+  queryClient,
+  getAuthUser: () =>
+    queryClient.query({
+      queryKey: queryKeys.auth.me(),
+      queryFn: getCurrentUser,
+      staleTime: 'static',
+    }),
+});
+
+export function App() {
+  const theme = useUiStore((state) => state.theme);
+
+  useEffect(() => {
+    applyThemeToDocument(theme);
+  }, [theme]);
+
+  useEffect(() => {
+    return onUnauthorizedResponse(() => {
+      queryClient.setQueryData(queryKeys.auth.me(), null);
+    });
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={appRouter} />
+    </QueryClientProvider>
+  );
+}
+
+export default App;
