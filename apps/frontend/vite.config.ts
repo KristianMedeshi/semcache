@@ -9,10 +9,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),
+      '@semcache/shared-types': path.resolve(
+        import.meta.dirname,
+        '../../packages/shared-types/src/index.ts',
+      ),
+      '@semcache/shared-dtos': path.resolve(
+        import.meta.dirname,
+        '../../packages/shared-dtos/src/index.ts',
+      ),
     },
-  },
-  optimizeDeps: {
-    include: ['@semcache/shared-types', '@semcache/shared-dtos'],
   },
   build: {
     commonjsOptions: {

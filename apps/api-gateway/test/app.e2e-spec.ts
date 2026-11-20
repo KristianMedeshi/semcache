@@ -11,8 +11,16 @@ import { AppModule } from '../src/app.module';
 describe('API Gateway (e2e)', () => {
   let app: INestApplication<App>;
   let mockAuthServer: Server;
+  let mockDialogServer: Server;
   let capturedRequests: Array<{ method?: string; url?: string; headers: IncomingHttpHeaders }> = [];
+  let capturedDialogRequests: Array<{
+    method?: string;
+    url?: string;
+    headers: IncomingHttpHeaders;
+    body: string;
+  }> = [];
   let previousAuthServiceUrl: string | undefined;
+  let previousDialogServiceUrl: string | undefined;
 
   beforeAll(async () => {
     mockAuthServer = createServer((req, res) => {
@@ -79,9 +87,38 @@ describe('API Gateway (e2e)', () => {
       mockAuthServer.listen(0, '127.0.0.1', () => resolve());
     });
 
+    mockDialogServer = createServer((req, res) => {
+      let rawBody = '';
+      req.on('data', (chunk: Buffer) => {
+        rawBody += chunk.toString('utf8');
+      });
+      req.on('end', () => {
+        capturedDialogRequests.push({
+          method: req.method,
+          url: req.url,
+          headers: req.headers,
+          body: rawBody,
+        });
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            path: req.url,
+          }),
+        );
+      });
+    });
+
+    await new Promise<void>((resolve) => {
+      mockDialogServer.listen(0, '127.0.0.1', () => resolve());
+    });
+
     const address = mockAuthServer.address() as AddressInfo;
+    const dialogAddress = mockDialogServer.address() as AddressInfo;
     previousAuthServiceUrl = process.env.AUTH_SERVICE_URL;
+    previousDialogServiceUrl = process.env.DIALOG_SERVICE_URL;
     process.env.AUTH_SERVICE_URL = `http://127.0.0.1:${address.port}`;
+    process.env.DIALOG_SERVICE_URL = `http://127.0.0.1:${dialogAddress.port}`;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -94,6 +131,7 @@ describe('API Gateway (e2e)', () => {
 
   beforeEach(() => {
     capturedRequests = [];
+    capturedDialogRequests = [];
   });
 
   afterAll(async () => {
@@ -101,10 +139,18 @@ describe('API Gateway (e2e)', () => {
     await new Promise<void>((resolve, reject) => {
       mockAuthServer.close((err) => (err ? reject(err) : resolve()));
     });
+    await new Promise<void>((resolve, reject) => {
+      mockDialogServer.close((err) => (err ? reject(err) : resolve()));
+    });
     if (previousAuthServiceUrl === undefined) {
       delete process.env.AUTH_SERVICE_URL;
     } else {
       process.env.AUTH_SERVICE_URL = previousAuthServiceUrl;
+    }
+    if (previousDialogServiceUrl === undefined) {
+      delete process.env.DIALOG_SERVICE_URL;
+    } else {
+      process.env.DIALOG_SERVICE_URL = previousDialogServiceUrl;
     }
   });
 
@@ -168,5 +214,28 @@ describe('API Gateway (e2e)', () => {
       .set('Origin', 'https://evil.example.com')
       .send({ email: 'alice@example.com', password: 'StrongPassword1!' })
       .expect(403);
+  });
+
+  it('requires authentication on /dialogs and attaches signed internal headers when signed in', async () => {
+    await request(app.getHttpServer()).get('/dialogs').expect(401);
+
+    await request(app.getHttpServer())
+      .get('/dialogs')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .expect(200);
+
+    expect(capturedDialogRequests).toHaveLength(1);
+    expect(capturedDialogRequests[0]?.headers['x-internal-user-id']).toBe(
+      '11111111-1111-4111-8111-111111111111',
+    );
+    expect(capturedDialogRequests[0]?.headers['x-internal-auth-signature']).toBeDefined();
+  });
+
+  it('rejects non-free model selection at gateway ValidationPipe', () => {
+    return request(app.getHttpServer())
+      .post('/dialogs/11111111-1111-4111-8111-111111111111/messages')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .send({ content: 'Hello', model: 'openai/gpt-4o' })
+      .expect(400);
   });
 });

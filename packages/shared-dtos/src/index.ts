@@ -1,5 +1,6 @@
 import {
   CacheHitStatus,
+  ChatMessageRole,
   HealthCheckStatus,
   QueryCategory,
   SemanticEvaluationMetadata,
@@ -114,4 +115,112 @@ export interface LogoutResponseDto {
  */
 export interface RevokeUserSessionsResponseDto {
   revokedCount: number;
+}
+
+/**
+ * Shared validation limits for dialogs, messages, and LLM requests.
+ */
+export const DIALOG_VALIDATION_LIMITS = {
+  TITLE_MAX_LENGTH: 120,
+  MESSAGE_MIN_LENGTH: 1,
+  MESSAGE_MAX_LENGTH: 8000,
+  MODEL_MAX_LENGTH: 120,
+} as const;
+
+/**
+ * Regex matching permitted zero-cost OpenRouter models (`openrouter/free` or `<provider>/<model>:free`).
+ */
+export const FREE_OPENROUTER_MODEL_REGEX =
+  /^(openrouter\/free|[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+:free)$/;
+
+/**
+ * Validation message returned when a non-free OpenRouter model is requested.
+ */
+export const FREE_OPENROUTER_MODEL_MESSAGE =
+  'Only free OpenRouter models (openrouter/free or <provider>/<model>:free) are allowed';
+
+/**
+ * Single message passed to `llm-service` for chat completion.
+ */
+export interface LlmChatMessageDto {
+  role: ChatMessageRole;
+  content: string;
+}
+
+/**
+ * DTO contract for `POST /llm/chat` requests from `dialog-service` to `llm-service`.
+ */
+export interface LlmChatCompletionRequestDto {
+  messages: LlmChatMessageDto[];
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+/**
+ * Token accounting returned by `llm-service` and persisted by `dialog-service`.
+ */
+export interface LlmTokenUsageDto {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+/**
+ * DTO contract for `POST /llm/chat` responses returned by `llm-service`.
+ */
+export interface LlmChatCompletionResponseDto {
+  content: string;
+  model: string;
+  latencyMs: number;
+  usage: LlmTokenUsageDto;
+}
+
+/**
+ * DTO contract for creating a new dialog conversation.
+ */
+export interface CreateDialogRequestDto {
+  title?: string;
+}
+
+/**
+ * DTO representing a user dialog thread.
+ */
+export interface DialogResponseDto {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * DTO representing a persisted message inside a dialog thread.
+ */
+export interface DialogMessageResponseDto {
+  id: string;
+  dialogId: string;
+  role: ChatMessageRole;
+  content: string;
+  model: string | null;
+  latencyMs: number | null;
+  usage: LlmTokenUsageDto | null;
+  createdAt: string;
+}
+
+/**
+ * DTO contract for sending a user message inside a dialog.
+ */
+export interface SendMessageRequestDto {
+  content: string;
+  model?: string;
+}
+
+/**
+ * DTO contract returned after completing a chat turn (`userMessage` + `assistantMessage`).
+ */
+export interface SendMessageResponseDto {
+  dialog: DialogResponseDto;
+  userMessage: DialogMessageResponseDto;
+  assistantMessage: DialogMessageResponseDto;
 }

@@ -128,19 +128,25 @@ Stop the database:
 pnpm db:down
 ```
 
-### 4. Apply Database Migrations (`auth-service`)
+### 4. Apply Database Migrations (`auth-service` & `dialog-service`)
 
-After starting PostgreSQL, apply the Drizzle ORM migrations for `auth-service`:
+After starting PostgreSQL, apply the Drizzle ORM migrations for `auth-service` and `dialog-service`:
 
 ```bash
 pnpm --filter @semcache/auth-service db:migrate
+pnpm --filter @semcache/dialog-service db:migrate
 ```
+
+### 5. Configure Free OpenRouter Models
+
+Set `OPENROUTER_API_KEY` in `.env` (copied from `.env.example`). Only free OpenRouter models (`openrouter/free` or `<provider>/<model>:free`) are permitted by default.
 
 ---
 
-## Authentication & Authorization
+## Architecture & Domain Documentation
 
-Detailed documentation for session-based authentication, CSRF protection, rate limiting, RBAC policies, API Gateway identity headers, and React integration is available in [docs/authentication-and-authorization.md](./docs/authentication-and-authorization.md).
+- Authentication, CSRF protection, rate limiting, RBAC policies, API Gateway identity headers, and React integration: [docs/authentication-and-authorization.md](./docs/authentication-and-authorization.md)
+- OpenRouter chat integration (`@nestjs/ai`), LangGraph dialog orchestration (`@langchain/langgraph`), and free-model enforcement: [docs/chat-and-llm-architecture.md](./docs/chat-and-llm-architecture.md)
 
 ---
 

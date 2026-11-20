@@ -1,9 +1,11 @@
 import { Link } from '@tanstack/react-router';
-import { LogIn, LogOut, ShieldCheck, Sparkles, UserPlus } from 'lucide-react';
+import { LogIn, LogOut, Sparkles, UserPlus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { useCurrentUserQuery, useSignOutMutation } from '@/features/auth/model/use-auth';
+import { ChatWorkspace } from '@/features/chat/ui/chat-workspace';
 import { ThemeToggle } from '@/features/theme/ui/theme-toggle';
+import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { CardContent } from '@/shared/ui/card-content';
@@ -69,14 +71,14 @@ export function HomePage() {
         </div>
       </header>
 
-      <main className="mx-auto my-12 flex w-full max-w-xl flex-col items-center">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="w-full"
-        >
-          <Card className="shadow-md">
+      <main
+        className={cn(
+          'mx-auto my-8 flex w-full flex-col items-center',
+          user ? 'max-w-5xl' : 'max-w-xl',
+        )}
+      >
+        {isPending ? (
+          <Card className="w-full shadow-md">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl font-semibold tracking-tight">
                 SemCache Workspace
@@ -85,20 +87,36 @@ export function HomePage() {
                 Adaptive LLM semantic response caching for customer support.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col items-center gap-4 text-center">
-              {isPending ? (
-                <p className="text-sm text-muted-foreground">Checking session...</p>
-              ) : user ? (
-                <div className="w-full space-y-3 rounded-lg border bg-muted/40 p-4 text-sm">
-                  <div className="flex items-center justify-center gap-2 font-medium">
-                    <ShieldCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>Signed in as {user.email}</span>
-                  </div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Role: {user.role}
-                  </p>
-                </div>
-              ) : (
+            <CardContent className="text-center">
+              <p className="text-sm text-muted-foreground">Checking session...</p>
+            </CardContent>
+          </Card>
+        ) : user ? (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="w-full"
+          >
+            <ChatWorkspace user={user} />
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="w-full"
+          >
+            <Card className="shadow-md">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl font-semibold tracking-tight">
+                  SemCache Workspace
+                </CardTitle>
+                <CardDescription>
+                  Adaptive LLM semantic response caching for customer support.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center gap-4 text-center">
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <Button asChild>
                     <Link to="/sign-in">
@@ -113,10 +131,10 @@ export function HomePage() {
                     </Link>
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </main>
 
       <footer className="mx-auto w-full max-w-5xl text-center text-xs text-muted-foreground">

@@ -39,6 +39,7 @@ export function useSignOutMutation() {
     onSuccess: () => {
       client.setQueryData(queryKeys.auth.me(), null);
       client.removeQueries({ queryKey: queryKeys.users.all });
+      client.removeQueries({ queryKey: queryKeys.dialogs.all });
     },
   });
 }

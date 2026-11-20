@@ -5,9 +5,10 @@ import { AppService } from './app.service';
 import { GatewayAuthModule } from './auth/gateway-auth.module';
 import { StripInternalHeadersMiddleware } from './auth/strip-internal-headers.middleware';
 import { GatewayConfigModule } from './config/gateway-config.module';
+import { GatewayDialogsModule } from './dialogs/gateway-dialogs.module';
 
 @Module({
-  imports: [GatewayConfigModule, GatewayAuthModule],
+  imports: [GatewayConfigModule, GatewayAuthModule, GatewayDialogsModule],
   controllers: [AppController],
   providers: [
     AppService,

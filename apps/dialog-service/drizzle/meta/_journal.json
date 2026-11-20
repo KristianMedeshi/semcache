@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1795188904912,
+      "tag": "0000_create_dialogs_and_messages",
+      "breakpoints": true
+    }
+  ]
+}

@@ -72,6 +72,31 @@ export interface SemanticEvaluationMetadata {
 }
 
 /**
+ * Chat message author roles aligned with OpenRouter/LLM chat completions.
+ */
+export enum ChatMessageRole {
+  SYSTEM = 'system',
+  USER = 'user',
+  ASSISTANT = 'assistant',
+}
+
+/**
+ * Curated list of zero-cost OpenRouter models permitted in SemCache.
+ */
+export const FREE_OPENROUTER_MODELS = [
+  'openrouter/free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
+  'nvidia/nemotron-3.5-lightning:free',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+  'nvidia/nemotron-3.5-super-vl:free',
+  'baidu/ernie-5.5-flash-preview:free',
+  'liquid/lfm-3-1.7b:free',
+  'recursive/flint-v1.0:free',
+] as const;
+
+export type FreeOpenRouterModelId = (typeof FREE_OPENROUTER_MODELS)[number];
+
+/**
  * Standard service health status response type.
  */
 export interface HealthCheckStatus {

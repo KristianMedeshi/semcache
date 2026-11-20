@@ -11,6 +11,11 @@ export const queryKeys = {
     detail: (userId: string) => [...queryKeys.users.all, 'detail', userId] as const,
     list: () => [...queryKeys.users.all, 'list'] as const,
   },
+  dialogs: {
+    all: ['dialogs'] as const,
+    list: () => [...queryKeys.dialogs.all, 'list'] as const,
+    messages: (dialogId: string) => [...queryKeys.dialogs.all, 'messages', dialogId] as const,
+  },
 } as const;
 
 export function createAppQueryClient(): QueryClient {
