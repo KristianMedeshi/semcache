@@ -7,6 +7,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
+    "jscpd": "jscpd",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
@@ -23,6 +24,7 @@
   "packageManager": "pnpm@12.18.0",
   "devDependencies": {
     "@nestjs/cli": "^12.0.13",
+    "jscpd": "^5.4.3",
     "oxlint": "^1.58.0",
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.10.1",

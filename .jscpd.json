@@ -1,0 +1,20 @@
+{
+  "reporters": ["console"],
+  "minLines": 5,
+  "minTokens": 50,
+  "format": ["typescript", "tsx", "javascript", "jsx", "css"],
+  "path": ["apps", "packages"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.turbo/**",
+    "**/coverage/**",
+    "**/drizzle/**",
+    "**/test-results/**",
+    "**/playwright-report/**",
+    "**/report/**",
+    "**/*.d.ts",
+    "**/*.tsbuildinfo"
+  ]
+}
