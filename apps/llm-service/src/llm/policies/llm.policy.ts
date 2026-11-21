@@ -1,5 +1,5 @@
 import { Policy } from '@nestjs/authorization';
-import { isFreeOpenRouterModel } from '@semcache/shared-config';
+import { isFreeOpenRouterModel } from '../../config/llm.env';
 
 @Policy()
 export class LlmPolicy {

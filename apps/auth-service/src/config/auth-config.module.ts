@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
-import { SharedConfigModule, authEnvSchema } from '@semcache/shared-config';
+import { SharedConfigModule } from '@semcache/shared-config';
 import { AuthConfigService } from './auth-config.service';
+import { authEnvSchema } from './auth.env';
 
 @Global()
 @Module({

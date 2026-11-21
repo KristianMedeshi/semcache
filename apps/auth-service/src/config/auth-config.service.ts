@@ -1,13 +1,12 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  type AuthEnvironmentConfig,
   type DurationValue,
   type NodeEnvironment,
-  authEnvSchema,
   createValidatedConfigService,
   resolveSecretFromConfig,
 } from '@semcache/shared-config';
+import { type AuthEnvironmentConfig, authEnvSchema } from './auth.env';
 
 @Injectable()
 export class AuthConfigService implements AuthEnvironmentConfig {

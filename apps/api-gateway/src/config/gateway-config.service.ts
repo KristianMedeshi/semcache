@@ -3,11 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import {
   type NodeEnvironment,
   createValidatedConfigService,
-  gatewayEnvSchema,
   resolveSecretFromConfig,
   resolveServiceTcpEndpoint,
 } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
+import { gatewayEnvSchema } from './gateway.env';
 
 @Injectable()
 export class GatewayConfigService {

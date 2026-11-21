@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
-import { SharedConfigModule, knowledgeBaseEnvSchema } from '@semcache/shared-config';
+import { SharedConfigModule } from '@semcache/shared-config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import './auth/knowledge-base-auth-types';
 import { InternalIdentityAuth } from './auth/internal-identity.provider';
+import { knowledgeBaseEnvSchema } from './config/knowledge-base.env';
 import { KnowledgeBasePolicy } from './policies/knowledge-base.policy';
 
 @Module({

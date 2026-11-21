@@ -3,11 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import {
   type NodeEnvironment,
   createValidatedConfigService,
-  dialogEnvSchema,
   resolveSecretFromConfig,
   resolveServiceTcpEndpoint,
 } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
+import { dialogEnvSchema } from './dialog.env';
 
 @Injectable()
 export class DialogConfigService {

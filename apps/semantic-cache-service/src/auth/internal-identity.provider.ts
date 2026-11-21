@@ -10,10 +10,10 @@ import {
   type NodeEnvironment,
   createValidatedConfigService,
   resolveSecretFromConfig,
-  semanticCacheEnvSchema,
   verifySignedInternalHeaders,
 } from '@semcache/shared-config';
 import type { AuthenticatedUser } from '@semcache/shared-types';
+import { semanticCacheEnvSchema } from '../config/semantic-cache.env';
 
 interface InternalRpcPayload {
   headers?: Record<string, string | string[] | undefined>;

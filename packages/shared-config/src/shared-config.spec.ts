@@ -3,13 +3,32 @@ import { ServiceName } from '@semcache/shared-types';
 import {
   ConfigService,
   SharedConfigModule,
-  authEnvSchema,
+  baseEnvSchema,
+  checkDatabaseUrl,
+  checkInternalSecret,
   createValidatedConfigService,
-  gatewayEnvSchema,
-  llmEnvSchema,
+  defaultString,
+  durationEnvSchema,
+  optionalString,
+  positiveInt,
   resolveSecretFromConfig,
   resolveServiceTcpEndpoint,
 } from './index';
+
+const testServiceEnvSchema = baseEnvSchema
+  .extend({
+    DATABASE_URL: defaultString(''),
+    INTERNAL_SERVICE_SECRET: defaultString(''),
+    AUTH_SERVICE_HOST: optionalString(),
+    AUTH_SERVICE_PORT: positiveInt('AUTH_SERVICE_PORT').optional(),
+    AUTH_SERVICE_URL: optionalString(),
+    REQUEST_TIMEOUT_MS: positiveInt('REQUEST_TIMEOUT_MS').default(5000),
+    SESSION_TTL: durationEnvSchema('SESSION_TTL', '24h'),
+  })
+  .superRefine((data, ctx) => {
+    checkDatabaseUrl(data, ctx);
+    checkInternalSecret(data, ctx);
+  });
 
 describe('SharedConfigModule & Environment Validation', () => {
   const originalEnv = { ...process.env };
@@ -20,48 +39,46 @@ describe('SharedConfigModule & Environment Validation', () => {
 
   it('registers ConfigService globally and serves coerced/validated values', async () => {
     process.env.NODE_ENV = 'test';
-    process.env.OPENROUTER_TIMEOUT_MS = '240000';
-    process.env.OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1/';
-    process.env.OPENROUTER_DEFAULT_MODEL = 'openrouter/free';
+    process.env.REQUEST_TIMEOUT_MS = '240000';
+    process.env.SESSION_TTL = '12h';
 
     const moduleRef = await Test.createTestingModule({
-      imports: [SharedConfigModule.forRoot(llmEnvSchema)],
+      imports: [SharedConfigModule.forRoot(testServiceEnvSchema)],
     }).compile();
 
     const configService = moduleRef.get(ConfigService);
     expect(configService.get('NODE_ENV')).toBe('test');
-    expect(configService.get<number>('OPENROUTER_TIMEOUT_MS')).toBe(240_000);
-    expect(configService.get<string>('OPENROUTER_BASE_URL')).toBe('https://openrouter.ai/api/v1');
-    expect(configService.get<string>('OPENROUTER_DEFAULT_MODEL')).toBe('openrouter/free');
+    expect(configService.get<number>('REQUEST_TIMEOUT_MS')).toBe(240_000);
+    expect(configService.get<string>('SESSION_TTL')).toBe('12h');
 
     await moduleRef.close();
   });
 
   it('aborts early on the first invalid env variable when compiling a Nest module', async () => {
     process.env.NODE_ENV = 'test';
-    process.env.OPENROUTER_TIMEOUT_MS = '0';
+    process.env.REQUEST_TIMEOUT_MS = '0';
 
     await expect(
       Test.createTestingModule({
-        imports: [SharedConfigModule.forRoot(llmEnvSchema)],
+        imports: [SharedConfigModule.forRoot(testServiceEnvSchema)],
       }).compile(),
-    ).rejects.toThrow(/OPENROUTER_TIMEOUT_MS must be a positive integer/);
+    ).rejects.toThrow(/REQUEST_TIMEOUT_MS must be a positive integer/);
   });
 
   it('aborts early on missing DATABASE_URL outside test mode and short secrets', () => {
     process.env.NODE_ENV = 'development';
     delete process.env.DATABASE_URL;
 
-    expect(() => createValidatedConfigService(authEnvSchema, { loadEnvFiles: false })).toThrow(
-      /Missing required environment variable: DATABASE_URL/,
-    );
+    expect(() =>
+      createValidatedConfigService(testServiceEnvSchema, { loadEnvFiles: false }),
+    ).toThrow(/Missing required environment variable: DATABASE_URL/);
 
     process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
     process.env.INTERNAL_SERVICE_SECRET = 'too-short';
 
-    expect(() => createValidatedConfigService(authEnvSchema, { loadEnvFiles: false })).toThrow(
-      /INTERNAL_SERVICE_SECRET must be at least 32 characters long/,
-    );
+    expect(() =>
+      createValidatedConfigService(testServiceEnvSchema, { loadEnvFiles: false }),
+    ).toThrow(/INTERNAL_SERVICE_SECRET must be at least 32 characters long/);
   });
 
   it('resolves TCP endpoints and secrets from ConfigService', () => {
@@ -71,7 +88,9 @@ describe('SharedConfigModule & Environment Validation', () => {
     delete process.env.AUTH_SERVICE_PORT;
     delete process.env.INTERNAL_SERVICE_SECRET;
 
-    const configService = createValidatedConfigService(gatewayEnvSchema, { loadEnvFiles: false });
+    const configService = createValidatedConfigService(testServiceEnvSchema, {
+      loadEnvFiles: false,
+    });
     const endpoint = resolveServiceTcpEndpoint(configService, ServiceName.AUTH_SERVICE, {
       hostKey: 'AUTH_SERVICE_HOST',
       portKey: 'AUTH_SERVICE_PORT',

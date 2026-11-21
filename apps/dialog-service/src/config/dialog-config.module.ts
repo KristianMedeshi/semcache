@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
-import { SharedConfigModule, dialogEnvSchema } from '@semcache/shared-config';
+import { SharedConfigModule } from '@semcache/shared-config';
 import { DialogConfigService } from './dialog-config.service';
+import { dialogEnvSchema } from './dialog.env';
 
 @Global()
 @Module({

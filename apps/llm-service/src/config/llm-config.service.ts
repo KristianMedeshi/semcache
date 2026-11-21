@@ -3,9 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import {
   type NodeEnvironment,
   createValidatedConfigService,
-  llmEnvSchema,
   resolveSecretFromConfig,
 } from '@semcache/shared-config';
+import { llmEnvSchema } from './llm.env';
 
 @Injectable()
 export class LlmConfigService {

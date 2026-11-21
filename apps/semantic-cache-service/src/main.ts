@@ -1,8 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { type MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { resolveMicroserviceTcpOptions, semanticCacheEnvSchema } from '@semcache/shared-config';
+import { resolveMicroserviceTcpOptions } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
 import { AppModule } from './app.module';
+import { semanticCacheEnvSchema } from './config/semantic-cache.env';
 
 async function bootstrap() {
   const { host, port } = resolveMicroserviceTcpOptions(

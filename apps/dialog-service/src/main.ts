@@ -1,8 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { type MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { dialogEnvSchema, resolveMicroserviceTcpOptions } from '@semcache/shared-config';
+import { resolveMicroserviceTcpOptions } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
 import { AppModule } from './app.module';
+import { dialogEnvSchema } from './config/dialog.env';
 
 async function bootstrap() {
   const { host, port } = resolveMicroserviceTcpOptions(

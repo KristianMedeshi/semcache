@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
-import { SharedConfigModule, semanticCacheEnvSchema } from '@semcache/shared-config';
+import { SharedConfigModule } from '@semcache/shared-config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import './auth/semantic-cache-auth-types';
 import { InternalIdentityAuth } from './auth/internal-identity.provider';
+import { semanticCacheEnvSchema } from './config/semantic-cache.env';
 import { SemanticCachePolicy } from './policies/semantic-cache.policy';
 
 @Module({

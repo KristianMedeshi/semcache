@@ -26,35 +26,13 @@ export type DurationUnit = 'ms' | 's' | 'm' | 'h' | 'd' | 'w';
 export type DurationString = `${number}${DurationUnit}`;
 export type DurationValue = number | DurationString;
 
-/**
- * Configuration parameters for session-based authentication and security controls.
- */
-export interface AuthEnvironmentConfig {
-  internalServiceSecret: string;
-  sessionCookieName: string;
-  sessionTtl: DurationValue;
-  sessionIdleTimeout: DurationValue;
-  corsOrigin: string[];
-  loginRateLimitWindowMs: number;
-  loginRateLimitMaxAttempts: number;
-  secureCookies: boolean;
-}
-
 export const DEFAULT_SESSION_COOKIE_NAME = 'semcache_sid';
-export const DEFAULT_SESSION_TTL: DurationValue = '24h';
-export const DEFAULT_SESSION_IDLE_TIMEOUT: DurationValue = '30m';
-export const DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
-export const DEFAULT_LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
 export const DEFAULT_CORS_ORIGIN = 'http://localhost:5173,http://127.0.0.1:5173';
 export const DEFAULT_CORS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
 export const MIN_INTERNAL_SECRET_LENGTH = 32;
 
 export const DEFAULT_SERVICE_HOST = '127.0.0.1';
 export const DEFAULT_TCP_TIMEOUT_MS = 30_000;
-
-export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-export const DEFAULT_OPENROUTER_MODEL = 'openrouter/free';
-export const DEFAULT_OPENROUTER_TIMEOUT_MS = 180_000;
 
 export interface TcpEndpointConfig {
   host: string;
@@ -200,14 +178,6 @@ export function buildCorsOptions(corsOrigin: string[]): {
 }
 
 const INTERNAL_HEADER_PREFIX = 'x-internal-';
-const FREE_MODEL_PATTERN = /^(openrouter\/free|[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+:free)$/;
-
-/**
- * Validates that an OpenRouter model identifier is explicitly zero-cost (`openrouter/free` or `*:free`).
- */
-export function isFreeOpenRouterModel(modelId: string): boolean {
-  return FREE_MODEL_PATTERN.test(modelId.trim());
-}
 
 /**
  * Strips any incoming `x-internal-*` headers from external requests so clients cannot

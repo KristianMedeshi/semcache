@@ -9,7 +9,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { isFreeOpenRouterModel } from '@semcache/shared-config';
+import { isFreeOpenRouterModel } from '../config/llm.env';
 import {
   FREE_OPENROUTER_MODEL_MESSAGE,
   type LlmChatCompletionRequestDto,

@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
-import { SharedConfigModule, gatewayEnvSchema } from '@semcache/shared-config';
+import { SharedConfigModule } from '@semcache/shared-config';
 import { GatewayConfigService } from './gateway-config.service';
+import { gatewayEnvSchema } from './gateway.env';
 
 @Global()
 @Module({

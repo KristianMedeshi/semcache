@@ -9,11 +9,11 @@ import {
   ConfigService,
   type NodeEnvironment,
   createValidatedConfigService,
-  knowledgeBaseEnvSchema,
   resolveSecretFromConfig,
   verifySignedInternalHeaders,
 } from '@semcache/shared-config';
 import type { AuthenticatedUser } from '@semcache/shared-types';
+import { knowledgeBaseEnvSchema } from '../config/knowledge-base.env';
 
 interface InternalRpcPayload {
   headers?: Record<string, string | string[] | undefined>;
