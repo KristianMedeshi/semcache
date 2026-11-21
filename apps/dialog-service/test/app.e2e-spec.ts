@@ -238,8 +238,8 @@ describe('Dialog Service (TCP e2e)', () => {
     expect(extractRpcErrorPayload(caughtError)?.statusCode).toBe(401);
   });
 
-  it('creates a dialog, sends a message through LangGraph, and retrieves history', async () => {
-    const internalHeaders = createSignedInternalHeaders(
+  function createCustomerHeaders() {
+    return createSignedInternalHeaders(
       {
         id: '11111111-1111-4111-8111-111111111111',
         email: 'customer@example.com',
@@ -248,13 +248,20 @@ describe('Dialog Service (TCP e2e)', () => {
       },
       secret,
     );
+  }
 
-    const createdDialog = await firstValueFrom(
+  async function createDialog(headers: Record<string, string>, title?: string) {
+    return firstValueFrom(
       client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_CREATE, {
-        headers: internalHeaders,
-        body: {},
+        headers,
+        body: title ? { title } : {},
       }),
     );
+  }
+
+  it('creates a dialog, sends a message through LangGraph, and retrieves history', async () => {
+    const internalHeaders = createCustomerHeaders();
+    const createdDialog = await createDialog(internalHeaders);
 
     const turn = await firstValueFrom(
       client.send<SendMessageResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_SEND, {
@@ -279,22 +286,8 @@ describe('Dialog Service (TCP e2e)', () => {
   });
 
   it('rejects non-free OpenRouter model requests with 400 Bad Request', async () => {
-    const internalHeaders = createSignedInternalHeaders(
-      {
-        id: '11111111-1111-4111-8111-111111111111',
-        email: 'customer@example.com',
-        role: UserRole.CUSTOMER,
-        sessionId: 'session-123',
-      },
-      secret,
-    );
-
-    const createdDialog = await firstValueFrom(
-      client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_CREATE, {
-        headers: internalHeaders,
-        body: { title: 'Test' },
-      }),
-    );
+    const internalHeaders = createCustomerHeaders();
+    const createdDialog = await createDialog(internalHeaders, 'Test');
 
     let caughtError: unknown;
     try {
@@ -313,22 +306,8 @@ describe('Dialog Service (TCP e2e)', () => {
   });
 
   it('streams user_message, delta chunks, and done over dialogs.messages.stream', async () => {
-    const internalHeaders = createSignedInternalHeaders(
-      {
-        id: '11111111-1111-4111-8111-111111111111',
-        email: 'customer@example.com',
-        role: UserRole.CUSTOMER,
-        sessionId: 'session-123',
-      },
-      secret,
-    );
-
-    const createdDialog = await firstValueFrom(
-      client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_CREATE, {
-        headers: internalHeaders,
-        body: {},
-      }),
-    );
+    const internalHeaders = createCustomerHeaders();
+    const createdDialog = await createDialog(internalHeaders);
 
     const events = await firstValueFrom(
       client
@@ -358,22 +337,8 @@ describe('Dialog Service (TCP e2e)', () => {
   });
 
   it('renames a dialog, edits a user message into a new branch, and deletes the dialog', async () => {
-    const internalHeaders = createSignedInternalHeaders(
-      {
-        id: '11111111-1111-4111-8111-111111111111',
-        email: 'customer@example.com',
-        role: UserRole.CUSTOMER,
-        sessionId: 'session-123',
-      },
-      secret,
-    );
-
-    const createdDialog = await firstValueFrom(
-      client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_CREATE, {
-        headers: internalHeaders,
-        body: { title: 'Initial' },
-      }),
-    );
+    const internalHeaders = createCustomerHeaders();
+    const createdDialog = await createDialog(internalHeaders, 'Initial');
 
     const renamed = await firstValueFrom(
       client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_UPDATE, {

@@ -36,14 +36,7 @@ export class AuthController {
   ): Promise<AuthTcpResponseDto<UserResponseDto>> {
     this.assertAllowedOrigin(reqContext);
     const user = await this.credentialsService.register(body.email, body.password);
-    const issued = await this.sessionService.create(user.id, {
-      metadata: this.sessionService.metadataFor(reqContext),
-      replacing: this.sessionService.tokenFrom(reqContext),
-    });
-    return {
-      data: user,
-      setCookie: issued.cookie,
-    };
+    return this.issueSessionResponse(user, reqContext);
   }
 
   @Public()
@@ -61,14 +54,7 @@ export class AuthController {
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
-    const issued = await this.sessionService.create(user.id, {
-      metadata: this.sessionService.metadataFor(reqContext),
-      replacing: this.sessionService.tokenFrom(reqContext),
-    });
-    return {
-      data: user,
-      setCookie: issued.cookie,
-    };
+    return this.issueSessionResponse(user, reqContext);
   }
 
   @Can(UserPolicy, 'readSelf')
@@ -91,6 +77,20 @@ export class AuthController {
   @MessagePattern(SERVICE_TCP_PATTERNS.AUTH_ME)
   me(@CurrentUser() user: UserResponseDto): UserResponseDto {
     return user;
+  }
+
+  private async issueSessionResponse(
+    user: UserResponseDto,
+    reqContext: RpcRequestContextData,
+  ): Promise<AuthTcpResponseDto<UserResponseDto>> {
+    const issued = await this.sessionService.create(user.id, {
+      metadata: this.sessionService.metadataFor(reqContext),
+      replacing: this.sessionService.tokenFrom(reqContext),
+    });
+    return {
+      data: user,
+      setCookie: issued.cookie,
+    };
   }
 
   private assertAllowedOrigin(reqContext: RpcRequestContextData): void {

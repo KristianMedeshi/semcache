@@ -8,6 +8,45 @@ import { AuthProxyService } from '../auth/auth-proxy.service';
 import { gatewayEnvSchema } from '../config/gateway.env';
 import { DialogProxyService } from './dialog-proxy.service';
 
+const TEST_USER = {
+  id: '11111111-1111-4111-8111-111111111111',
+  email: 'alice@example.com',
+  role: UserRole.CUSTOMER,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+
+function createDialogProxyHarness(options?: {
+  user?: typeof TEST_USER | null;
+  dialogSendMock?: jest.Mock;
+}) {
+  const config = createValidatedConfigService(gatewayEnvSchema, { loadEnvFiles: false });
+  const authClient = { send: jest.fn() } as unknown as ClientProxy;
+  const dialogSendMock = options?.dialogSendMock ?? jest.fn();
+  const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
+  const authProxy = new AuthProxyService(config, authClient);
+  jest
+    .spyOn(authProxy, 'resolveCurrentUser')
+    .mockResolvedValue(options?.user === undefined ? TEST_USER : options.user);
+
+  const proxy = new DialogProxyService(authProxy, dialogClient);
+  return { proxy, dialogSendMock };
+}
+
+function createJsonResponseMock() {
+  const json = jest.fn();
+  const status = jest.fn().mockReturnValue({ json });
+  return { res: { status, json } as unknown as Response, status, json };
+}
+
+function createStreamResponseMock() {
+  const writeHead = jest.fn();
+  const write = jest.fn();
+  const end = jest.fn();
+  const on = jest.fn();
+  return { res: { writeHead, write, end, on } as unknown as Response, writeHead, write, end };
+}
+
 describe('DialogProxyService', () => {
   const originalEnv = { ...process.env };
 
@@ -21,15 +60,7 @@ describe('DialogProxyService', () => {
   });
 
   it('rejects unauthenticated callers before calling dialog-service', async () => {
-    const config = createValidatedConfigService(gatewayEnvSchema, {
-      loadEnvFiles: false,
-    });
-    const authClient = { send: jest.fn() } as unknown as ClientProxy;
-    const dialogClient = { send: jest.fn() } as unknown as ClientProxy;
-    const authProxy = new AuthProxyService(config, authClient);
-    jest.spyOn(authProxy, 'resolveCurrentUser').mockResolvedValue(null);
-
-    const proxy = new DialogProxyService(authProxy, dialogClient);
+    const { proxy } = createDialogProxyHarness({ user: null });
     const req = { method: 'GET', headers: {} } as Request;
     const res = {} as Response;
 
@@ -39,26 +70,10 @@ describe('DialogProxyService', () => {
   });
 
   it('forwards authenticated requests over TCP with signed internal identity headers', async () => {
-    const config = createValidatedConfigService(gatewayEnvSchema, {
-      loadEnvFiles: false,
-    });
-    const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogSendMock = jest.fn(() => of([{ id: 'dialog-1' }]));
-    const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
-    const authProxy = new AuthProxyService(config, authClient);
-    jest.spyOn(authProxy, 'resolveCurrentUser').mockResolvedValue({
-      id: '11111111-1111-4111-8111-111111111111',
-      email: 'alice@example.com',
-      role: UserRole.CUSTOMER,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    });
-
-    const proxy = new DialogProxyService(authProxy, dialogClient);
+    const { proxy } = createDialogProxyHarness({ dialogSendMock });
     const req = { method: 'GET', headers: { cookie: 'semcache_sid=abc' } } as Request;
-    const json = jest.fn();
-    const status = jest.fn().mockReturnValue({ json });
-    const res = { status, json } as unknown as Response;
+    const { res, status, json } = createJsonResponseMock();
 
     await proxy.forwardDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_LIST);
 
@@ -77,30 +92,12 @@ describe('DialogProxyService', () => {
   });
 
   it('streams SSE events over HTTP when streamDialogRequest receives TCP stream events', async () => {
-    const config = createValidatedConfigService(gatewayEnvSchema, {
-      loadEnvFiles: false,
-    });
-    const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogSendMock = jest.fn(() =>
       of({ type: 'delta', delta: 'Hello ' }, { type: 'delta', delta: 'world' }),
     );
-    const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
-    const authProxy = new AuthProxyService(config, authClient);
-    jest.spyOn(authProxy, 'resolveCurrentUser').mockResolvedValue({
-      id: '11111111-1111-4111-8111-111111111111',
-      email: 'alice@example.com',
-      role: UserRole.CUSTOMER,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    });
-
-    const proxy = new DialogProxyService(authProxy, dialogClient);
+    const { proxy } = createDialogProxyHarness({ dialogSendMock });
     const req = { method: 'POST', headers: { cookie: 'semcache_sid=abc' } } as Request;
-    const writeHead = jest.fn();
-    const write = jest.fn();
-    const end = jest.fn();
-    const on = jest.fn();
-    const res = { writeHead, write, end, on } as unknown as Response;
+    const { res, writeHead, write, end } = createStreamResponseMock();
 
     await proxy.streamDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM, {
       dialogId: 'dialog-1',
@@ -117,10 +114,6 @@ describe('DialogProxyService', () => {
   });
 
   it('emits an SSE error event if TCP stream fails after headers are sent', async () => {
-    const config = createValidatedConfigService(gatewayEnvSchema, {
-      loadEnvFiles: false,
-    });
-    const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogSendMock = jest.fn(
       () =>
         new Observable((subscriber) => {
@@ -128,23 +121,9 @@ describe('DialogProxyService', () => {
           subscriber.error({ statusCode: 502, message: 'Provider failed mid-stream' });
         }),
     );
-    const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
-    const authProxy = new AuthProxyService(config, authClient);
-    jest.spyOn(authProxy, 'resolveCurrentUser').mockResolvedValue({
-      id: '11111111-1111-4111-8111-111111111111',
-      email: 'alice@example.com',
-      role: UserRole.CUSTOMER,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    });
-
-    const proxy = new DialogProxyService(authProxy, dialogClient);
+    const { proxy } = createDialogProxyHarness({ dialogSendMock });
     const req = { method: 'POST', headers: { cookie: 'semcache_sid=abc' } } as Request;
-    const writeHead = jest.fn();
-    const write = jest.fn();
-    const end = jest.fn();
-    const on = jest.fn();
-    const res = { writeHead, write, end, on } as unknown as Response;
+    const { res, write, end } = createStreamResponseMock();
 
     await proxy.streamDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM, {
       dialogId: 'dialog-1',
@@ -160,26 +139,10 @@ describe('DialogProxyService', () => {
   });
 
   it('forwards dialogId and messageId in DialogTcpRequestDto when provided', async () => {
-    const config = createValidatedConfigService(gatewayEnvSchema, {
-      loadEnvFiles: false,
-    });
-    const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogSendMock = jest.fn(() => of({ ok: true }));
-    const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
-    const authProxy = new AuthProxyService(config, authClient);
-    jest.spyOn(authProxy, 'resolveCurrentUser').mockResolvedValue({
-      id: '11111111-1111-4111-8111-111111111111',
-      email: 'alice@example.com',
-      role: UserRole.CUSTOMER,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    });
-
-    const proxy = new DialogProxyService(authProxy, dialogClient);
+    const { proxy } = createDialogProxyHarness({ dialogSendMock });
     const req = { method: 'POST', headers: { cookie: 'semcache_sid=abc' } } as Request;
-    const json = jest.fn();
-    const status = jest.fn().mockReturnValue({ json });
-    const res = { status, json } as unknown as Response;
+    const { res } = createJsonResponseMock();
 
     await proxy.forwardDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT, {
       dialogId: 'dialog-1',

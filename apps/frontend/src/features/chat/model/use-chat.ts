@@ -82,6 +82,12 @@ export function useDeleteDialogMutation() {
   });
 }
 
+function upsertDialogInListCache(client: QueryClient, dialog: DialogResponseDto): void {
+  client.setQueryData<DialogResponseDto[]>(queryKeys.dialogs.list(), (prev) =>
+    prev ? [dialog, ...prev.filter((d) => d.id !== dialog.id)] : [dialog],
+  );
+}
+
 export function useSendMessageMutation() {
   const client = useQueryClient();
 
@@ -96,9 +102,7 @@ export function useSendMessageMutation() {
             ? [...prev, turn.userMessage, turn.assistantMessage]
             : [turn.userMessage, turn.assistantMessage],
       );
-      client.setQueryData<DialogResponseDto[]>(queryKeys.dialogs.list(), (prev) =>
-        prev ? [turn.dialog, ...prev.filter((d) => d.id !== turn.dialog.id)] : [turn.dialog],
-      );
+      upsertDialogInListCache(client, turn.dialog);
     },
   });
 }
@@ -206,9 +210,7 @@ function finalizeTurnCache(client: QueryClient, turn: SendMessageResponseDto): v
       return [...base, turn.userMessage, turn.assistantMessage];
     },
   );
-  client.setQueryData<DialogResponseDto[]>(queryKeys.dialogs.list(), (prev) =>
-    prev ? [turn.dialog, ...prev.filter((d) => d.id !== turn.dialog.id)] : [turn.dialog],
-  );
+  upsertDialogInListCache(client, turn.dialog);
 }
 
 export function useStreamMessageMutation() {

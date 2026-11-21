@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { AiModule, AiService } from '@nestjs/ai';
 import { FakeModel, overrideModels, providerError } from '@nestjs/ai/testing';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { SharedConfigModule, createValidatedConfigService } from '@semcache/shared-config';
 import { ChatMessageRole } from '@semcache/shared-types';
 import { firstValueFrom, toArray } from 'rxjs';
@@ -20,9 +20,24 @@ describe('LlmService', () => {
     process.env = { ...originalEnv };
   });
 
-  it('generates completion using default free model and FakeModel override', async () => {
+  async function createLlmTestService(
+    fake?: FakeModel,
+  ): Promise<{ service: LlmService; moduleRef: TestingModule }> {
     process.env.NODE_ENV = 'test';
     delete process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_DEFAULT_MODEL ??= 'openrouter/free';
+
+    const builder = Test.createTestingModule({
+      imports: [
+        SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }),
+        LlmModule,
+      ],
+    });
+    const moduleRef = await (fake ? overrideModels(builder, { default: fake }) : builder).compile();
+    return { service: moduleRef.get(LlmService), moduleRef };
+  }
+
+  it('generates completion using default free model and FakeModel override', async () => {
     process.env.OPENROUTER_DEFAULT_MODEL = 'openrouter/free';
 
     const fake = new FakeModel([
@@ -32,14 +47,7 @@ describe('LlmService', () => {
       },
     ]);
 
-    const moduleRef = await overrideModels(
-      Test.createTestingModule({
-        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
-      }),
-      { default: fake },
-    ).compile();
-
-    const service = moduleRef.get(LlmService);
+    const { service, moduleRef } = await createLlmTestService(fake);
     const result = await service.generateChatCompletion({
       messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
     });
@@ -59,19 +67,10 @@ describe('LlmService', () => {
   });
 
   it('extracts system messages into instructions instead of passing them in messages', async () => {
-    process.env.NODE_ENV = 'test';
-    delete process.env.OPENROUTER_API_KEY;
     process.env.OPENROUTER_DEFAULT_MODEL = 'openrouter/free';
 
     const fake = new FakeModel(['Here is how to reset your password.']);
-    const moduleRef = await overrideModels(
-      Test.createTestingModule({
-        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
-      }),
-      { default: fake },
-    ).compile();
-
-    const service = moduleRef.get(LlmService);
+    const { service, moduleRef } = await createLlmTestService(fake);
     const result = await service.generateChatCompletion({
       messages: [
         { role: ChatMessageRole.SYSTEM, content: 'You are a helpful support assistant.' },
@@ -86,14 +85,7 @@ describe('LlmService', () => {
   });
 
   it('rejects requests containing only system messages', async () => {
-    process.env.NODE_ENV = 'test';
-    delete process.env.OPENROUTER_API_KEY;
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
-    }).compile();
-
-    const service = moduleRef.get(LlmService);
+    const { service, moduleRef } = await createLlmTestService();
 
     await expect(
       service.generateChatCompletion({
@@ -105,14 +97,7 @@ describe('LlmService', () => {
   });
 
   it('rejects non-free OpenRouter models at request time', async () => {
-    process.env.NODE_ENV = 'test';
-    delete process.env.OPENROUTER_API_KEY;
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
-    }).compile();
-
-    const service = moduleRef.get(LlmService);
+    const { service, moduleRef } = await createLlmTestService();
 
     await expect(
       service.generateChatCompletion({
@@ -162,21 +147,11 @@ describe('LlmService', () => {
   });
 
   it('wraps upstream provider errors into BadGatewayException', async () => {
-    process.env.NODE_ENV = 'test';
-    delete process.env.OPENROUTER_API_KEY;
-
     const fake = new FakeModel([
       providerError(500, { message: 'OpenRouter down' }),
       providerError(500, { message: 'OpenRouter down' }),
     ]);
-    const moduleRef = await overrideModels(
-      Test.createTestingModule({
-        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
-      }),
-      { default: fake },
-    ).compile();
-
-    const service = moduleRef.get(LlmService);
+    const { service, moduleRef } = await createLlmTestService(fake);
     await expect(
       service.generateChatCompletion({
         messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
@@ -261,8 +236,6 @@ describe('LlmService', () => {
   });
 
   it('streams delta chunks and a final done event via streamChatCompletion', async () => {
-    process.env.NODE_ENV = 'test';
-    delete process.env.OPENROUTER_API_KEY;
     process.env.OPENROUTER_DEFAULT_MODEL = 'openrouter/free';
 
     const fake = new FakeModel([
@@ -272,14 +245,7 @@ describe('LlmService', () => {
       },
     ]);
 
-    const moduleRef = await overrideModels(
-      Test.createTestingModule({
-        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
-      }),
-      { default: fake },
-    ).compile();
-
-    const service = moduleRef.get(LlmService);
+    const { service, moduleRef } = await createLlmTestService(fake);
     const events = await firstValueFrom(
       service
         .streamChatCompletion({
@@ -311,14 +277,7 @@ describe('LlmService', () => {
   });
 
   it('emits BadRequestException on streamChatCompletion for non-free models', async () => {
-    process.env.NODE_ENV = 'test';
-    delete process.env.OPENROUTER_API_KEY;
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
-    }).compile();
-
-    const service = moduleRef.get(LlmService);
+    const { service, moduleRef } = await createLlmTestService();
 
     await expect(
       firstValueFrom(
@@ -335,21 +294,11 @@ describe('LlmService', () => {
   });
 
   it('wraps upstream provider stream errors into BadGatewayException', async () => {
-    process.env.NODE_ENV = 'test';
-    delete process.env.OPENROUTER_API_KEY;
-
     const fake = new FakeModel([
       providerError(500, { message: 'Stream down' }),
       providerError(500, { message: 'Stream down' }),
     ]);
-    const moduleRef = await overrideModels(
-      Test.createTestingModule({
-        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
-      }),
-      { default: fake },
-    ).compile();
-
-    const service = moduleRef.get(LlmService);
+    const { service, moduleRef } = await createLlmTestService(fake);
     await expect(
       firstValueFrom(
         service

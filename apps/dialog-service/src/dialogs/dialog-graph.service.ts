@@ -86,13 +86,13 @@ export class DialogGraphService {
       .compile();
   }
 
-  async executeTurn(input: {
+  private createInitialState(input: {
     dialog: DialogResponseDto;
     content: string;
     model?: string;
     parentMessageId?: string | null;
-  }): Promise<SendMessageResponseDto> {
-    const finalState = await this.compiledGraph.invoke({
+  }): DialogTurnStateType {
+    return {
       dialog: input.dialog,
       userContent: input.content,
       requestedModel: input.model,
@@ -102,7 +102,16 @@ export class DialogGraphService {
       llmCompletion: null,
       assistantMessage: null,
       updatedDialog: null,
-    });
+    };
+  }
+
+  async executeTurn(input: {
+    dialog: DialogResponseDto;
+    content: string;
+    model?: string;
+    parentMessageId?: string | null;
+  }): Promise<SendMessageResponseDto> {
+    const finalState = await this.compiledGraph.invoke(this.createInitialState(input));
 
     if (!finalState.userMessage || !finalState.assistantMessage || !finalState.updatedDialog) {
       throw new BadGatewayException('Dialog orchestration failed to produce a complete turn');
@@ -126,17 +135,9 @@ export class DialogGraphService {
       let llmSubscription: Subscription | undefined;
 
       const start = async () => {
-        const { userMessage, history } = await this.recordUserMessage({
-          dialog: input.dialog,
-          userContent: input.content,
-          requestedModel: input.model,
-          parentMessageId: input.parentMessageId,
-          history: [],
-          userMessage: null,
-          llmCompletion: null,
-          assistantMessage: null,
-          updatedDialog: null,
-        });
+        const { userMessage, history } = await this.recordUserMessage(
+          this.createInitialState(input),
+        );
 
         if (unsubscribed || !userMessage || !history) {
           return;

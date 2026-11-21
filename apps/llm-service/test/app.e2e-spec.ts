@@ -88,15 +88,14 @@ describe('LLM Service (TCP e2e)', () => {
     });
   });
 
-  it('llm.chat rejects paid models with 400 Bad Request RPC error', async () => {
+  async function expectPaidModelRejected(pattern: string, stream: boolean): Promise<void> {
     let caughtError: unknown;
     try {
-      await firstValueFrom(
-        client.send(SERVICE_TCP_PATTERNS.LLM_CHAT, {
-          model: 'openai/gpt-4o',
-          messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
-        }),
-      );
+      const obs = client.send(pattern, {
+        model: 'openai/gpt-4o',
+        messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
+      });
+      await firstValueFrom(stream ? obs.pipe(toArray()) : obs);
     } catch (error) {
       caughtError = error;
     }
@@ -104,6 +103,10 @@ describe('LLM Service (TCP e2e)', () => {
     const rpcError = extractRpcErrorPayload(caughtError);
     expect(rpcError?.statusCode).toBe(400);
     expect(JSON.stringify(rpcError)).toContain('Only free OpenRouter models');
+  }
+
+  it('llm.chat rejects paid models with 400 Bad Request RPC error', async () => {
+    await expectPaidModelRejected(SERVICE_TCP_PATTERNS.LLM_CHAT, false);
   });
 
   it('llm.chat.stream emits delta chunks and final done event over TCP', async () => {
@@ -137,22 +140,6 @@ describe('LLM Service (TCP e2e)', () => {
   });
 
   it('llm.chat.stream rejects paid models with 400 Bad Request RPC error', async () => {
-    let caughtError: unknown;
-    try {
-      await firstValueFrom(
-        client
-          .send(SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM, {
-            model: 'openai/gpt-4o',
-            messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
-          })
-          .pipe(toArray()),
-      );
-    } catch (error) {
-      caughtError = error;
-    }
-
-    const rpcError = extractRpcErrorPayload(caughtError);
-    expect(rpcError?.statusCode).toBe(400);
-    expect(JSON.stringify(rpcError)).toContain('Only free OpenRouter models');
+    await expectPaidModelRejected(SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM, true);
   });
 });

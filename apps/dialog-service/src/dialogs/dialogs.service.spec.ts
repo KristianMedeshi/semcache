@@ -11,61 +11,74 @@ import { DialogGraphService } from './dialog-graph.service';
 import type { DialogsRepository } from './dialogs.repository';
 import { DialogsService } from './dialogs.service';
 
+const TEST_USER_ID = '11111111-1111-4111-8111-111111111111';
+const TEST_DIALOG_ID = '22222222-2222-4222-8222-222222222222';
+
+function createInMemoryDialogHarness(options?: {
+  initialMessages?: DialogMessageResponseDto[];
+  sendImpl?: jest.Mock;
+}) {
+  let dialog: DialogResponseDto = {
+    id: TEST_DIALOG_ID,
+    userId: TEST_USER_ID,
+    title: 'New Conversation',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+  const storedMessages: DialogMessageResponseDto[] = [...(options?.initialMessages ?? [])];
+
+  const mockRepo: Partial<DialogsRepository> = {
+    findDialogByIdForUser: jest.fn(async (id, owner) =>
+      id === dialog.id && owner === TEST_USER_ID ? dialog : null,
+    ),
+    findMessageByIdForDialog: jest.fn(
+      async (_dId, mId) => storedMessages.find((m) => m.id === mId) ?? null,
+    ),
+    insertMessage: jest.fn(async (input) => {
+      const msg: DialogMessageResponseDto = {
+        id: `msg-${storedMessages.length + 1}`,
+        dialogId: input.dialogId,
+        parentMessageId: input.parentMessageId ?? null,
+        role: input.role,
+        content: input.content,
+        model: input.model ?? null,
+        latencyMs: input.latencyMs ?? null,
+        usage: input.usage ?? null,
+        createdAt: '2026-01-01T00:00:01.000Z',
+      };
+      storedMessages.push(msg);
+      return msg;
+    }),
+    findMessagesByDialog: jest.fn(async () => [...storedMessages]),
+    touchDialog: jest.fn(async (_id, title) => {
+      dialog = {
+        ...dialog,
+        title: title ?? dialog.title,
+        updatedAt: '2026-01-01T00:00:02.000Z',
+      };
+      return dialog;
+    }),
+  };
+
+  const sendMock = options?.sendImpl ?? jest.fn();
+  const mockLlmClient = { send: sendMock } as unknown as ClientProxy;
+  const graphService = new DialogGraphService(mockRepo as DialogsRepository, mockLlmClient);
+  const service = new DialogsService(mockRepo as DialogsRepository, graphService);
+
+  return { userId: TEST_USER_ID, dialogId: TEST_DIALOG_ID, service, sendMock };
+}
+
 describe('DialogsService & DialogGraphService', () => {
   it('executes a LangGraph dialog turn, persists user & assistant messages, and updates title', async () => {
-    const userId = '11111111-1111-4111-8111-111111111111';
-    const dialogId = '22222222-2222-4222-8222-222222222222';
-    let dialog: DialogResponseDto = {
-      id: dialogId,
-      userId,
-      title: 'New Conversation',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    };
-    const storedMessages: DialogMessageResponseDto[] = [];
-
-    const mockRepo: Partial<DialogsRepository> = {
-      findDialogByIdForUser: jest.fn(async (id, owner) =>
-        id === dialog.id && owner === userId ? dialog : null,
-      ),
-      insertMessage: jest.fn(async (input) => {
-        const msg: DialogMessageResponseDto = {
-          id: `msg-${storedMessages.length + 1}`,
-          dialogId: input.dialogId,
-          parentMessageId: input.parentMessageId ?? null,
-          role: input.role,
-          content: input.content,
-          model: input.model ?? null,
-          latencyMs: input.latencyMs ?? null,
-          usage: input.usage ?? null,
-          createdAt: '2026-01-01T00:00:01.000Z',
-        };
-        storedMessages.push(msg);
-        return msg;
-      }),
-      findMessagesByDialog: jest.fn(async () => [...storedMessages]),
-      touchDialog: jest.fn(async (_id, title) => {
-        dialog = {
-          ...dialog,
-          title: title ?? dialog.title,
-          updatedAt: '2026-01-01T00:00:02.000Z',
-        };
-        return dialog;
-      }),
-    };
-
     const completionPayload: LlmChatCompletionResponseDto = {
       content: 'You can reset your password from Account Settings.',
       model: 'openrouter/free',
       latencyMs: 142,
       usage: { promptTokens: 25, completionTokens: 11, totalTokens: 36 },
     };
-
-    const sendMock = jest.fn(() => of(completionPayload));
-    const mockLlmClient = { send: sendMock } as unknown as ClientProxy;
-
-    const graphService = new DialogGraphService(mockRepo as DialogsRepository, mockLlmClient);
-    const service = new DialogsService(mockRepo as DialogsRepository, graphService);
+    const { userId, dialogId, service, sendMock } = createInMemoryDialogHarness({
+      sendImpl: jest.fn(() => of(completionPayload)),
+    });
 
     const turn = await service.sendMessage(userId, dialogId, {
       content: 'How do I reset my password?',
@@ -108,66 +121,23 @@ describe('DialogsService & DialogGraphService', () => {
   });
 
   it('streams user_message, delta chunks, and done event while persisting messages', async () => {
-    const userId = '11111111-1111-4111-8111-111111111111';
-    const dialogId = '22222222-2222-4222-8222-222222222222';
-    let dialog: DialogResponseDto = {
-      id: dialogId,
-      userId,
-      title: 'New Conversation',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    };
-    const storedMessages: DialogMessageResponseDto[] = [];
-
-    const mockRepo: Partial<DialogsRepository> = {
-      findDialogByIdForUser: jest.fn(async (id, owner) =>
-        id === dialog.id && owner === userId ? dialog : null,
-      ),
-      insertMessage: jest.fn(async (input) => {
-        const msg: DialogMessageResponseDto = {
-          id: `msg-${storedMessages.length + 1}`,
-          dialogId: input.dialogId,
-          parentMessageId: input.parentMessageId ?? null,
-          role: input.role,
-          content: input.content,
-          model: input.model ?? null,
-          latencyMs: input.latencyMs ?? null,
-          usage: input.usage ?? null,
-          createdAt: '2026-01-01T00:00:01.000Z',
-        };
-        storedMessages.push(msg);
-        return msg;
-      }),
-      findMessagesByDialog: jest.fn(async () => [...storedMessages]),
-      touchDialog: jest.fn(async (_id, title) => {
-        dialog = {
-          ...dialog,
-          title: title ?? dialog.title,
-          updatedAt: '2026-01-01T00:00:02.000Z',
-        };
-        return dialog;
-      }),
-    };
-
-    const sendMock = jest.fn(() =>
-      of(
-        { type: 'delta', delta: 'You can reset ' },
-        { type: 'delta', delta: 'your password in Settings.' },
-        {
-          type: 'done',
-          completion: {
-            content: 'You can reset your password in Settings.',
-            model: 'openrouter/free',
-            latencyMs: 95,
-            usage: { promptTokens: 20, completionTokens: 9, totalTokens: 29 },
+    const { userId, dialogId, service, sendMock } = createInMemoryDialogHarness({
+      sendImpl: jest.fn(() =>
+        of(
+          { type: 'delta', delta: 'You can reset ' },
+          { type: 'delta', delta: 'your password in Settings.' },
+          {
+            type: 'done',
+            completion: {
+              content: 'You can reset your password in Settings.',
+              model: 'openrouter/free',
+              latencyMs: 95,
+              usage: { promptTokens: 20, completionTokens: 9, totalTokens: 29 },
+            },
           },
-        },
+        ),
       ),
-    );
-    const mockLlmClient = { send: sendMock } as unknown as ClientProxy;
-
-    const graphService = new DialogGraphService(mockRepo as DialogsRepository, mockLlmClient);
-    const service = new DialogsService(mockRepo as DialogsRepository, graphService);
+    });
 
     const events = await firstValueFrom(
       service
@@ -235,15 +205,8 @@ describe('DialogsService & DialogGraphService', () => {
   });
 
   it('creates a sibling branch when editing a user message and sends only ancestor history to LLM', async () => {
-    const userId = '11111111-1111-4111-8111-111111111111';
-    const dialogId = '22222222-2222-4222-8222-222222222222';
-    let dialog: DialogResponseDto = {
-      id: dialogId,
-      userId,
-      title: 'Roaming Help',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    };
+    const userId = TEST_USER_ID;
+    const dialogId = TEST_DIALOG_ID;
     const storedMessages: DialogMessageResponseDto[] = [
       {
         id: 'm-1',
@@ -291,49 +254,17 @@ describe('DialogsService & DialogGraphService', () => {
       },
     ];
 
-    const mockRepo: Partial<DialogsRepository> = {
-      findDialogByIdForUser: jest.fn(async (id, owner) =>
-        id === dialog.id && owner === userId ? dialog : null,
+    const { service, sendMock } = createInMemoryDialogHarness({
+      initialMessages: storedMessages,
+      sendImpl: jest.fn(() =>
+        of({
+          content: 'Edited follow-up answer',
+          model: 'openrouter/free',
+          latencyMs: 75,
+          usage: { promptTokens: 15, completionTokens: 8, totalTokens: 23 },
+        }),
       ),
-      findMessageByIdForDialog: jest.fn(
-        async (_dId, mId) => storedMessages.find((m) => m.id === mId) ?? null,
-      ),
-      findMessagesByDialog: jest.fn(async () => [...storedMessages]),
-      insertMessage: jest.fn(async (input) => {
-        const msg: DialogMessageResponseDto = {
-          id: `m-${storedMessages.length + 1}`,
-          dialogId: input.dialogId,
-          parentMessageId: input.parentMessageId ?? null,
-          role: input.role,
-          content: input.content,
-          model: input.model ?? null,
-          latencyMs: input.latencyMs ?? null,
-          usage: input.usage ?? null,
-          createdAt: '2026-01-01T00:00:05.000Z',
-        };
-        storedMessages.push(msg);
-        return msg;
-      }),
-      touchDialog: jest.fn(async () => {
-        dialog = { ...dialog, updatedAt: '2026-01-01T00:00:06.000Z' };
-        return dialog;
-      }),
-    };
-
-    const sendMock = jest.fn(() =>
-      of({
-        content: 'Edited follow-up answer',
-        model: 'openrouter/free',
-        latencyMs: 75,
-        usage: { promptTokens: 15, completionTokens: 8, totalTokens: 23 },
-      }),
-    );
-
-    const graphService = new DialogGraphService(
-      mockRepo as DialogsRepository,
-      { send: sendMock } as unknown as ClientProxy,
-    );
-    const service = new DialogsService(mockRepo as DialogsRepository, graphService);
+    });
 
     await expect(
       service.editMessage(userId, dialogId, 'm-2', { content: 'Cannot edit assistant' }),

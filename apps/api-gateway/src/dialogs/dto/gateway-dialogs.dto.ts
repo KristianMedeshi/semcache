@@ -30,25 +30,6 @@ export class GatewayUpdateDialogDto implements UpdateDialogRequestDto {
   title!: string;
 }
 
-export class GatewaySendMessageDto implements SendMessageRequestDto {
-  @Transform(trimOptionalString)
-  @IsString()
-  @MinLength(DIALOG_VALIDATION_LIMITS.MESSAGE_MIN_LENGTH)
-  @MaxLength(DIALOG_VALIDATION_LIMITS.MESSAGE_MAX_LENGTH)
-  content!: string;
-
-  @IsOptional()
-  @Transform(trimOptionalString)
-  @IsString()
-  @MaxLength(DIALOG_VALIDATION_LIMITS.MODEL_MAX_LENGTH)
-  @Matches(FREE_OPENROUTER_MODEL_REGEX, { message: FREE_OPENROUTER_MODEL_MESSAGE })
-  model?: string;
-
-  @IsOptional()
-  @IsUUID()
-  parentMessageId?: string | null;
-}
-
 export class GatewayEditMessageDto implements EditMessageRequestDto {
   @Transform(trimOptionalString)
   @IsString()
@@ -62,4 +43,13 @@ export class GatewayEditMessageDto implements EditMessageRequestDto {
   @MaxLength(DIALOG_VALIDATION_LIMITS.MODEL_MAX_LENGTH)
   @Matches(FREE_OPENROUTER_MODEL_REGEX, { message: FREE_OPENROUTER_MODEL_MESSAGE })
   model?: string;
+}
+
+export class GatewaySendMessageDto
+  extends GatewayEditMessageDto
+  implements SendMessageRequestDto
+{
+  @IsOptional()
+  @IsUUID()
+  parentMessageId?: string | null;
 }

@@ -30,25 +30,6 @@ export class UpdateDialogDto implements UpdateDialogRequestDto {
   title!: string;
 }
 
-export class SendMessageDto implements SendMessageRequestDto {
-  @Transform(trimString)
-  @IsString()
-  @MinLength(DIALOG_VALIDATION_LIMITS.MESSAGE_MIN_LENGTH)
-  @MaxLength(DIALOG_VALIDATION_LIMITS.MESSAGE_MAX_LENGTH)
-  content!: string;
-
-  @IsOptional()
-  @Transform(trimString)
-  @IsString()
-  @MaxLength(DIALOG_VALIDATION_LIMITS.MODEL_MAX_LENGTH)
-  @Matches(FREE_OPENROUTER_MODEL_REGEX, { message: FREE_OPENROUTER_MODEL_MESSAGE })
-  model?: string;
-
-  @IsOptional()
-  @IsUUID()
-  parentMessageId?: string | null;
-}
-
 export class EditMessageDto implements EditMessageRequestDto {
   @Transform(trimString)
   @IsString()
@@ -62,4 +43,10 @@ export class EditMessageDto implements EditMessageRequestDto {
   @MaxLength(DIALOG_VALIDATION_LIMITS.MODEL_MAX_LENGTH)
   @Matches(FREE_OPENROUTER_MODEL_REGEX, { message: FREE_OPENROUTER_MODEL_MESSAGE })
   model?: string;
+}
+
+export class SendMessageDto extends EditMessageDto implements SendMessageRequestDto {
+  @IsOptional()
+  @IsUUID()
+  parentMessageId?: string | null;
 }
