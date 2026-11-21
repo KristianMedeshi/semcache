@@ -45,7 +45,7 @@ export function SignInPage() {
   return (
     <AuthShell
       title="Welcome back"
-      description="Sign in to your SemCache account to continue."
+      description="Sign in to your SemCache Telecom account for 24/7 support."
       footer={
         <span>
           Don&apos;t have an account?{' '}
@@ -63,13 +63,23 @@ export function SignInPage() {
 
         <AuthEmailField id="sign-in-email" error={errors.email?.message} {...register('email')} />
 
-        <AuthPasswordField
-          id="sign-in-password"
-          autoComplete="current-password"
-          placeholder="Enter your password"
-          error={errors.password?.message}
-          {...register('password')}
-        />
+        <div className="space-y-1.5">
+          <AuthPasswordField
+            id="sign-in-password"
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            error={errors.password?.message}
+            {...register('password')}
+          />
+          <div className="flex justify-end">
+            <Link
+              to="/forgot-password"
+              className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
+        </div>
 
         <AuthSubmitButton isPending={signInMutation.isPending} pendingText="Signing in...">
           Sign in

@@ -39,9 +39,10 @@ function renderChatWorkspace() {
 describe('ChatWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
-  it('creates a conversation on first message and renders free OpenRouter model response', async () => {
+  it('displays Telecom Assistant welcome state and all 6 suggestion cards, sending a question without exposing internal cache/LLM metrics', async () => {
     const user = userEvent.setup();
     const createdDialog: DialogResponseDto = {
       id: '22222222-2222-4222-8222-222222222222',
@@ -54,7 +55,7 @@ describe('ChatWorkspace', () => {
       id: 'm-1',
       dialogId: createdDialog.id,
       role: ChatMessageRole.USER,
-      content: 'How do I check my order?',
+      content: 'How do I activate my eSIM?',
       model: null,
       latencyMs: null,
       usage: null,
@@ -64,7 +65,8 @@ describe('ChatWorkspace', () => {
       id: 'm-2',
       dialogId: createdDialog.id,
       role: ChatMessageRole.ASSISTANT,
-      content: 'Visit Orders in your account dashboard.',
+      content:
+        '### eSIM Activation Steps\n\n1. Open **Settings > Cellular**.\n2. Scan your QR code.',
       model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
       latencyMs: 180,
       usage: { promptTokens: 20, completionTokens: 10, totalTokens: 30 },
@@ -75,31 +77,94 @@ describe('ChatWorkspace', () => {
     vi.mocked(chatClient.createDialog).mockResolvedValueOnce(createdDialog);
     vi.mocked(chatClient.getDialogMessages).mockResolvedValue([]);
     vi.mocked(chatClient.sendDialogMessage).mockResolvedValueOnce({
-      dialog: { ...createdDialog, title: 'How do I check my order?' },
+      dialog: { ...createdDialog, title: 'How do I activate my eSIM?' },
       userMessage: userMsg,
       assistantMessage: assistantMsg,
     });
 
     renderChatWorkspace();
 
-    expect(await screen.findByText('Start a free OpenRouter conversation')).toBeVisible();
+    expect(await screen.findByText('Hello! Welcome to SemCache Support.')).toBeVisible();
+    expect(screen.getByText('Telecom Assistant')).toBeVisible();
+    expect(screen.getByText('Which mobile plan is right for me?')).toBeVisible();
+    expect(screen.getByText('How much mobile data do I have left?')).toBeVisible();
+    expect(screen.getByText('How can I pay my bill?')).toBeVisible();
+    expect(screen.getByText('How does international roaming work?')).toBeVisible();
+    expect(screen.getByText('How do I activate my eSIM?')).toBeVisible();
+    expect(screen.getByText("My mobile internet isn't working.")).toBeVisible();
 
-    await user.selectOptions(
-      screen.getByLabelText('Free Model'),
-      'nvidia/nemotron-3-ultra-550b-a55b:free',
-    );
-    await user.type(screen.getByLabelText('Message input'), 'How do I check my order?');
-    await user.click(screen.getByRole('button', { name: /send/i }));
+    await user.click(screen.getByRole('button', { name: /how do i activate my esim\?/i }));
 
     await waitFor(() => {
       expect(chatClient.sendDialogMessage).toHaveBeenCalledWith(createdDialog.id, {
-        content: 'How do I check my order?',
-        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        content: 'How do I activate my eSIM?',
       });
     });
 
-    expect(await screen.findByText('Visit Orders in your account dashboard.')).toBeVisible();
-    expect(screen.getByText('180 ms')).toBeVisible();
-    expect(screen.getByText('30 tokens')).toBeVisible();
+    expect(await screen.findByText('eSIM Activation Steps')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Helpful response' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Not helpful response' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Copy response' })).toBeVisible();
+
+    // Verify internal model/cache metadata is never exposed to the customer
+    expect(screen.queryByText('nvidia/nemotron-3-ultra-550b-a55b:free')).not.toBeInTheDocument();
+    expect(screen.queryByText('180 ms')).not.toBeInTheDocument();
+    expect(screen.queryByText('30 tokens')).not.toBeInTheDocument();
+  });
+
+  it('supports Enter to send and Shift+Enter for newline in the composer, and opens human agent escalation dialog', async () => {
+    const user = userEvent.setup();
+    const existingDialog: DialogResponseDto = {
+      id: '33333333-3333-4333-8333-333333333333',
+      userId: testUser.id,
+      title: 'Roaming Inquiry',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    vi.mocked(chatClient.listDialogs).mockResolvedValueOnce([existingDialog]);
+    vi.mocked(chatClient.getDialogMessages).mockResolvedValue([]);
+    vi.mocked(chatClient.sendDialogMessage).mockResolvedValueOnce({
+      dialog: existingDialog,
+      userMessage: {
+        id: 'm-10',
+        dialogId: existingDialog.id,
+        role: ChatMessageRole.USER,
+        content: 'Line 1\nLine 2',
+        model: null,
+        latencyMs: null,
+        usage: null,
+        createdAt: '2026-01-01T00:00:01.000Z',
+      },
+      assistantMessage: {
+        id: 'm-11',
+        dialogId: existingDialog.id,
+        role: ChatMessageRole.ASSISTANT,
+        content: 'Here is your roaming information.',
+        model: 'openrouter/free',
+        latencyMs: 120,
+        usage: null,
+        createdAt: '2026-01-01T00:00:02.000Z',
+      },
+    });
+
+    renderChatWorkspace();
+
+    const input = await screen.findByLabelText('Message input');
+    await user.type(input, 'Line 1{Shift>}{Enter}{/Shift}Line 2{Enter}');
+
+    await waitFor(() => {
+      expect(chatClient.sendDialogMessage).toHaveBeenCalledWith(existingDialog.id, {
+        content: 'Line 1\nLine 2',
+      });
+    });
+
+    const escalationButtons = screen.getAllByRole('button', { name: /talk to a human agent/i });
+    await user.click(escalationButtons[0]);
+
+    expect(await screen.findByText(/specialists available/i)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /request live agent/i }));
+
+    expect(await screen.findByText(/a live telecom specialist has been notified/i)).toBeVisible();
   });
 });

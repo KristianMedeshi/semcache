@@ -1,11 +1,11 @@
 import { Link } from '@tanstack/react-router';
-import { LogIn, LogOut, Sparkles, UserPlus } from 'lucide-react';
-import { motion } from 'motion/react';
-import { toast } from 'sonner';
-import { useCurrentUserQuery, useSignOutMutation } from '@/features/auth/model/use-auth';
+import { ArrowRight, Headset, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
+import { useCurrentUserQuery } from '@/features/auth/model/use-auth';
+import { TELECOM_SUGGESTIONS } from '@/features/chat/model/telecom-suggestions';
 import { ChatWorkspace } from '@/features/chat/ui/chat-workspace';
 import { ThemeToggle } from '@/features/theme/ui/theme-toggle';
-import { cn } from '@/shared/lib/utils';
+import { Badge } from '@/shared/ui/badge';
+import { BrandLogo } from '@/shared/ui/brand-logo';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { CardContent } from '@/shared/ui/card-content';
@@ -13,132 +13,119 @@ import { CardDescription } from '@/shared/ui/card-description';
 import { CardHeader } from '@/shared/ui/card-header';
 import { CardTitle } from '@/shared/ui/card-title';
 
-const radialBackdrop = (
-  <div
-    aria-hidden="true"
-    className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,var(--color-muted)_0%,transparent_65%)]"
-  />
-);
-
 export function HomePage() {
   const { data: user, isPending } = useCurrentUserQuery();
-  const signOutMutation = useSignOutMutation();
 
-  const handleSignOut = async () => {
-    try {
-      await signOutMutation.mutateAsync();
-      toast.success('Signed out');
-    } catch {
-      toast.error('Failed to sign out');
-    }
-  };
+  if (isPending) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md shadow-sm">
+          <CardHeader className="items-center text-center">
+            <BrandLogo subtitle="Telecom Customer Support" />
+            <CardTitle className="pt-2 text-xl font-semibold tracking-tight">
+              SemCache Telecom Support
+            </CardTitle>
+            <CardDescription>Connecting to your support workspace...</CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-muted-foreground">Checking session...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (user) {
+    return <ChatWorkspace user={user} />;
+  }
 
   return (
-    <div className="relative flex min-h-screen flex-col justify-between bg-background px-4 py-6 sm:px-6">
-      {radialBackdrop}
+    <div className="flex min-h-screen flex-col justify-between bg-background">
+      <header className="border-b bg-card">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+          <BrandLogo subtitle="Telecom Customer Support" />
 
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-            <Sparkles className="size-4" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight">SemCache</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          {user ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              disabled={signOutMutation.isPending}
-            >
-              <LogOut className="size-4" />
-              Sign out
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/sign-in">Sign in</Link>
             </Button>
-          ) : (
-            <>
-              <Button asChild variant="ghost" size="sm">
-                <Link to="/sign-in">Sign in</Link>
-              </Button>
-              <Button asChild size="sm">
-                <Link to="/sign-up">Sign up</Link>
-              </Button>
-            </>
-          )}
+            <Button asChild size="sm">
+              <Link to="/sign-up">Sign up</Link>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main
-        className={cn(
-          'mx-auto my-8 flex w-full flex-col items-center',
-          user ? 'max-w-5xl' : 'max-w-xl',
-        )}
-      >
-        {isPending ? (
-          <Card className="w-full shadow-md">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-semibold tracking-tight">
-                SemCache Workspace
-              </CardTitle>
-              <CardDescription>
-                Adaptive LLM semantic response caching for customer support.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-sm text-muted-foreground">Checking session...</p>
-            </CardContent>
-          </Card>
-        ) : user ? (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="w-full"
-          >
-            <ChatWorkspace user={user} />
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="w-full"
-          >
-            <Card className="shadow-md">
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl font-semibold tracking-tight">
-                  SemCache Workspace
-                </CardTitle>
-                <CardDescription>
-                  Adaptive LLM semantic response caching for customer support.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-4 text-center">
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <Button asChild>
-                    <Link to="/sign-in">
-                      <LogIn className="size-4" />
-                      Sign in
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline">
-                    <Link to="/sign-up">
-                      <UserPlus className="size-4" />
-                      Create account
-                    </Link>
-                  </Button>
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 py-10 sm:px-6 lg:py-14">
+        <div className="mx-auto max-w-2xl text-center">
+          <Badge variant="teal" className="mb-4">
+            <span className="size-1.5 rounded-full bg-cyan-500" />
+            24/7 Telecom Assistant Online
+          </Badge>
+
+          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Instant support for your mobile services
+          </h1>
+
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+            Get clear answers about mobile plans, data usage, billing, international roaming, eSIM
+            activation, and network troubleshooting — or connect with a live specialist anytime.
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button asChild size="lg" className="rounded-xl">
+              <Link to="/sign-in">
+                <LogIn className="size-4" />
+                Sign in to Support Chat
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="lg" className="rounded-xl">
+              <Link to="/sign-up">
+                <UserPlus className="size-4" />
+                Create account
+              </Link>
+            </Button>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <Headset className="size-3.5 text-primary" />
+              Human specialist escalation available
+            </span>
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="size-3.5 text-cyan-600 dark:text-cyan-400" />
+              Encrypted subscriber session
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          {TELECOM_SUGGESTIONS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Card key={item.id} className="gap-3 p-4 shadow-xs transition-shadow hover:shadow-sm">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                    <Icon className="size-4.5" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                      {item.category}
+                    </p>
+                    <p className="text-sm font-medium text-foreground">{item.prompt}</p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+                <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+              </Card>
+            );
+          })}
+        </div>
       </main>
 
-      <footer className="mx-auto w-full max-w-5xl text-center text-xs text-muted-foreground">
-        SemCache Customer Support Platform
+      <footer className="border-t bg-card py-4 text-center text-xs text-muted-foreground">
+        SemCache Telecom Customer Support Platform
       </footer>
     </div>
   );

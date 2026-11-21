@@ -9,13 +9,14 @@ vi.mock('@/features/auth/api/auth.client', async (importOriginal) => ({
 }));
 
 describe('App', () => {
-  it('renders the workspace home page and toggles dark mode', async () => {
+  it('renders the SemCache Telecom portal in light mode by default and toggles dark mode', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(await screen.findByText('SemCache Workspace')).toBeVisible();
+    expect(await screen.findByText('Instant support for your mobile services')).toBeVisible();
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
 
-    const toggleButton = screen.getByRole('button', { name: /switch to/i });
+    const toggleButton = screen.getByRole('button', { name: /switch to dark theme/i });
     await user.click(toggleButton);
 
     expect(document.documentElement.classList.contains('dark')).toBe(true);

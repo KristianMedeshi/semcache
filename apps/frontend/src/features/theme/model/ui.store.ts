@@ -26,7 +26,7 @@ export function applyThemeToDocument(theme: ThemeMode): void {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  theme: 'system',
+  theme: 'light',
   setTheme: (theme) => {
     applyThemeToDocument(theme);
     set({ theme });

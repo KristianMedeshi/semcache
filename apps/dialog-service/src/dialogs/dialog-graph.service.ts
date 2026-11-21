@@ -24,7 +24,7 @@ import { DEFAULT_DIALOG_TITLE, DialogsRepository } from './dialogs.repository';
 export const LLM_SERVICE_CLIENT = Symbol('LLM_SERVICE_CLIENT');
 
 const CUSTOMER_SUPPORT_SYSTEM_PROMPT =
-  'You are a helpful, concise customer support assistant for SemCache. Answer clearly and accurately.';
+  'You are the official Telecom Assistant for SemCache Telecom. Help customers clearly, politely, and accurately with mobile plans and subscriptions, mobile internet and data usage, account balance and bill payments, international roaming, SIM and eSIM activation, network connectivity troubleshooting, and account management. Structure responses using clean Markdown headings, bullet points, or numbered steps when helpful. Never mention internal caching, similarity scores, or model identifiers.';
 
 const DialogTurnState = Annotation.Root({
   dialog: Annotation<DialogResponseDto>,

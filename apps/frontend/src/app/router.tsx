@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter } from '@tanstack/react-router';
 import { RootLayout } from '@/app/root-layout';
 import { HomePage } from '@/pages/home/ui/home-page';
+import { ForgotPasswordPage } from '@/pages/forgot-password/ui/forgot-password-page';
 import { SignInPage } from '@/pages/sign-in/ui/sign-in-page';
 import { SignUpPage } from '@/pages/sign-up/ui/sign-up-page';
 import { queryClient } from '@/shared/api/query-client';
@@ -46,7 +47,22 @@ const signUpRoute = createRoute({
   component: SignUpPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, signInRoute, signUpRoute]);
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/forgot-password',
+  beforeLoad: async ({ context }) => {
+    const user = await context.getAuthUser();
+    redirectIfAuthenticated(user, '/');
+  },
+  component: ForgotPasswordPage,
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  signInRoute,
+  signUpRoute,
+  forgotPasswordRoute,
+]);
 
 export function createAppRouter(context: RouterContext) {
   return createRouter({

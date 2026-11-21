@@ -1,21 +1,26 @@
 import type { UserResponseDto } from '@semcache/shared-dtos';
-import { FREE_OPENROUTER_MODELS, type FreeOpenRouterModelId } from '@semcache/shared-types';
-import { Loader2, MessageSquarePlus, MessagesSquare, Send, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { Headset } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useSignOutMutation } from '@/features/auth/model/use-auth';
+import { AdminOperatorDialog } from '@/features/auth/ui/admin-operator-dialog';
+import { ProfileSettingsDialog } from '@/features/auth/ui/profile-settings-dialog';
 import {
   useCreateDialogMutation,
   useDialogMessagesQuery,
   useDialogsQuery,
   useSendMessageMutation,
 } from '@/features/chat/model/use-chat';
+import { ChatComposer } from '@/features/chat/ui/chat-composer';
+import { ChatHeader } from '@/features/chat/ui/chat-header';
 import { ChatMessageItem } from '@/features/chat/ui/chat-message-item';
+import { ChatWelcomeState } from '@/features/chat/ui/chat-welcome-state';
+import {
+  ConversationSidebarContent,
+  MobileConversationDrawer,
+} from '@/features/chat/ui/conversation-sidebar';
+import { HumanEscalationDialog } from '@/features/chat/ui/human-escalation-dialog';
 import { getAuthServerError } from '@/shared/api/api-client';
-import { cn } from '@/shared/lib/utils';
-import { Button } from '@/shared/ui/button';
-import { Card } from '@/shared/ui/card';
-import { Input } from '@/shared/ui/input';
-import { Label } from '@/shared/ui/label';
 
 export interface ChatWorkspaceProps {
   user: UserResponseDto;
@@ -23,34 +28,62 @@ export interface ChatWorkspaceProps {
 
 export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   const [selectedDialogId, setSelectedDialogId] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<FreeOpenRouterModelId>(
-    FREE_OPENROUTER_MODELS[0],
-  );
+  const [isNewChatPending, setIsNewChatPending] = useState(false);
   const [draft, setDraft] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+  const [escalationOpen, setEscalationOpen] = useState(false);
+  const [escalationRequested, setEscalationRequested] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [lastMessagesByDialog, setLastMessagesByDialog] = useState<Record<string, string>>({});
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const dialogsQuery = useDialogsQuery();
   const dialogs = dialogsQuery.data ?? [];
-  const activeDialogId = selectedDialogId ?? dialogs[0]?.id ?? null;
+  const activeDialogId = isNewChatPending ? null : (selectedDialogId ?? dialogs[0]?.id ?? null);
+  const activeDialog = dialogs.find((d) => d.id === activeDialogId);
 
   const messagesQuery = useDialogMessagesQuery(activeDialogId);
   const createDialogMutation = useCreateDialogMutation();
   const sendMessageMutation = useSendMessageMutation();
+  const signOutMutation = useSignOutMutation();
 
   const isSending = createDialogMutation.isPending || sendMessageMutation.isPending;
   const activeMessages = messagesQuery.data ?? [];
 
-  const handleCreateDialog = async () => {
+  useEffect(() => {
+    if (activeDialogId && activeMessages.length > 0) {
+      const last = activeMessages[activeMessages.length - 1];
+      setLastMessagesByDialog((prev) =>
+        prev[activeDialogId] === last.content ? prev : { ...prev, [activeDialogId]: last.content },
+      );
+    }
+  }, [activeDialogId, activeMessages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeMessages.length, isSending]);
+
+  const handleSelectDialog = (dialogId: string) => {
+    setIsNewChatPending(false);
+    setSelectedDialogId(dialogId);
+  };
+
+  const handleNewConversation = async () => {
     try {
       const created = await createDialogMutation.mutateAsync({});
+      setIsNewChatPending(false);
       setSelectedDialogId(created.id);
+      setEscalationRequested(false);
     } catch (error) {
-      toast.error(getAuthServerError(error as Error, 'Failed to create conversation'));
+      toast.error(getAuthServerError(error as Error, 'Failed to start a new conversation'));
     }
   };
 
-  const handleSendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const content = draft.trim();
+  const submitMessage = async (rawContent: string) => {
+    const content = rawContent.trim();
     if (!content || isSending) {
       return;
     }
@@ -60,140 +93,154 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
       if (!targetDialogId) {
         const created = await createDialogMutation.mutateAsync({});
         targetDialogId = created.id;
+        setIsNewChatPending(false);
         setSelectedDialogId(created.id);
       }
 
       setDraft('');
       await sendMessageMutation.mutateAsync({
         dialogId: targetDialogId,
-        dto: { content, model: selectedModel },
+        dto: { content },
       });
     } catch (error) {
       setDraft(content);
-      toast.error(getAuthServerError(error as Error, 'Failed to get AI response'));
+      toast.error(getAuthServerError(error as Error, 'Unable to send message. Please try again.'));
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOutMutation.mutateAsync();
+      toast.success('Signed out');
+    } catch {
+      toast.error('Failed to sign out');
+    }
+  };
+
+  const showWelcomeState =
+    !activeDialogId || (!messagesQuery.isPending && activeMessages.length === 0);
+
   return (
-    <Card className="grid h-[72vh] min-h-[520px] w-full grid-cols-1 overflow-hidden shadow-md md:grid-cols-[260px_1fr]">
-      <aside className="flex flex-col border-b bg-muted/20 md:border-r md:border-b-0">
-        <div className="flex items-center justify-between border-b p-3">
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-foreground">{user.email}</p>
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {user.role}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleCreateDialog}
-            disabled={isSending}
-          >
-            <MessageSquarePlus className="size-4" />
-            New chat
-          </Button>
-        </div>
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
+      <ChatHeader
+        user={user}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        onOpenMobileHistory={() => setMobileHistoryOpen(true)}
+        onOpenEscalation={() => setEscalationOpen(true)}
+        onOpenProfileSettings={() => setProfileOpen(true)}
+        onOpenAdminDirectory={() => setAdminOpen(true)}
+        onSignOut={handleSignOut}
+        isSigningOut={signOutMutation.isPending}
+      />
 
-        <div className="flex-1 space-y-1 overflow-y-auto p-2">
-          {dialogsQuery.isPending ? (
-            <p className="px-2 py-4 text-xs text-muted-foreground">Loading conversations...</p>
-          ) : dialogs.length === 0 ? (
-            <p className="px-2 py-4 text-xs text-muted-foreground">
-              No conversations yet. Send a message to start.
-            </p>
-          ) : (
-            dialogs.map((dialog) => {
-              const isSelected = dialog.id === activeDialogId;
-              return (
-                <button
-                  key={dialog.id}
-                  type="button"
-                  onClick={() => setSelectedDialogId(dialog.id)}
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors',
-                    isSelected
-                      ? 'bg-primary text-primary-foreground font-medium'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
-                >
-                  <MessagesSquare className="size-3.5 shrink-0" />
-                  <span className="truncate">{dialog.title}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </aside>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {isSidebarOpen ? (
+          <aside className="hidden w-72 shrink-0 border-r md:block lg:w-80">
+            <ConversationSidebarContent
+              dialogs={dialogs}
+              activeDialogId={activeDialogId}
+              lastMessagesByDialog={lastMessagesByDialog}
+              isLoading={dialogsQuery.isPending}
+              isBusy={isSending}
+              onSelectDialog={handleSelectDialog}
+              onNewConversation={handleNewConversation}
+            />
+          </aside>
+        ) : null}
 
-      <section className="flex min-h-0 flex-col">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" />
-            <h1 className="text-sm font-semibold">OpenRouter Support Chat</h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Label htmlFor="free-model-select" className="text-xs text-muted-foreground">
-              Free Model
-            </Label>
-            <select
-              id="free-model-select"
-              value={selectedModel}
-              onChange={(event) => setSelectedModel(event.target.value as FreeOpenRouterModelId)}
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-xs outline-none focus-visible:border-ring"
-            >
-              {FREE_OPENROUTER_MODELS.map((modelId) => (
-                <option key={modelId} value={modelId}>
-                  {modelId}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          {!activeDialogId ? (
-            <div className="flex h-full flex-col items-center justify-center text-center text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Start a free OpenRouter conversation</p>
-              <p className="mt-1 max-w-sm text-xs">
-                Ask any customer support question. Only zero-cost OpenRouter models are enabled.
-              </p>
+        <main className="flex min-h-0 flex-1 flex-col bg-background">
+          {escalationRequested ? (
+            <div className="flex items-center justify-between gap-3 border-b bg-accent/60 px-4 py-2 text-xs text-accent-foreground">
+              <div className="flex items-center gap-2">
+                <Headset className="size-4 shrink-0 text-primary" />
+                <span>
+                  A live telecom specialist has been notified and will join this conversation
+                  shortly.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEscalationRequested(false)}
+                className="font-medium underline underline-offset-4"
+              >
+                Dismiss
+              </button>
             </div>
-          ) : messagesQuery.isPending ? (
-            <p className="text-sm text-muted-foreground">Loading messages...</p>
-          ) : activeMessages.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              Send your first message below to start this conversation.
-            </div>
-          ) : (
-            activeMessages.map((message) => <ChatMessageItem key={message.id} message={message} />)
-          )}
+          ) : null}
 
-          {sendMessageMutation.isPending && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              <span>Generating response via {selectedModel}...</span>
-            </div>
-          )}
-        </div>
+          <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+            <div className="mx-auto flex w-full max-w-3xl flex-col space-y-5">
+              {activeDialogId && messagesQuery.isPending ? (
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  Loading conversation...
+                </div>
+              ) : showWelcomeState ? (
+                <ChatWelcomeState
+                  onSelectSuggestion={(prompt) => void submitMessage(prompt)}
+                  disabled={isSending}
+                />
+              ) : (
+                activeMessages.map((message) => (
+                  <ChatMessageItem key={message.id} message={message} />
+                ))
+              )}
 
-        <form onSubmit={handleSendMessage} className="flex items-center gap-2 border-t p-3">
-          <Input
-            type="text"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Ask a question..."
-            aria-label="Message input"
-            disabled={isSending}
+              {sendMessageMutation.isPending ? (
+                <div role="status" aria-live="polite" className="flex items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+                    <Headset className="size-4" />
+                  </div>
+                  <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border bg-card px-4 py-3 text-xs text-muted-foreground shadow-xs">
+                    <span className="flex gap-1">
+                      <span className="size-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-primary" />
+                    </span>
+                    <span>Telecom Assistant is typing...</span>
+                  </div>
+                </div>
+              ) : null}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          <ChatComposer
+            draft={draft}
+            onDraftChange={setDraft}
+            onSubmit={() => void submitMessage(draft)}
+            onOpenEscalation={() => setEscalationOpen(true)}
+            isSending={isSending}
           />
-          <Button type="submit" disabled={isSending || draft.trim().length === 0}>
-            {isSending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-            Send
-          </Button>
-        </form>
-      </section>
-    </Card>
+        </main>
+      </div>
+
+      <MobileConversationDrawer
+        open={mobileHistoryOpen}
+        onOpenChange={setMobileHistoryOpen}
+        dialogs={dialogs}
+        activeDialogId={activeDialogId}
+        lastMessagesByDialog={lastMessagesByDialog}
+        isLoading={dialogsQuery.isPending}
+        isBusy={isSending}
+        onSelectDialog={handleSelectDialog}
+        onNewConversation={handleNewConversation}
+      />
+
+      <HumanEscalationDialog
+        open={escalationOpen}
+        onOpenChange={setEscalationOpen}
+        conversationTitle={activeDialog?.title}
+        onConfirmTransfer={() => {
+          setEscalationRequested(true);
+          toast.success('Support specialist requested. Estimated wait: under 2 minutes.');
+        }}
+      />
+
+      <ProfileSettingsDialog user={user} open={profileOpen} onOpenChange={setProfileOpen} />
+
+      <AdminOperatorDialog open={adminOpen} onOpenChange={setAdminOpen} />
+    </div>
   );
 }

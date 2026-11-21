@@ -51,7 +51,7 @@ export function SignUpPage() {
   return (
     <AuthShell
       title="Create your account"
-      description="Get started with SemCache customer support."
+      description="Get started with SemCache Telecom customer support."
       footer={
         <span>
           Already have an account?{' '}

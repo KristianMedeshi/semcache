@@ -145,6 +145,7 @@ Set `OPENROUTER_API_KEY` in `.env` (copied from `.env.example`). Only free OpenR
 
 ## Architecture & Domain Documentation
 
+- Application design, telecom UX standards, and UI architecture (`shadcn/ui` + Radix UI + Tailwind CSS): [docs/app-design-and-standards.md](./docs/app-design-and-standards.md)
 - Authentication, CSRF protection, rate limiting, RBAC policies, API Gateway identity headers, and React integration: [docs/authentication-and-authorization.md](./docs/authentication-and-authorization.md)
 - OpenRouter chat integration (`@nestjs/ai`), LangGraph dialog orchestration (`@langchain/langgraph`), and free-model enforcement: [docs/chat-and-llm-architecture.md](./docs/chat-and-llm-architecture.md)
 

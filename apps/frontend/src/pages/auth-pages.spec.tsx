@@ -50,6 +50,7 @@ describe('Auth Pages', () => {
     renderAtRoute('/sign-in');
 
     expect(await screen.findByText('Welcome back')).toBeVisible();
+    expect(screen.getByRole('link', { name: /forgot password\?/i })).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: /sign in/i }));
     expect(await screen.findByText('Please enter a valid email address')).toBeVisible();
@@ -100,5 +101,21 @@ describe('Auth Pages', () => {
         expect.anything(),
       );
     });
+  });
+
+  it('validates email and displays recovery confirmation on Forgot Password page', async () => {
+    const user = userEvent.setup();
+    renderAtRoute('/forgot-password');
+
+    expect(await screen.findByText('Reset your password')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: /send recovery link/i }));
+    expect(await screen.findByText('Please enter a valid email address')).toBeVisible();
+
+    await user.type(screen.getByLabelText(/email address/i), 'subscriber@telecom.com');
+    await user.click(screen.getByRole('button', { name: /send recovery link/i }));
+
+    expect(await screen.findByText('Check your inbox')).toBeVisible();
+    expect(screen.getByText('subscriber@telecom.com')).toBeVisible();
   });
 });
