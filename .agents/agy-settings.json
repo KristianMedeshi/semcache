@@ -15,6 +15,8 @@
       "command(git status)",
       "command(git diff)",
       "command(git log)",
+      "command(git add)",      
+      "command(git commit)",      
       "command(pnpm build)",
       "command(pnpm lint)",
       "command(pnpm typecheck)",
