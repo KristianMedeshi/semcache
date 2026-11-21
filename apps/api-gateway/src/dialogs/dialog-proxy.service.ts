@@ -1,22 +1,35 @@
-import { BadGatewayException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import { extractRpcErrorPayload } from '@semcache/shared-config';
+import type { DialogTcpRequestDto } from '@semcache/shared-dtos';
 import type { Request, Response } from 'express';
+import { firstValueFrom } from 'rxjs';
 import { AuthProxyService } from '../auth/auth-proxy.service';
-import { GatewayConfigService } from '../config/gateway-config.service';
+
+export const DIALOG_SERVICE_CLIENT = Symbol('DIALOG_SERVICE_CLIENT');
 
 @Injectable()
 export class DialogProxyService {
   private readonly logger = new Logger(DialogProxyService.name);
 
   constructor(
-    private readonly config: GatewayConfigService,
     private readonly authProxyService: AuthProxyService,
+    @Inject(DIALOG_SERVICE_CLIENT) private readonly dialogClient: ClientProxy,
   ) {}
 
-  async forwardDialogRequest(
+  async forwardDialogRequest<TBody = undefined>(
     req: Request,
     res: Response,
-    targetPath: string,
-    body?: unknown,
+    pattern: string,
+    options?: { dialogId?: string; body?: TBody; statusCode?: number },
   ): Promise<void> {
     const user = await this.authProxyService.resolveCurrentUser(req.headers.cookie);
     if (!user) {
@@ -30,41 +43,31 @@ export class DialogProxyService {
       sessionId: 'gateway-dialog-proxy',
     });
 
-    const headers: Record<string, string> = {
-      ...identityHeaders,
-      ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+    const payload: DialogTcpRequestDto<TBody> = {
+      headers: identityHeaders,
+      ...(options?.dialogId !== undefined ? { dialogId: options.dialogId } : {}),
+      ...(options?.body !== undefined ? { body: options.body } : {}),
     };
 
-    let upstream: globalThis.Response;
+    let result: unknown;
     try {
-      upstream = await fetch(`${this.config.dialogServiceUrl}${targetPath}`, {
-        method: req.method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
+      result = await firstValueFrom(this.dialogClient.send<unknown>(pattern, payload));
     } catch (error) {
+      const rpcError = extractRpcErrorPayload(error);
+      if (rpcError?.statusCode) {
+        throw new HttpException(rpcError, rpcError.statusCode);
+      }
+
       this.logger.error(
         JSON.stringify({
           event: 'gateway.dialog_proxy.network_error',
-          path: targetPath,
-          error: error instanceof Error ? error.message : 'Unknown fetch error',
+          pattern,
+          error: error instanceof Error ? error.message : 'Unknown TCP error',
         }),
       );
       throw new BadGatewayException('Dialog service unavailable');
     }
 
-    const rawBody = await upstream.text();
-    res.status(upstream.status);
-    if (!rawBody) {
-      res.end();
-      return;
-    }
-
-    const contentType = upstream.headers.get('content-type') ?? '';
-    if (contentType.includes('application/json')) {
-      res.json(JSON.parse(rawBody) as unknown);
-      return;
-    }
-    res.send(rawBody);
+    res.status(options?.statusCode ?? HttpStatus.OK).json(result);
   }
 }

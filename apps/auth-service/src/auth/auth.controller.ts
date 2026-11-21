@@ -1,39 +1,44 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Logger,
-  Post,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { CurrentUser, Public, SignInService } from '@nestjs/authentication';
+import { createHash } from 'node:crypto';
+import { Controller, ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
+import { CurrentUser, Public, SessionService } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { SkipThrottle, Throttle, hours, minutes } from '@nestjs/throttler';
-import type { LogoutResponseDto, UserResponseDto } from '@semcache/shared-dtos';
+import type { AuthTcpResponseDto, LogoutResponseDto, UserResponseDto } from '@semcache/shared-dtos';
+import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import { CredentialsService } from './credentials.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UserPolicy } from './policies/user.policy';
+import { RpcRequestContext, type RpcRequestContextData } from './session-auth.provider';
 
-@Controller('auth')
+@Controller()
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
   constructor(
     private readonly credentialsService: CredentialsService,
-    private readonly signInService: SignInService,
+    private readonly sessionService: SessionService,
   ) {}
 
   @Public()
   @SkipThrottle({ account: true })
   @Throttle({ default: { limit: 10, ttl: hours(1) } })
-  @Post('register')
-  async register(@Body() body: RegisterDto): Promise<UserResponseDto> {
+  @MessagePattern(SERVICE_TCP_PATTERNS.AUTH_REGISTER)
+  async register(
+    @Payload('body') body: RegisterDto,
+    @RpcRequestContext() reqContext: RpcRequestContextData,
+  ): Promise<AuthTcpResponseDto<UserResponseDto>> {
+    this.assertAllowedOrigin(reqContext);
     const user = await this.credentialsService.register(body.email, body.password);
-    await this.signInService.signIn(user.id, { method: 'password' });
-    return user;
+    const issued = await this.sessionService.create(user.id, {
+      metadata: this.sessionService.metadataFor(reqContext),
+      replacing: this.sessionService.tokenFrom(reqContext),
+    });
+    return {
+      data: user,
+      setCookie: issued.cookie,
+    };
   }
 
   @Public()
@@ -41,31 +46,61 @@ export class AuthController {
     default: { limit: 30, ttl: minutes(15) },
     account: { limit: 5, ttl: minutes(15) },
   })
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  async login(@Body() body: LoginDto): Promise<UserResponseDto> {
+  @MessagePattern(SERVICE_TCP_PATTERNS.AUTH_LOGIN)
+  async login(
+    @Payload('body') body: LoginDto,
+    @RpcRequestContext() reqContext: RpcRequestContextData,
+  ): Promise<AuthTcpResponseDto<UserResponseDto>> {
+    this.assertAllowedOrigin(reqContext);
     const user = await this.credentialsService.verify(body.email, body.password);
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
-    await this.signInService.signIn(user.id, { method: 'password' });
-    return user;
+    const issued = await this.sessionService.create(user.id, {
+      metadata: this.sessionService.metadataFor(reqContext),
+      replacing: this.sessionService.tokenFrom(reqContext),
+    });
+    return {
+      data: user,
+      setCookie: issued.cookie,
+    };
   }
 
   @Public()
-  @Post('logout')
-  @HttpCode(HttpStatus.OK)
-  async logout(): Promise<LogoutResponseDto> {
-    if (!(await this.signInService.signOut())) {
+  @MessagePattern(SERVICE_TCP_PATTERNS.AUTH_LOGOUT)
+  async logout(
+    @RpcRequestContext() reqContext: RpcRequestContextData,
+  ): Promise<AuthTcpResponseDto<LogoutResponseDto>> {
+    this.assertAllowedOrigin(reqContext);
+    const token = this.sessionService.tokenFrom(reqContext);
+    if (!token) {
       throw new UnauthorizedException('Authentication required');
     }
+
+    const session = await this.sessionService.validate(token);
+    await this.sessionService.discard(
+      session?.id ?? createHash('sha256').update(token).digest('base64url'),
+    );
+    if (!session) {
+      throw new UnauthorizedException('Authentication required');
+    }
+
     this.logger.log(JSON.stringify({ event: 'auth.logout.success' }));
-    return { success: true };
+    return {
+      data: { success: true },
+      setCookie: this.sessionService.clearCookie(),
+    };
   }
 
   @Can(UserPolicy, 'readSelf')
-  @Get('me')
+  @MessagePattern(SERVICE_TCP_PATTERNS.AUTH_ME)
   me(@CurrentUser() user: UserResponseDto): UserResponseDto {
     return user;
+  }
+
+  private assertAllowedOrigin(reqContext: RpcRequestContextData): void {
+    if (this.sessionService.isCrossOriginWrite(reqContext)) {
+      throw new ForbiddenException('Cross-origin request refused');
+    }
   }
 }

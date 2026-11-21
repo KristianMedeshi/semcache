@@ -1,9 +1,21 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
-import type { UserResponseDto } from '@semcache/shared-dtos';
-import type { AuthenticatedUser } from '@semcache/shared-types';
+import {
+  BadGatewayException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import { extractRpcErrorPayload } from '@semcache/shared-config';
+import type { AuthTcpRequestDto, AuthTcpResponseDto, UserResponseDto } from '@semcache/shared-dtos';
+import { type AuthenticatedUser, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
+import { firstValueFrom } from 'rxjs';
 import { GatewayConfigService } from '../config/gateway-config.service';
 import { createSignedInternalHeaders, stripForgedInternalHeaders } from './internal-identity.util';
+
+export const AUTH_SERVICE_CLIENT = Symbol('AUTH_SERVICE_CLIENT');
 
 const FORWARDED_HEADERS = [
   'cookie',
@@ -14,17 +26,24 @@ const FORWARDED_HEADERS = [
   'x-forwarded-for',
 ] as const;
 
+function isAuthTcpResponse(value: unknown): value is AuthTcpResponseDto<unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && 'data' in value;
+}
+
 @Injectable()
 export class AuthProxyService {
   private readonly logger = new Logger(AuthProxyService.name);
 
-  constructor(private readonly config: GatewayConfigService) {}
+  constructor(
+    private readonly config: GatewayConfigService,
+    @Inject(AUTH_SERVICE_CLIENT) private readonly authClient: ClientProxy,
+  ) {}
 
   async forwardRequest(
     req: Request,
     res: Response,
-    targetPath: string,
-    body?: unknown,
+    pattern: string,
+    options?: { id?: string; body?: unknown; statusCode?: number },
   ): Promise<void> {
     const sanitizedIncoming = stripForgedInternalHeaders(req.headers);
     const forwardHeaders: Record<string, string> = {};
@@ -38,42 +57,43 @@ export class AuthProxyService {
       }
     }
 
-    if (body !== undefined) {
-      forwardHeaders['content-type'] = 'application/json';
-    }
+    const requestPayload: AuthTcpRequestDto<unknown> = {
+      headers: forwardHeaders,
+      method: req.method,
+      ...(req.ip ? { ip: req.ip } : {}),
+      ...(options?.id !== undefined ? { id: options.id } : {}),
+      ...(options?.body !== undefined ? { body: options.body } : {}),
+    };
 
-    let upstream: globalThis.Response;
+    let result: unknown;
     try {
-      upstream = await fetch(`${this.config.authServiceUrl}${targetPath}`, {
-        method: req.method,
-        headers: forwardHeaders,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
+      result = await firstValueFrom(this.authClient.send<unknown>(pattern, requestPayload));
     } catch (error) {
+      const rpcError = extractRpcErrorPayload(error);
+      if (rpcError?.statusCode) {
+        throw new HttpException(rpcError, rpcError.statusCode);
+      }
+
       this.logger.error(
         JSON.stringify({
           event: 'gateway.auth_proxy.network_error',
-          path: targetPath,
-          error: error instanceof Error ? error.message : 'Unknown fetch error',
+          pattern,
+          error: error instanceof Error ? error.message : 'Unknown TCP error',
         }),
       );
       throw new BadGatewayException('Authentication service unavailable');
     }
 
-    const setCookies = upstream.headers.getSetCookie();
-    if (setCookies.length > 0) {
-      res.setHeader('set-cookie', setCookies);
-    }
-
-    const contentType = upstream.headers.get('content-type') ?? '';
-    if (contentType.includes('application/json')) {
-      const payload: unknown = await upstream.json();
-      res.status(upstream.status).json(payload);
+    const statusCode = options?.statusCode ?? HttpStatus.OK;
+    if (isAuthTcpResponse(result)) {
+      if (result.setCookie) {
+        res.setHeader('set-cookie', [result.setCookie]);
+      }
+      res.status(statusCode).json(result.data);
       return;
     }
 
-    const text = await upstream.text();
-    res.status(upstream.status).send(text);
+    res.status(statusCode).json(result);
   }
 
   async resolveCurrentUser(cookieHeader?: string): Promise<UserResponseDto | null> {
@@ -82,14 +102,16 @@ export class AuthProxyService {
     }
 
     try {
-      const response = await fetch(`${this.config.authServiceUrl}/auth/me`, {
-        method: 'GET',
+      const payload: AuthTcpRequestDto = {
         headers: { cookie: cookieHeader },
-      });
-      if (!response.ok) {
-        return null;
-      }
-      return (await response.json()) as UserResponseDto;
+        method: 'GET',
+      };
+      return await firstValueFrom(
+        this.authClient.send<UserResponseDto, AuthTcpRequestDto>(
+          SERVICE_TCP_PATTERNS.AUTH_ME,
+          payload,
+        ),
+      );
     } catch {
       return null;
     }

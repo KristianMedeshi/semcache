@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  DEFAULT_SERVICE_PORTS,
   type NodeEnvironment,
   getNodeEnv,
   getOptionalEnv,
   getRequiredEnv,
   resolveSecretEnv,
+  resolveServiceTcpEndpoint,
 } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
 
@@ -15,7 +15,8 @@ export class DialogConfigService {
 
   readonly nodeEnv: NodeEnvironment;
   readonly databaseUrl: string;
-  readonly llmServiceUrl: string;
+  readonly llmServiceHost: string;
+  readonly llmServicePort: number;
   readonly internalServiceSecret: string;
 
   constructor() {
@@ -23,8 +24,13 @@ export class DialogConfigService {
     this.databaseUrl =
       this.nodeEnv === 'test' ? getOptionalEnv('DATABASE_URL', '') : getRequiredEnv('DATABASE_URL');
 
-    const defaultLlmUrl = `http://localhost:${DEFAULT_SERVICE_PORTS[ServiceName.LLM_SERVICE]}`;
-    this.llmServiceUrl = getOptionalEnv('LLM_SERVICE_URL', defaultLlmUrl).replace(/\/+$/, '');
+    const llmEndpoint = resolveServiceTcpEndpoint(ServiceName.LLM_SERVICE, {
+      hostKey: 'LLM_SERVICE_HOST',
+      portKey: 'LLM_SERVICE_PORT',
+      urlKey: 'LLM_SERVICE_URL',
+    });
+    this.llmServiceHost = llmEndpoint.host;
+    this.llmServicePort = llmEndpoint.port;
     this.internalServiceSecret = resolveSecretEnv('INTERNAL_SERVICE_SECRET', this.nodeEnv, (msg) =>
       this.logger.warn(msg),
     );

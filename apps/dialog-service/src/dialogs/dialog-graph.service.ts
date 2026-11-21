@@ -2,21 +2,26 @@ import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import {
   BadGatewayException,
   BadRequestException,
-  HttpException,
+  Inject,
   Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import { extractRpcErrorPayload, formatRpcErrorMessage } from '@semcache/shared-config';
 import type {
   DialogMessageResponseDto,
   DialogResponseDto,
+  LlmChatCompletionRequestDto,
   LlmChatCompletionResponseDto,
   LlmChatMessageDto,
   SendMessageResponseDto,
 } from '@semcache/shared-dtos';
-import { ChatMessageRole } from '@semcache/shared-types';
-import { DialogConfigService } from '../config/dialog-config.service';
+import { ChatMessageRole, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
+import { firstValueFrom } from 'rxjs';
 import { DEFAULT_DIALOG_TITLE, DialogsRepository } from './dialogs.repository';
+
+export const LLM_SERVICE_CLIENT = Symbol('LLM_SERVICE_CLIENT');
 
 const CUSTOMER_SUPPORT_SYSTEM_PROMPT =
   'You are a helpful, concise customer support assistant for SemCache. Answer clearly and accurately.';
@@ -46,7 +51,7 @@ export class DialogGraphService {
 
   constructor(
     private readonly dialogsRepository: DialogsRepository,
-    private readonly config: DialogConfigService,
+    @Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy,
   ) {
     this.compiledGraph = new StateGraph(DialogTurnState)
       .addNode('record_user_message', (state) => this.recordUserMessage(state))
@@ -111,40 +116,39 @@ export class DialogGraphService {
   }
 
   private async callLlmService(state: DialogTurnStateType): Promise<Partial<DialogTurnStateType>> {
-    let response: globalThis.Response;
     try {
-      response = await fetch(`${this.config.llmServiceUrl}/llm/chat`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          messages: state.history,
-          ...(state.requestedModel ? { model: state.requestedModel } : {}),
-        }),
-      });
+      const llmCompletion = await firstValueFrom(
+        this.llmClient.send<LlmChatCompletionResponseDto, LlmChatCompletionRequestDto>(
+          SERVICE_TCP_PATTERNS.LLM_CHAT,
+          {
+            messages: state.history,
+            ...(state.requestedModel ? { model: state.requestedModel } : {}),
+          },
+        ),
+      );
+      return { llmCompletion };
     } catch (error) {
+      const rpcError = extractRpcErrorPayload(error);
+      if (rpcError) {
+        const message = formatRpcErrorMessage(rpcError, 'LLM service error');
+        if (rpcError.statusCode === 400) {
+          throw new BadRequestException(message);
+        }
+        if (rpcError.statusCode === 503) {
+          throw new ServiceUnavailableException(message);
+        }
+        throw new BadGatewayException(message);
+      }
+
       this.logger.error(
         JSON.stringify({
           event: 'dialog.llm_service.network_error',
           dialogId: state.dialog.id,
-          error: error instanceof Error ? error.message : 'Unknown network error',
+          error: error instanceof Error ? error.message : 'Unknown TCP error',
         }),
       );
       throw new BadGatewayException('LLM service unavailable');
     }
-
-    if (!response.ok) {
-      const errorMessage = await this.extractUpstreamErrorMessage(response);
-      if (response.status === 400) {
-        throw new BadRequestException(errorMessage);
-      }
-      if (response.status === 503) {
-        throw new ServiceUnavailableException(errorMessage);
-      }
-      throw new BadGatewayException(errorMessage);
-    }
-
-    const llmCompletion = (await response.json()) as LlmChatCompletionResponseDto;
-    return { llmCompletion };
   }
 
   private async recordAssistantMessage(
@@ -174,22 +178,5 @@ export class DialogGraphService {
       assistantMessage,
       updatedDialog,
     };
-  }
-
-  private async extractUpstreamErrorMessage(response: globalThis.Response): Promise<string> {
-    try {
-      const payload = (await response.json()) as { message?: string | string[] };
-      if (Array.isArray(payload.message)) {
-        return payload.message.join(', ');
-      }
-      if (typeof payload.message === 'string' && payload.message.length > 0) {
-        return payload.message;
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-    }
-    return `LLM service error (HTTP ${response.status})`;
   }
 }

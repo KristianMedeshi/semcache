@@ -21,7 +21,7 @@ SemCache implements browser-based session authentication and policy-based author
 - **Rate limiting**:
   - `ThrottlerModule` + `ThrottlerGuard` apply both per-IP throttling (`default`) and per-email + IP throttling (`account`) on `POST /auth/login`.
 - **CSRF protection**:
-  - Both `auth-service` and `api-gateway` enable `app.enableCsrfProtection({ trustedOrigins: config.corsOrigin })` (Fetch Metadata `Sec-Fetch-Site` with `Origin`/`Host` validation) and CORS with `credentials: true`.
+  - `api-gateway` enables `app.enableCsrfProtection({ trustedOrigins: config.corsOrigin })` (Fetch Metadata `Sec-Fetch-Site` with `Origin`/`Host` validation) and CORS with `credentials: true`, and `auth-service` enforces `SessionService.isCrossOriginWrite()` on forwarded RPC header metadata.
 
 ---
 
@@ -44,20 +44,20 @@ SemCache implements browser-based session authentication and policy-based author
 
 ---
 
-## 3. REST API Contracts & Endpoints
+## 3. Gateway REST & Internal TCP Contracts (`SERVICE_TCP_PATTERNS`)
 
-All DTO contracts live in `@semcache/shared-dtos` (`packages/shared-dtos/src/index.ts`).
+All DTO contracts live in `@semcache/shared-dtos` (`packages/shared-dtos/src/index.ts`) and TCP message patterns live in `@semcache/shared-types` (`SERVICE_TCP_PATTERNS`).
 
-| Method   | Path                        | Access                                    | Request DTO                   | Response DTO                            |
-| :------- | :-------------------------- | :---------------------------------------- | :---------------------------- | :-------------------------------------- |
-| `POST`   | `/auth/register`            | Public                                    | `RegisterRequestDto`          | `UserResponseDto` (`201`)               |
-| `POST`   | `/auth/login`               | Public                                    | `LoginRequestDto`             | `UserResponseDto` (`200`)               |
-| `POST`   | `/auth/logout`              | Session cookie required (`401` if absent) | —                             | `LogoutResponseDto` (`200`)             |
-| `GET`    | `/auth/me`                  | Authenticated (`CUSTOMER` / `ADMIN`)      | —                             | `UserResponseDto` (`200`)               |
-| `GET`    | `/users/:id`                | Owner (`CUSTOMER`) or `ADMIN`             | —                             | `UserResponseDto` (`200`)               |
-| `PATCH`  | `/users/:id`                | Owner (`CUSTOMER`) or `ADMIN`             | `UpdateUserProfileRequestDto` | `UserResponseDto` (`200`)               |
-| `GET`    | `/admin/users`              | `ADMIN` only                              | —                             | `UserResponseDto[]` (`200`)             |
-| `DELETE` | `/admin/users/:id/sessions` | `ADMIN` only                              | —                             | `RevokeUserSessionsResponseDto` (`200`) |
+| Method   | Path                        | TCP Pattern                  | Access                                    | Request DTO                   | Response DTO                            |
+| :------- | :-------------------------- | :--------------------------- | :---------------------------------------- | :---------------------------- | :-------------------------------------- |
+| `POST`   | `/auth/register`            | `auth.register`              | Public                                    | `RegisterRequestDto`          | `UserResponseDto` (`201`)               |
+| `POST`   | `/auth/login`               | `auth.login`                 | Public                                    | `LoginRequestDto`             | `UserResponseDto` (`200`)               |
+| `POST`   | `/auth/logout`              | `auth.logout`                | Session cookie required (`401` if absent) | —                             | `LogoutResponseDto` (`200`)             |
+| `GET`    | `/auth/me`                  | `auth.me`                    | Authenticated (`CUSTOMER` / `ADMIN`)      | —                             | `UserResponseDto` (`200`)               |
+| `GET`    | `/users/:id`                | `users.get`                  | Owner (`CUSTOMER`) or `ADMIN`             | —                             | `UserResponseDto` (`200`)               |
+| `PATCH`  | `/users/:id`                | `users.update`               | Owner (`CUSTOMER`) or `ADMIN`             | `UpdateUserProfileRequestDto` | `UserResponseDto` (`200`)               |
+| `GET`    | `/admin/users`              | `admin.users.list`           | `ADMIN` only                              | —                             | `UserResponseDto[]` (`200`)             |
+| `DELETE` | `/admin/users/:id/sessions` | `admin.users.revokeSessions` | `ADMIN` only                              | —                             | `RevokeUserSessionsResponseDto` (`200`) |
 
 > **Note**: `role` is rejected (`400 Bad Request`) on all public registration and profile update payloads via strict `ValidationPipe` (`whitelist: true`, `forbidNonWhitelisted: true`).
 >
@@ -83,7 +83,7 @@ pnpm --filter @semcache/auth-service db:migrate
 ## 5. API Gateway & Microservice Identity Context
 
 - `StripInternalHeadersMiddleware` and `stripForgedInternalHeaders()` strip any client-supplied `x-internal-*` headers (`x-internal-user-id`, `x-internal-user-email`, `x-internal-user-role`, `x-internal-session-id`, `x-internal-auth-signature`) at the `api-gateway` boundary.
-- `AuthProxyService` forwards authentication, profile, and admin requests to `AUTH_SERVICE_URL`, relaying `Cookie`, `Origin`, `Referer`, `Sec-Fetch-Site`, `User-Agent`, and `Set-Cookie`.
+- `AuthProxyService` forwards authentication, profile, and admin requests to `auth-service` over NestJS TCP (`Transport.TCP` at `AUTH_SERVICE_HOST:AUTH_SERVICE_PORT`), relaying sanitized `Cookie`, `Origin`, `Referer`, `Sec-Fetch-Site`, `User-Agent`, `X-Forwarded-For`, and `Set-Cookie`.
 - `createSignedInternalHeaders` / `verifySignedInternalHeaders` sign and verify `AuthenticatedUser` identity headers with HMAC-SHA256 using `INTERNAL_SERVICE_SECRET` for downstream service calls.
 
 ---
@@ -99,7 +99,8 @@ pnpm --filter @semcache/auth-service db:migrate
 | Variable                        | Default (dev/test)                            | Production Requirement    | Purpose                                        |
 | :------------------------------ | :-------------------------------------------- | :------------------------ | :--------------------------------------------- |
 | `DATABASE_URL`                  | Optional in `test`                            | Required                  | PostgreSQL connection URL                      |
-| `AUTH_SERVICE_URL`              | `http://localhost:3001`                       | Required if non-default   | Base URL of `auth-service` for `api-gateway`   |
+| `AUTH_SERVICE_HOST`             | `127.0.0.1`                                   | Required if non-default   | TCP host of `auth-service` for `api-gateway`   |
+| `AUTH_SERVICE_PORT`             | `3001`                                        | Required if non-default   | TCP port of `auth-service` for `api-gateway`   |
 | `INTERNAL_SERVICE_SECRET`       | Ephemeral 32-byte random                      | Required (min 32 chars)   | HMAC secret for signing `x-internal-*` headers |
 | `SESSION_COOKIE_NAME`           | `semcache_sid`                                | Optional                  | Name of the HttpOnly session cookie            |
 | `SESSION_TTL_MS`                | `86400000` (24h)                              | Optional                  | Absolute session expiration in ms              |

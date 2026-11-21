@@ -9,15 +9,16 @@ Frontend (:5173)
   │  Cookie session + JSON over HTTP
   ▼
 API Gateway (:3000)
-  │  1. Verifies session via auth-service (/auth/me)
+  │  1. Verifies session via auth-service over TCP (`auth.me`)
   │  2. Signs x-internal-user-* headers with INTERNAL_SERVICE_SECRET
+  │  3. Forwards dialog operations over NestJS TCP (`Transport.TCP`)
   ▼
-Dialog Service (:3002)
+Dialog Service (:3002, TCP)
   │  1. Verifies internal signature (InternalAuthGuard)
   │  2. Persists dialog & messages via Drizzle ORM (dialogs, dialog_messages)
   │  3. Orchestrates turn with LangGraph StateGraph (DialogGraphService)
   ▼
-LLM Service (:3004)
+LLM Service (:3004, TCP, `llm.chat`)
   │  1. Enforces free-only OpenRouter model policy
   │  2. Executes chat completion via @nestjs/ai + @ai-sdk/openai-compatible
   ▼
@@ -40,9 +41,9 @@ To prevent accidental paid usage during thesis development and evaluation, SemCa
 
 ---
 
-## 3. REST Contracts (`@semcache/shared-dtos`)
+## 3. HTTP & TCP Contracts (`@semcache/shared-dtos` & `SERVICE_TCP_PATTERNS`)
 
-### `llm-service` (`POST /llm/chat`)
+### `llm-service` (`SERVICE_TCP_PATTERNS.LLM_CHAT` = `'llm.chat'` over `Transport.TCP`)
 
 Request (`LlmChatCompletionRequestDto`):
 
@@ -58,12 +59,12 @@ Response (`LlmChatCompletionResponseDto`):
 - `latencyMs`: provider round-trip duration in milliseconds
 - `usage`: `{ promptTokens, completionTokens, totalTokens }`
 
-### `dialog-service` & `api-gateway` (`/dialogs`)
+### `dialog-service` (`Transport.TCP`) & `api-gateway` (HTTP `/dialogs`)
 
-- `POST /dialogs` — creates a new dialog for the authenticated user (`CreateDialogRequestDto` -> `DialogResponseDto`).
-- `GET /dialogs` — lists dialogs owned by the authenticated user (`DialogResponseDto[]`).
-- `GET /dialogs/:id/messages` — lists ordered messages for an owned dialog (`DialogMessageResponseDto[]`).
-- `POST /dialogs/:id/messages` — executes a LangGraph turn (`SendMessageRequestDto` -> `SendMessageResponseDto`) containing `{ dialog, userMessage, assistantMessage }`.
+- `POST /dialogs` -> `dialogs.create` — creates a new dialog for the authenticated user (`CreateDialogRequestDto` -> `DialogResponseDto`).
+- `GET /dialogs` -> `dialogs.list` — lists dialogs owned by the authenticated user (`DialogResponseDto[]`).
+- `GET /dialogs/:id/messages` -> `dialogs.messages.list` — lists ordered messages for an owned dialog (`DialogMessageResponseDto[]`).
+- `POST /dialogs/:id/messages` -> `dialogs.messages.send` — executes a LangGraph turn (`SendMessageRequestDto` -> `SendMessageResponseDto`) containing `{ dialog, userMessage, assistantMessage }`.
 
 ---
 
@@ -71,8 +72,10 @@ Response (`LlmChatCompletionResponseDto`):
 
 Add the following variables to `.env` (documented in `.env.example`):
 
-- `DIALOG_SERVICE_URL=http://localhost:3002`
-- `LLM_SERVICE_URL=http://localhost:3004`
+- `DIALOG_SERVICE_HOST=127.0.0.1`
+- `DIALOG_SERVICE_PORT=3002`
+- `LLM_SERVICE_HOST=127.0.0.1`
+- `LLM_SERVICE_PORT=3004`
 - `OPENROUTER_API_KEY=<your-openrouter-api-key>`
 - `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`
 - `OPENROUTER_DEFAULT_MODEL=openrouter/free`

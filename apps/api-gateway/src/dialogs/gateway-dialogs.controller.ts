@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
+import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { DialogProxyService } from './dialog-proxy.service';
 import { GatewayCreateDialogDto, GatewaySendMessageDto } from './dto/gateway-dialogs.dto';
@@ -13,12 +24,27 @@ export class GatewayDialogsController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    await this.dialogProxyService.forwardDialogRequest(req, res, '/dialogs', body);
+    await this.dialogProxyService.forwardDialogRequest(
+      req,
+      res,
+      SERVICE_TCP_PATTERNS.DIALOGS_CREATE,
+      {
+        body,
+        statusCode: HttpStatus.CREATED,
+      },
+    );
   }
 
   @Get()
   async listDialogs(@Req() req: Request, @Res() res: Response): Promise<void> {
-    await this.dialogProxyService.forwardDialogRequest(req, res, '/dialogs');
+    await this.dialogProxyService.forwardDialogRequest(
+      req,
+      res,
+      SERVICE_TCP_PATTERNS.DIALOGS_LIST,
+      {
+        statusCode: HttpStatus.OK,
+      },
+    );
   }
 
   @Get(':id/messages')
@@ -27,7 +53,15 @@ export class GatewayDialogsController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    await this.dialogProxyService.forwardDialogRequest(req, res, `/dialogs/${id}/messages`);
+    await this.dialogProxyService.forwardDialogRequest(
+      req,
+      res,
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_LIST,
+      {
+        dialogId: id,
+        statusCode: HttpStatus.OK,
+      },
+    );
   }
 
   @Post(':id/messages')
@@ -37,6 +71,15 @@ export class GatewayDialogsController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    await this.dialogProxyService.forwardDialogRequest(req, res, `/dialogs/${id}/messages`, body);
+    await this.dialogProxyService.forwardDialogRequest(
+      req,
+      res,
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_SEND,
+      {
+        dialogId: id,
+        body,
+        statusCode: HttpStatus.OK,
+      },
+    );
   }
 }

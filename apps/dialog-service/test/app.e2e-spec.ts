@@ -1,20 +1,52 @@
 import { randomUUID } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { Injectable, type INestApplication } from '@nestjs/common';
+import type { AddressInfo, Server } from 'node:net';
+import { Controller, type INestMicroservice, Injectable, Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import {
+  ClientProxy,
+  ClientProxyFactory,
+  MessagePattern,
+  type MicroserviceOptions,
+  Payload,
+  Transport,
+} from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { createSignedInternalHeaders } from '@semcache/shared-config';
+import { createSignedInternalHeaders, extractRpcErrorPayload } from '@semcache/shared-config';
 import type {
   DialogMessageResponseDto,
   DialogResponseDto,
+  LlmChatCompletionResponseDto,
   LlmTokenUsageDto,
+  SendMessageResponseDto,
 } from '@semcache/shared-dtos';
-import { ChatMessageRole, ServiceName, UserRole } from '@semcache/shared-types';
-import request from 'supertest';
-import type { App } from 'supertest/types';
+import {
+  ChatMessageRole,
+  SERVICE_TCP_PATTERNS,
+  ServiceName,
+  UserRole,
+} from '@semcache/shared-types';
+import { firstValueFrom } from 'rxjs';
 import { AppModule } from '../src/app.module';
 import { DIALOG_PG_POOL } from '../src/db/database.module';
 import { DEFAULT_DIALOG_TITLE, DialogsRepository } from '../src/dialogs/dialogs.repository';
+
+@Controller()
+class MockLlmController {
+  @MessagePattern(SERVICE_TCP_PATTERNS.LLM_CHAT)
+  chat(@Payload() payload: { model?: string }): LlmChatCompletionResponseDto {
+    return {
+      content: 'Assistant answer via mocked LLM service',
+      model: payload.model ?? 'openrouter/free',
+      latencyMs: 85,
+      usage: { promptTokens: 20, completionTokens: 6, totalTokens: 26 },
+    };
+  }
+}
+
+@Module({
+  controllers: [MockLlmController],
+})
+class MockLlmModule {}
 
 @Injectable()
 class InMemoryDialogsRepository {
@@ -87,45 +119,26 @@ class InMemoryDialogsRepository {
   }
 }
 
-describe('Dialog Service (e2e)', () => {
-  let app: INestApplication<App>;
-  let mockLlmServer: Server;
+describe('Dialog Service (TCP e2e)', () => {
+  let app: INestMicroservice;
+  let client: ClientProxy;
+  let mockLlmApp: INestMicroservice;
   const originalEnv = { ...process.env };
   const secret = 'test-internal-service-secret-32-chars';
 
   beforeAll(async () => {
-    mockLlmServer = createServer((req, res) => {
-      let body = '';
-      req.on('data', (chunk: Buffer) => {
-        body += chunk.toString('utf8');
-      });
-      req.on('end', () => {
-        if (req.url === '/llm/chat' && req.method === 'POST') {
-          const parsed = JSON.parse(body) as { model?: string };
-          res.writeHead(200, { 'content-type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              content: 'Assistant answer via mocked LLM service',
-              model: parsed.model ?? 'openrouter/free',
-              latencyMs: 85,
-              usage: { promptTokens: 20, completionTokens: 6, totalTokens: 26 },
-            }),
-          );
-          return;
-        }
-        res.writeHead(404);
-        res.end();
-      });
+    mockLlmApp = await NestFactory.createMicroservice<MicroserviceOptions>(MockLlmModule, {
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: 0 },
+      logger: false,
     });
-
-    await new Promise<void>((resolve) => {
-      mockLlmServer.listen(0, '127.0.0.1', () => resolve());
-    });
-    const address = mockLlmServer.address() as AddressInfo;
+    await mockLlmApp.listen();
+    const llmAddress = mockLlmApp.unwrap<Server>().address() as AddressInfo;
 
     process.env.NODE_ENV = 'test';
     process.env.INTERNAL_SERVICE_SECRET = secret;
-    process.env.LLM_SERVICE_URL = `http://127.0.0.1:${address.port}`;
+    process.env.LLM_SERVICE_HOST = '127.0.0.1';
+    process.env.LLM_SERVICE_PORT = String(llmAddress.port);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -136,33 +149,45 @@ describe('Dialog Service (e2e)', () => {
       .useValue({ end: jest.fn().mockResolvedValue(undefined) })
       .compile();
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
+    app = moduleFixture.createNestMicroservice<MicroserviceOptions>({
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: 0 },
+    });
+    await app.listen();
+
+    const dialogAddress = app.unwrap<Server>().address() as AddressInfo;
+    client = ClientProxyFactory.create({
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: dialogAddress.port },
+    });
+    await client.connect();
   });
 
   afterAll(async () => {
+    await client.close();
     await app.close();
-    await new Promise<void>((resolve, reject) => {
-      mockLlmServer.close((err) => (err ? reject(err) : resolve()));
-    });
+    await mockLlmApp.close();
     process.env = { ...originalEnv };
   });
 
-  it('/health (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/health')
-      .expect(200)
-      .expect((res) => {
-        expect(res.body).toEqual({
-          service: ServiceName.DIALOG_SERVICE,
-          status: 'ok',
-          timestamp: expect.any(String),
-        });
-      });
+  it('app.health returns ServiceName.DIALOG_SERVICE health status', async () => {
+    const res = await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.APP_HEALTH, {}));
+    expect(res).toEqual({
+      service: ServiceName.DIALOG_SERVICE,
+      status: 'ok',
+      timestamp: expect.any(String),
+    });
   });
 
-  it('rejects requests without valid signed internal identity headers', () => {
-    return request(app.getHttpServer()).get('/dialogs').expect(401);
+  it('rejects requests without valid signed internal identity headers', async () => {
+    let caughtError: unknown;
+    try {
+      await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.DIALOGS_LIST, { headers: {} }));
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(extractRpcErrorPayload(caughtError)?.statusCode).toBe(401);
   });
 
   it('creates a dialog, sends a message through LangGraph, and retrieves history', async () => {
@@ -176,30 +201,33 @@ describe('Dialog Service (e2e)', () => {
       secret,
     );
 
-    const createRes = await request(app.getHttpServer())
-      .post('/dialogs')
-      .set(internalHeaders)
-      .send({})
-      .expect(201);
+    const createdDialog = await firstValueFrom(
+      client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_CREATE, {
+        headers: internalHeaders,
+        body: {},
+      }),
+    );
 
-    const dialogId = (createRes.body as DialogResponseDto).id;
+    const turn = await firstValueFrom(
+      client.send<SendMessageResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_SEND, {
+        headers: internalHeaders,
+        dialogId: createdDialog.id,
+        body: { content: 'Where is my invoice?', model: 'openrouter/free' },
+      }),
+    );
 
-    const turnRes = await request(app.getHttpServer())
-      .post(`/dialogs/${dialogId}/messages`)
-      .set(internalHeaders)
-      .send({ content: 'Where is my invoice?', model: 'openrouter/free' })
-      .expect(200);
+    expect(turn.dialog.title).toBe('Where is my invoice?');
+    expect(turn.assistantMessage.content).toBe('Assistant answer via mocked LLM service');
+    expect(turn.assistantMessage.model).toBe('openrouter/free');
 
-    expect(turnRes.body.dialog.title).toBe('Where is my invoice?');
-    expect(turnRes.body.assistantMessage.content).toBe('Assistant answer via mocked LLM service');
-    expect(turnRes.body.assistantMessage.model).toBe('openrouter/free');
+    const messages = await firstValueFrom(
+      client.send<DialogMessageResponseDto[]>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_LIST, {
+        headers: internalHeaders,
+        dialogId: createdDialog.id,
+      }),
+    );
 
-    const messagesRes = await request(app.getHttpServer())
-      .get(`/dialogs/${dialogId}/messages`)
-      .set(internalHeaders)
-      .expect(200);
-
-    expect(messagesRes.body).toHaveLength(2);
+    expect(messages).toHaveLength(2);
   });
 
   it('rejects non-free OpenRouter model requests with 400 Bad Request', async () => {
@@ -213,18 +241,26 @@ describe('Dialog Service (e2e)', () => {
       secret,
     );
 
-    const createRes = await request(app.getHttpServer())
-      .post('/dialogs')
-      .set(internalHeaders)
-      .send({ title: 'Test' })
-      .expect(201);
+    const createdDialog = await firstValueFrom(
+      client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_CREATE, {
+        headers: internalHeaders,
+        body: { title: 'Test' },
+      }),
+    );
 
-    const dialogId = (createRes.body as DialogResponseDto).id;
+    let caughtError: unknown;
+    try {
+      await firstValueFrom(
+        client.send(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_SEND, {
+          headers: internalHeaders,
+          dialogId: createdDialog.id,
+          body: { content: 'Hello', model: 'openai/gpt-4o' },
+        }),
+      );
+    } catch (error) {
+      caughtError = error;
+    }
 
-    await request(app.getHttpServer())
-      .post(`/dialogs/${dialogId}/messages`)
-      .set(internalHeaders)
-      .send({ content: 'Hello', model: 'openai/gpt-4o' })
-      .expect(400);
+    expect(extractRpcErrorPayload(caughtError)?.statusCode).toBe(400);
   });
 });

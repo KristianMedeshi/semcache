@@ -7,10 +7,14 @@ import {
 } from '@nestjs/common';
 import { verifySignedInternalHeaders } from '@semcache/shared-config';
 import type { AuthenticatedUser } from '@semcache/shared-types';
-import type { Request } from 'express';
 import { DialogConfigService } from '../config/dialog-config.service';
 
-export interface InternalAuthenticatedRequest extends Request {
+interface InternalRpcPayload {
+  headers?: Record<string, string | string[] | undefined>;
+  internalUser?: AuthenticatedUser;
+}
+
+interface InternalRpcContext {
   internalUser?: AuthenticatedUser;
 }
 
@@ -19,9 +23,11 @@ export class InternalAuthGuard implements CanActivate {
   constructor(private readonly config: DialogConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<InternalAuthenticatedRequest>();
+    const rpc = context.switchToRpc();
+    const data = rpc.getData<InternalRpcPayload | undefined>();
+    const rpcContext = rpc.getContext<InternalRpcContext | undefined>();
     const verified = verifySignedInternalHeaders(
-      request.headers,
+      data?.headers ?? {},
       this.config.internalServiceSecret,
     );
 
@@ -29,17 +35,25 @@ export class InternalAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or missing internal identity signature');
     }
 
-    request.internalUser = verified;
+    if (rpcContext && typeof rpcContext === 'object') {
+      rpcContext.internalUser = verified;
+    }
+    if (data && typeof data === 'object') {
+      data.internalUser = verified;
+    }
     return true;
   }
 }
 
 export const CurrentInternalUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthenticatedUser => {
-    const request = ctx.switchToHttp().getRequest<InternalAuthenticatedRequest>();
-    if (!request.internalUser) {
+    const rpc = ctx.switchToRpc();
+    const rpcContext = rpc.getContext<InternalRpcContext | undefined>();
+    const data = rpc.getData<InternalRpcPayload | undefined>();
+    const user = rpcContext?.internalUser ?? data?.internalUser;
+    if (!user) {
       throw new UnauthorizedException('Internal user context not resolved');
     }
-    return request.internalUser;
+    return user;
   },
 );

@@ -224,3 +224,41 @@ export interface SendMessageResponseDto {
   userMessage: DialogMessageResponseDto;
   assistantMessage: DialogMessageResponseDto;
 }
+
+/**
+ * Structured RPC error payload serialized over NestJS TCP transport.
+ */
+export interface RpcErrorPayloadDto {
+  statusCode: number;
+  message: string | string[];
+  error?: string;
+  errorCode?: string;
+}
+
+/**
+ * TCP RPC request envelope forwarded from `api-gateway` to `auth-service`.
+ */
+export interface AuthTcpRequestDto<TBody = undefined> {
+  body?: TBody;
+  id?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  method?: string;
+  ip?: string;
+}
+
+/**
+ * TCP RPC response envelope returned by `auth-service` when setting or clearing cookies.
+ */
+export interface AuthTcpResponseDto<TData> {
+  data: TData;
+  setCookie?: string;
+}
+
+/**
+ * TCP RPC request envelope forwarded from `api-gateway` to `dialog-service`.
+ */
+export interface DialogTcpRequestDto<TBody = undefined> {
+  headers: Record<string, string>;
+  dialogId?: string;
+  body?: TBody;
+}

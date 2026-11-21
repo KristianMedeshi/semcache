@@ -3,12 +3,14 @@ import {
   Controller,
   Delete,
   Get,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
   Req,
   Res,
 } from '@nestjs/common';
+import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { AuthProxyService } from './auth-proxy.service';
 import { GatewayUpdateProfileDto } from './dto/gateway-auth.dto';
@@ -23,7 +25,10 @@ export class GatewayUsersController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    await this.authProxyService.forwardRequest(req, res, `/users/${id}`);
+    await this.authProxyService.forwardRequest(req, res, SERVICE_TCP_PATTERNS.USERS_GET, {
+      id,
+      statusCode: HttpStatus.OK,
+    });
   }
 
   @Patch(':id')
@@ -33,7 +38,11 @@ export class GatewayUsersController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    await this.authProxyService.forwardRequest(req, res, `/users/${id}`, body);
+    await this.authProxyService.forwardRequest(req, res, SERVICE_TCP_PATTERNS.USERS_UPDATE, {
+      id,
+      body,
+      statusCode: HttpStatus.OK,
+    });
   }
 }
 
@@ -43,7 +52,9 @@ export class GatewayAdminUsersController {
 
   @Get()
   async listUsers(@Req() req: Request, @Res() res: Response): Promise<void> {
-    await this.authProxyService.forwardRequest(req, res, '/admin/users');
+    await this.authProxyService.forwardRequest(req, res, SERVICE_TCP_PATTERNS.ADMIN_USERS_LIST, {
+      statusCode: HttpStatus.OK,
+    });
   }
 
   @Delete(':id/sessions')
@@ -52,6 +63,14 @@ export class GatewayAdminUsersController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    await this.authProxyService.forwardRequest(req, res, `/admin/users/${id}/sessions`);
+    await this.authProxyService.forwardRequest(
+      req,
+      res,
+      SERVICE_TCP_PATTERNS.ADMIN_USERS_REVOKE_SESSIONS,
+      {
+        id,
+        statusCode: HttpStatus.OK,
+      },
+    );
   }
 }

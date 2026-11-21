@@ -104,3 +104,27 @@ export interface HealthCheckStatus {
   status: 'ok' | 'degraded' | 'down';
   timestamp: string;
 }
+
+/**
+ * Canonical TCP message patterns used for synchronous inter-service communication
+ * over NestJS `Transport.TCP`.
+ */
+export const SERVICE_TCP_PATTERNS = {
+  APP_HELLO: 'app.hello',
+  APP_HEALTH: 'app.health',
+  AUTH_REGISTER: 'auth.register',
+  AUTH_LOGIN: 'auth.login',
+  AUTH_LOGOUT: 'auth.logout',
+  AUTH_ME: 'auth.me',
+  USERS_GET: 'users.get',
+  USERS_UPDATE: 'users.update',
+  ADMIN_USERS_LIST: 'admin.users.list',
+  ADMIN_USERS_REVOKE_SESSIONS: 'admin.users.revokeSessions',
+  DIALOGS_CREATE: 'dialogs.create',
+  DIALOGS_LIST: 'dialogs.list',
+  DIALOGS_MESSAGES_LIST: 'dialogs.messages.list',
+  DIALOGS_MESSAGES_SEND: 'dialogs.messages.send',
+  LLM_CHAT: 'llm.chat',
+} as const;
+
+export type ServiceTcpPattern = (typeof SERVICE_TCP_PATTERNS)[keyof typeof SERVICE_TCP_PATTERNS];

@@ -47,6 +47,14 @@ export const DEFAULT_CORS_ORIGIN = 'http://localhost:5173,http://127.0.0.1:5173'
 export const DEFAULT_CORS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
 export const MIN_INTERNAL_SECRET_LENGTH = 32;
 
+export const DEFAULT_SERVICE_HOST = '127.0.0.1';
+export const DEFAULT_TCP_TIMEOUT_MS = 30_000;
+
+export interface TcpEndpointConfig {
+  host: string;
+  port: number;
+}
+
 /**
  * Default port mapping for local development across microservices.
  */
@@ -58,6 +66,120 @@ export const DEFAULT_SERVICE_PORTS: Record<ServiceName, number> = {
   [ServiceName.LLM_SERVICE]: 3004,
   [ServiceName.KNOWLEDGE_BASE_SERVICE]: 3005,
 };
+
+/**
+ * Resolves a microservice's TCP host/port from dedicated env vars, with optional fallback
+ * to a legacy URL env var and default service ports.
+ */
+export function resolveServiceTcpEndpoint(
+  service: ServiceName,
+  options?: { hostKey?: string; portKey?: string; urlKey?: string },
+): TcpEndpointConfig {
+  const hostEnv = options?.hostKey ? process.env[options.hostKey]?.trim() : undefined;
+  const portEnv = options?.portKey ? process.env[options.portKey]?.trim() : undefined;
+  const urlEnv = options?.urlKey ? process.env[options.urlKey]?.trim() : undefined;
+
+  let parsedHost: string | undefined;
+  let parsedPort: number | undefined;
+  if ((!hostEnv || !portEnv) && urlEnv) {
+    try {
+      const parsed = new URL(urlEnv);
+      if (parsed.hostname) {
+        parsedHost = parsed.hostname;
+      }
+      if (parsed.port) {
+        const numericPort = Number.parseInt(parsed.port, 10);
+        if (!Number.isNaN(numericPort) && numericPort > 0) {
+          parsedPort = numericPort;
+        }
+      }
+    } catch {
+      // Ignore malformed legacy URLs and fall back to defaults/explicit vars
+    }
+  }
+
+  const host =
+    (hostEnv && hostEnv.length > 0 ? hostEnv : undefined) ??
+    parsedHost ??
+    getOptionalEnv('HOST', DEFAULT_SERVICE_HOST);
+
+  const port =
+    options?.portKey && portEnv
+      ? getPositiveIntEnv(options.portKey, DEFAULT_SERVICE_PORTS[service])
+      : (parsedPort ?? DEFAULT_SERVICE_PORTS[service]);
+
+  return { host, port };
+}
+
+export interface ExtractedRpcErrorPayload {
+  statusCode?: number;
+  message?: string | string[];
+  error?: string;
+  errorCode?: string;
+}
+
+/**
+ * Extracts a structured HTTP-like error payload from an RPC error emitted by `@nestjs/microservices`.
+ * Returns `null` for transport/connection failures that have no application status code.
+ */
+export function extractRpcErrorPayload(error: unknown): ExtractedRpcErrorPayload | null {
+  const candidates: unknown[] = [error];
+  if (typeof error === 'object' && error !== null) {
+    const record = error as Record<string, unknown>;
+    if ('error' in record) {
+      candidates.push(record.error);
+    }
+    if ('response' in record) {
+      candidates.push(record.response);
+    }
+    if (typeof (record as { getError?: unknown }).getError === 'function') {
+      candidates.push((record as { getError: () => unknown }).getError());
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'object' || candidate === null) {
+      continue;
+    }
+    const record = candidate as Record<string, unknown>;
+    if (
+      typeof record.statusCode === 'number' &&
+      Number.isInteger(record.statusCode) &&
+      record.statusCode >= 400 &&
+      record.statusCode <= 599
+    ) {
+      return {
+        statusCode: record.statusCode,
+        ...(typeof record.message === 'string' || Array.isArray(record.message)
+          ? { message: record.message as string | string[] }
+          : {}),
+        ...(typeof record.error === 'string' ? { error: record.error } : {}),
+        ...(typeof record.errorCode === 'string' ? { errorCode: record.errorCode } : {}),
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Formats an extracted RPC error payload message into a single readable string.
+ */
+export function formatRpcErrorMessage(
+  payload: { statusCode?: number; message?: string | string[] },
+  fallbackPrefix: string,
+): string {
+  if (Array.isArray(payload.message)) {
+    const joined = payload.message.filter((m): m is string => typeof m === 'string').join(', ');
+    if (joined.length > 0) {
+      return joined;
+    }
+  }
+  if (typeof payload.message === 'string' && payload.message.length > 0) {
+    return payload.message;
+  }
+  return `${fallbackPrefix} (status ${payload.statusCode ?? 'unknown'})`;
+}
 
 /**
  * Reads a required environment variable or throws a descriptive startup error.

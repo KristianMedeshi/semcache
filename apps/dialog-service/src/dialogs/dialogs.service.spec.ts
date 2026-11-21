@@ -1,29 +1,17 @@
 import { NotFoundException } from '@nestjs/common';
+import type { ClientProxy } from '@nestjs/microservices';
 import type {
   DialogMessageResponseDto,
   DialogResponseDto,
   LlmChatCompletionResponseDto,
 } from '@semcache/shared-dtos';
-import { ChatMessageRole } from '@semcache/shared-types';
-import { DialogConfigService } from '../config/dialog-config.service';
+import { ChatMessageRole, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
+import { of } from 'rxjs';
 import { DialogGraphService } from './dialog-graph.service';
 import type { DialogsRepository } from './dialogs.repository';
 import { DialogsService } from './dialogs.service';
 
 describe('DialogsService & DialogGraphService', () => {
-  const originalEnv = { ...process.env };
-  const originalFetch = global.fetch;
-
-  beforeEach(() => {
-    process.env.NODE_ENV = 'test';
-    process.env.LLM_SERVICE_URL = 'http://127.0.0.1:3004';
-  });
-
-  afterEach(() => {
-    process.env = { ...originalEnv };
-    global.fetch = originalFetch;
-  });
-
   it('executes a LangGraph dialog turn, persists user & assistant messages, and updates title', async () => {
     const userId = '11111111-1111-4111-8111-111111111111';
     const dialogId = '22222222-2222-4222-8222-222222222222';
@@ -72,16 +60,10 @@ describe('DialogsService & DialogGraphService', () => {
       usage: { promptTokens: 25, completionTokens: 11, totalTokens: 36 },
     };
 
-    global.fetch = jest.fn(
-      async () =>
-        new Response(JSON.stringify(completionPayload), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-    ) as typeof fetch;
+    const sendMock = jest.fn(() => of(completionPayload));
+    const mockLlmClient = { send: sendMock } as unknown as ClientProxy;
 
-    const config = new DialogConfigService();
-    const graphService = new DialogGraphService(mockRepo as DialogsRepository, config);
+    const graphService = new DialogGraphService(mockRepo as DialogsRepository, mockLlmClient);
     const service = new DialogsService(mockRepo as DialogsRepository, graphService);
 
     const turn = await service.sendMessage(userId, dialogId, {
@@ -89,6 +71,10 @@ describe('DialogsService & DialogGraphService', () => {
       model: 'openrouter/free',
     });
 
+    expect(sendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.LLM_CHAT, {
+      messages: expect.any(Array),
+      model: 'openrouter/free',
+    });
     expect(turn.dialog.title).toBe('How do I reset my password?');
     expect(turn.userMessage.role).toBe(ChatMessageRole.USER);
     expect(turn.assistantMessage.role).toBe(ChatMessageRole.ASSISTANT);
@@ -108,8 +94,8 @@ describe('DialogsService & DialogGraphService', () => {
     const mockRepo: Partial<DialogsRepository> = {
       findDialogByIdForUser: jest.fn(async () => null),
     };
-    const config = new DialogConfigService();
-    const graphService = new DialogGraphService(mockRepo as DialogsRepository, config);
+    const mockLlmClient = { send: jest.fn() } as unknown as ClientProxy;
+    const graphService = new DialogGraphService(mockRepo as DialogsRepository, mockLlmClient);
     const service = new DialogsService(mockRepo as DialogsRepository, graphService);
 
     await expect(

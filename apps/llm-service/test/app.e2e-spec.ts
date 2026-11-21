@@ -1,13 +1,21 @@
-import type { INestApplication } from '@nestjs/common';
+import type { AddressInfo, Server } from 'node:net';
+import type { INestMicroservice } from '@nestjs/common';
 import { FakeModel, overrideModels } from '@nestjs/ai/testing';
+import {
+  ClientProxy,
+  ClientProxyFactory,
+  type MicroserviceOptions,
+  Transport,
+} from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ChatMessageRole, ServiceName } from '@semcache/shared-types';
-import request from 'supertest';
-import type { App } from 'supertest/types';
+import { extractRpcErrorPayload } from '@semcache/shared-config';
+import { ChatMessageRole, SERVICE_TCP_PATTERNS, ServiceName } from '@semcache/shared-types';
+import { firstValueFrom } from 'rxjs';
 import { AppModule } from '../src/app.module';
 
-describe('LLM Service (e2e)', () => {
-  let app: INestApplication<App>;
+describe('LLM Service (TCP e2e)', () => {
+  let app: INestMicroservice;
+  let client: ClientProxy;
   const originalEnv = { ...process.env };
 
   beforeEach(async () => {
@@ -27,41 +35,47 @@ describe('LLM Service (e2e)', () => {
       },
     ).compile();
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
+    app = moduleFixture.createNestMicroservice<MicroserviceOptions>({
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: 0 },
+    });
+    await app.listen();
+
+    const address = app.unwrap<Server>().address() as AddressInfo;
+    client = ClientProxyFactory.create({
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: address.port },
+    });
+    await client.connect();
   });
 
   afterEach(async () => {
+    await client.close();
     await app.close();
     process.env = { ...originalEnv };
   });
 
-  it('/health (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/health')
-      .expect(200)
-      .expect((res) => {
-        expect(res.body).toEqual({
-          service: ServiceName.LLM_SERVICE,
-          status: 'ok',
-          timestamp: expect.any(String),
-        });
-      });
+  it('app.health returns ServiceName.LLM_SERVICE health status', async () => {
+    const res = await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.APP_HEALTH, {}));
+    expect(res).toEqual({
+      service: ServiceName.LLM_SERVICE,
+      status: 'ok',
+      timestamp: expect.any(String),
+    });
   });
 
-  it('/llm/chat (POST) returns completion for free OpenRouter model', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/llm/chat')
-      .send({
+  it('llm.chat returns completion for free OpenRouter model', async () => {
+    const res = await firstValueFrom(
+      client.send(SERVICE_TCP_PATTERNS.LLM_CHAT, {
         model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
         messages: [
           { role: ChatMessageRole.SYSTEM, content: 'You are a helpful support assistant.' },
           { role: ChatMessageRole.USER, content: 'How do I reset my password?' },
         ],
-      })
-      .expect(200);
+      }),
+    );
 
-    expect(res.body).toEqual({
+    expect(res).toEqual({
       content: 'Mocked free assistant response',
       model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
       latencyMs: expect.any(Number),
@@ -73,15 +87,21 @@ describe('LLM Service (e2e)', () => {
     });
   });
 
-  it('/llm/chat (POST) rejects paid models with 400 Bad Request', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/llm/chat')
-      .send({
-        model: 'openai/gpt-4o',
-        messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
-      })
-      .expect(400);
+  it('llm.chat rejects paid models with 400 Bad Request RPC error', async () => {
+    let caughtError: unknown;
+    try {
+      await firstValueFrom(
+        client.send(SERVICE_TCP_PATTERNS.LLM_CHAT, {
+          model: 'openai/gpt-4o',
+          messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
+        }),
+      );
+    } catch (error) {
+      caughtError = error;
+    }
 
-    expect(JSON.stringify(res.body)).toContain('Only free OpenRouter models');
+    const rpcError = extractRpcErrorPayload(caughtError);
+    expect(rpcError?.statusCode).toBe(400);
+    expect(JSON.stringify(rpcError)).toContain('Only free OpenRouter models');
   });
 });

@@ -1,17 +1,28 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, type INestApplication } from '@nestjs/common';
+import type { AddressInfo, Server } from 'node:net';
+import { type INestMicroservice, Injectable } from '@nestjs/common';
 import {
   AuthenticationStorage,
   PasswordHasher,
   type SessionRecord,
   type SessionStore,
 } from '@nestjs/authentication';
+import {
+  ClientProxy,
+  ClientProxyFactory,
+  type MicroserviceOptions,
+  Transport,
+} from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import type { UserResponseDto } from '@semcache/shared-dtos';
-import { ServiceName, UserRole } from '@semcache/shared-types';
-import request from 'supertest';
-import type { App } from 'supertest/types';
-import { configureAuthApp } from '../src/app.bootstrap';
+import { extractRpcErrorPayload } from '@semcache/shared-config';
+import type {
+  AuthTcpResponseDto,
+  LogoutResponseDto,
+  RevokeUserSessionsResponseDto,
+  UserResponseDto,
+} from '@semcache/shared-dtos';
+import { SERVICE_TCP_PATTERNS, ServiceName, UserRole } from '@semcache/shared-types';
+import { firstValueFrom } from 'rxjs';
 import { AppModule } from '../src/app.module';
 import { DrizzleSessionStore } from '../src/auth/drizzle-session.store';
 import { UsersRepository, normalizeEmail } from '../src/users/users.repository';
@@ -180,16 +191,33 @@ class InMemorySessionStore implements SessionStore {
   }
 }
 
-function extractCookiePair(setCookieHeader: string | string[] | undefined): string {
-  const first = Array.isArray(setCookieHeader) ? setCookieHeader[0] : setCookieHeader;
-  if (!first) {
-    throw new Error('Expected Set-Cookie header to be present');
+function extractCookiePair(setCookieHeader: string | undefined): string {
+  if (!setCookieHeader) {
+    throw new Error('Expected setCookie string to be present');
   }
-  return first.split(';')[0] ?? '';
+  return setCookieHeader.split(';')[0] ?? '';
 }
 
-describe('AuthService Authentication & Authorization (e2e)', () => {
-  let app: INestApplication<App>;
+async function sendRpcExpectingError(
+  client: ClientProxy,
+  pattern: string,
+  payload: unknown,
+  expectedStatus: number,
+) {
+  let caughtError: unknown;
+  try {
+    await firstValueFrom(client.send(pattern, payload));
+  } catch (error) {
+    caughtError = error;
+  }
+  const rpcError = extractRpcErrorPayload(caughtError);
+  expect(rpcError?.statusCode).toBe(expectedStatus);
+  return rpcError;
+}
+
+describe('AuthService Authentication & Authorization (TCP e2e)', () => {
+  let app: INestMicroservice;
+  let client: ClientProxy;
   let usersRepository: InMemoryUsersRepository;
   let sessionStore: InMemorySessionStore;
   let passwordHasher: PasswordHasher;
@@ -213,92 +241,111 @@ describe('AuthService Authentication & Authorization (e2e)', () => {
       .useValue(passwordHasher)
       .compile();
 
-    app = moduleFixture.createNestApplication();
-    configureAuthApp(app);
-    await app.init();
+    app = moduleFixture.createNestMicroservice<MicroserviceOptions>({
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: 0 },
+    });
+    await app.listen();
+
+    const address = app.unwrap<Server>().address() as AddressInfo;
+    client = ClientProxyFactory.create({
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: address.port },
+    });
+    await client.connect();
 
     sessionStore = app.get(DrizzleSessionStore);
   });
 
   afterAll(async () => {
+    await client.close();
     await app.close();
   });
 
-  describe('public health & root endpoints', () => {
-    it('GET / returns Hello World!', () => {
-      return request(app.getHttpServer()).get('/').expect(200).expect('Hello World!');
+  describe('public health & root patterns', () => {
+    it('app.hello returns Hello World!', async () => {
+      const res = await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.APP_HELLO, {}));
+      expect(res).toBe('Hello World!');
     });
 
-    it('GET /health returns ServiceName.AUTH_SERVICE health status', () => {
-      return request(app.getHttpServer())
-        .get('/health')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toEqual({
-            service: ServiceName.AUTH_SERVICE,
-            status: 'ok',
-            timestamp: expect.any(String),
-          });
-        });
+    it('app.health returns ServiceName.AUTH_SERVICE health status', async () => {
+      const res = await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.APP_HEALTH, {}));
+      expect(res).toEqual({
+        service: ServiceName.AUTH_SERVICE,
+        status: 'ok',
+        timestamp: expect.any(String),
+      });
     });
   });
 
   describe('authentication flows', () => {
     it('registers a customer, sets an HttpOnly session cookie, and rejects duplicate email', async () => {
-      const registerRes = await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({ email: 'Alice@Example.com', password: 'StrongPassword1!' })
-        .expect(201);
+      const registerRes = await firstValueFrom(
+        client.send<AuthTcpResponseDto<UserResponseDto>>(SERVICE_TCP_PATTERNS.AUTH_REGISTER, {
+          body: { email: 'Alice@Example.com', password: 'StrongPassword1!' },
+          method: 'POST',
+        }),
+      );
 
-      expect(registerRes.body).toEqual({
+      expect(registerRes.data).toEqual({
         id: expect.any(String),
         email: 'alice@example.com',
         role: UserRole.CUSTOMER,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       });
-      expect(registerRes.body).not.toHaveProperty('passwordHash');
+      expect(registerRes.data).not.toHaveProperty('passwordHash');
 
-      const setCookie = registerRes.headers['set-cookie'];
-      expect(setCookie).toBeDefined();
-      const rawSetCookie = Array.isArray(setCookie) ? setCookie[0] : String(setCookie);
-      expect(rawSetCookie).toContain('HttpOnly');
-      expect(rawSetCookie).toContain('SameSite=Lax');
+      expect(registerRes.setCookie).toBeDefined();
+      expect(registerRes.setCookie).toContain('HttpOnly');
+      expect(registerRes.setCookie).toContain('SameSite=Lax');
 
-      const cookiePair = extractCookiePair(setCookie);
+      const cookiePair = extractCookiePair(registerRes.setCookie);
       const rawToken = cookiePair.split('=')[1] ?? '';
       expect(rawToken.length).toBeGreaterThan(20);
       expect(sessionStore.sessions.has(rawToken)).toBe(false);
 
-      await request(app.getHttpServer())
-        .get('/auth/me')
-        .set('Cookie', cookiePair)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.email).toBe('alice@example.com');
-          expect(res.body.role).toBe(UserRole.CUSTOMER);
-        });
+      const meRes = await firstValueFrom(
+        client.send<UserResponseDto>(SERVICE_TCP_PATTERNS.AUTH_ME, {
+          headers: { cookie: cookiePair },
+          method: 'GET',
+        }),
+      );
+      expect(meRes.email).toBe('alice@example.com');
+      expect(meRes.role).toBe(UserRole.CUSTOMER);
 
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({ email: 'alice@example.com', password: 'AnotherPassword1!' })
-        .expect(409);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_REGISTER,
+        {
+          body: { email: 'alice@example.com', password: 'AnotherPassword1!' },
+          method: 'POST',
+        },
+        409,
+      );
     });
 
     it('rejects weak passwords and role escalation during registration', async () => {
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({ email: 'weak@example.com', password: 'short' })
-        .expect(400);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_REGISTER,
+        { body: { email: 'weak@example.com', password: 'short' }, method: 'POST' },
+        400,
+      );
 
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          email: 'escalate@example.com',
-          password: 'StrongPassword1!',
-          role: UserRole.ADMIN,
-        })
-        .expect(400);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_REGISTER,
+        {
+          body: {
+            email: 'escalate@example.com',
+            password: 'StrongPassword1!',
+            role: UserRole.ADMIN,
+          },
+          method: 'POST',
+        },
+        400,
+      );
     });
 
     it('authenticates with valid credentials, rotates session on login, and invalidates on logout', async () => {
@@ -308,33 +355,58 @@ describe('AuthService Authentication & Authorization (e2e)', () => {
         role: UserRole.CUSTOMER,
       });
 
-      const firstLogin = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'bob@example.com', password: 'ValidPass123!' })
-        .expect(200);
+      const firstLogin = await firstValueFrom(
+        client.send<AuthTcpResponseDto<UserResponseDto>>(SERVICE_TCP_PATTERNS.AUTH_LOGIN, {
+          body: { email: 'bob@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        }),
+      );
+      const firstCookie = extractCookiePair(firstLogin.setCookie);
 
-      const firstCookie = extractCookiePair(firstLogin.headers['set-cookie']);
-
-      const secondLogin = await request(app.getHttpServer())
-        .post('/auth/login')
-        .set('Cookie', firstCookie)
-        .send({ email: 'bob@example.com', password: 'ValidPass123!' })
-        .expect(200);
-
-      const rotatedCookie = extractCookiePair(secondLogin.headers['set-cookie']);
+      const secondLogin = await firstValueFrom(
+        client.send<AuthTcpResponseDto<UserResponseDto>>(SERVICE_TCP_PATTERNS.AUTH_LOGIN, {
+          headers: { cookie: firstCookie },
+          body: { email: 'bob@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        }),
+      );
+      const rotatedCookie = extractCookiePair(secondLogin.setCookie);
       expect(rotatedCookie).not.toBe(firstCookie);
 
-      await request(app.getHttpServer()).get('/auth/me').set('Cookie', firstCookie).expect(401);
-      await request(app.getHttpServer()).get('/auth/me').set('Cookie', rotatedCookie).expect(200);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_ME,
+        { headers: { cookie: firstCookie }, method: 'GET' },
+        401,
+      );
 
-      await request(app.getHttpServer())
-        .post('/auth/logout')
-        .set('Cookie', rotatedCookie)
-        .expect(200)
-        .expect({ success: true });
+      await firstValueFrom(
+        client.send(SERVICE_TCP_PATTERNS.AUTH_ME, {
+          headers: { cookie: rotatedCookie },
+          method: 'GET',
+        }),
+      );
 
-      await request(app.getHttpServer()).get('/auth/me').set('Cookie', rotatedCookie).expect(401);
-      await request(app.getHttpServer()).post('/auth/logout').expect(401);
+      const logoutRes = await firstValueFrom(
+        client.send<AuthTcpResponseDto<LogoutResponseDto>>(SERVICE_TCP_PATTERNS.AUTH_LOGOUT, {
+          headers: { cookie: rotatedCookie },
+          method: 'POST',
+        }),
+      );
+      expect(logoutRes.data).toEqual({ success: true });
+
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_ME,
+        { headers: { cookie: rotatedCookie }, method: 'GET' },
+        401,
+      );
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_LOGOUT,
+        { method: 'POST' },
+        401,
+      );
     });
 
     it('returns generic 401 on wrong credentials and rate-limits repeated failed attempts', async () => {
@@ -344,34 +416,54 @@ describe('AuthService Authentication & Authorization (e2e)', () => {
         role: UserRole.CUSTOMER,
       });
 
-      const unknownEmailRes = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'unknown-user@example.com', password: 'WrongPassword1!' })
-        .expect(401);
+      const unknownEmailErr = await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_LOGIN,
+        {
+          body: { email: 'unknown-user@example.com', password: 'WrongPassword1!' },
+          method: 'POST',
+        },
+        401,
+      );
 
-      const wrongPassRes = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'ratelimit@example.com', password: 'WrongPassword1!' })
-        .expect(401);
+      const wrongPassErr = await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_LOGIN,
+        {
+          body: { email: 'ratelimit@example.com', password: 'WrongPassword1!' },
+          method: 'POST',
+        },
+        401,
+      );
 
-      expect(unknownEmailRes.body.message).toBe('Invalid email or password');
-      expect(wrongPassRes.body.message).toBe('Invalid email or password');
+      expect(unknownEmailErr?.message).toBe('Invalid email or password');
+      expect(wrongPassErr?.message).toBe('Invalid email or password');
 
       for (let i = 0; i < 4; i++) {
-        await request(app.getHttpServer())
-          .post('/auth/login')
-          .send({ email: 'ratelimit@example.com', password: 'WrongPassword1!' })
-          .expect(401);
+        await sendRpcExpectingError(
+          client,
+          SERVICE_TCP_PATTERNS.AUTH_LOGIN,
+          {
+            body: { email: 'ratelimit@example.com', password: 'WrongPassword1!' },
+            method: 'POST',
+          },
+          401,
+        );
       }
 
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'ratelimit@example.com', password: 'ValidPass123!' })
-        .expect(429);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_LOGIN,
+        {
+          body: { email: 'ratelimit@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        },
+        429,
+      );
     });
 
     it('rejects unauthenticated access and expired or idle sessions', async () => {
-      await request(app.getHttpServer()).get('/auth/me').expect(401);
+      await sendRpcExpectingError(client, SERVICE_TCP_PATTERNS.AUTH_ME, { method: 'GET' }, 401);
 
       const passwordHash = await passwordHasher.hash('ValidPass123!');
       const user = await usersRepository.create('expiry@example.com', {
@@ -379,27 +471,41 @@ describe('AuthService Authentication & Authorization (e2e)', () => {
         role: UserRole.CUSTOMER,
       });
 
-      const loginRes = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'expiry@example.com', password: 'ValidPass123!' })
-        .expect(200);
-      const cookie = extractCookiePair(loginRes.headers['set-cookie']);
+      const loginRes = await firstValueFrom(
+        client.send<AuthTcpResponseDto<UserResponseDto>>(SERVICE_TCP_PATTERNS.AUTH_LOGIN, {
+          body: { email: 'expiry@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        }),
+      );
+      const cookie = extractCookiePair(loginRes.setCookie);
 
       sessionStore.expireSessionsForUser(user.id);
-      await request(app.getHttpServer()).get('/auth/me').set('Cookie', cookie).expect(401);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_ME,
+        { headers: { cookie }, method: 'GET' },
+        401,
+      );
 
-      const secondLogin = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'expiry@example.com', password: 'ValidPass123!' })
-        .expect(200);
-      const secondCookie = extractCookiePair(secondLogin.headers['set-cookie']);
+      const secondLogin = await firstValueFrom(
+        client.send<AuthTcpResponseDto<UserResponseDto>>(SERVICE_TCP_PATTERNS.AUTH_LOGIN, {
+          body: { email: 'expiry@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        }),
+      );
+      const secondCookie = extractCookiePair(secondLogin.setCookie);
 
       sessionStore.idleExpireSessionsForUser(user.id, 30 * 60 * 1000);
-      await request(app.getHttpServer()).get('/auth/me').set('Cookie', secondCookie).expect(401);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_ME,
+        { headers: { cookie: secondCookie }, method: 'GET' },
+        401,
+      );
     });
   });
 
-  describe('authorization and CSRF protection', () => {
+  describe('authorization and CSRF origin protection', () => {
     it('enforces customer ownership, role restrictions, and admin access', async () => {
       const passwordHash = await passwordHasher.hash('ValidPass123!');
       const customerA = await usersRepository.create('cust-a@example.com', {
@@ -415,91 +521,154 @@ describe('AuthService Authentication & Authorization (e2e)', () => {
         role: UserRole.ADMIN,
       });
 
-      const loginA = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'cust-a@example.com', password: 'ValidPass123!' })
-        .expect(200);
-      const cookieA = extractCookiePair(loginA.headers['set-cookie']);
+      const loginA = await firstValueFrom(
+        client.send<AuthTcpResponseDto<UserResponseDto>>(SERVICE_TCP_PATTERNS.AUTH_LOGIN, {
+          body: { email: 'cust-a@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        }),
+      );
+      const cookieA = extractCookiePair(loginA.setCookie);
 
-      const loginAdmin = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'admin@example.com', password: 'ValidPass123!' })
-        .expect(200);
-      const adminCookie = extractCookiePair(loginAdmin.headers['set-cookie']);
+      const loginAdmin = await firstValueFrom(
+        client.send<AuthTcpResponseDto<UserResponseDto>>(SERVICE_TCP_PATTERNS.AUTH_LOGIN, {
+          body: { email: 'admin@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        }),
+      );
+      const adminCookie = extractCookiePair(loginAdmin.setCookie);
 
-      await request(app.getHttpServer())
-        .get(`/users/${customerA.id}`)
-        .set('Cookie', cookieA)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.id).toBe(customerA.id);
-        });
+      const fetchedA = await firstValueFrom(
+        client.send<UserResponseDto>(SERVICE_TCP_PATTERNS.USERS_GET, {
+          id: customerA.id,
+          headers: { cookie: cookieA },
+          method: 'GET',
+        }),
+      );
+      expect(fetchedA.id).toBe(customerA.id);
 
-      await request(app.getHttpServer())
-        .patch(`/users/${customerA.id}`)
-        .set('Cookie', cookieA)
-        .send({ email: 'cust-a-updated@example.com' })
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.email).toBe('cust-a-updated@example.com');
-        });
+      const updatedA = await firstValueFrom(
+        client.send<AuthTcpResponseDto<UserResponseDto>>(SERVICE_TCP_PATTERNS.USERS_UPDATE, {
+          id: customerA.id,
+          headers: { cookie: cookieA },
+          body: { email: 'cust-a-updated@example.com' },
+          method: 'PATCH',
+        }),
+      );
+      expect(updatedA.data.email).toBe('cust-a-updated@example.com');
 
-      await request(app.getHttpServer())
-        .patch(`/users/${customerA.id}`)
-        .set('Cookie', cookieA)
-        .send({ role: UserRole.ADMIN })
-        .expect(400);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.USERS_UPDATE,
+        {
+          id: customerA.id,
+          headers: { cookie: cookieA },
+          body: { role: UserRole.ADMIN },
+          method: 'PATCH',
+        },
+        400,
+      );
 
-      await request(app.getHttpServer())
-        .get(`/users/${customerB.id}`)
-        .set('Cookie', cookieA)
-        .expect(403);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.USERS_GET,
+        {
+          id: customerB.id,
+          headers: { cookie: cookieA },
+          method: 'GET',
+        },
+        403,
+      );
 
-      await request(app.getHttpServer())
-        .patch(`/users/${customerB.id}`)
-        .set('Cookie', cookieA)
-        .send({ email: 'hijacked@example.com' })
-        .expect(403);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.USERS_UPDATE,
+        {
+          id: customerB.id,
+          headers: { cookie: cookieA },
+          body: { email: 'hijacked@example.com' },
+          method: 'PATCH',
+        },
+        403,
+      );
 
-      await request(app.getHttpServer()).get('/admin/users').set('Cookie', cookieA).expect(403);
-      await request(app.getHttpServer()).get('/admin/users').expect(401);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.ADMIN_USERS_LIST,
+        { headers: { cookie: cookieA }, method: 'GET' },
+        403,
+      );
 
-      await request(app.getHttpServer())
-        .get('/admin/users')
-        .set('Cookie', adminCookie)
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body.length).toBeGreaterThanOrEqual(3);
-        });
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.ADMIN_USERS_LIST,
+        { method: 'GET' },
+        401,
+      );
 
-      await request(app.getHttpServer())
-        .get(`/users/${customerB.id}`)
-        .set('Cookie', adminCookie)
-        .expect(200);
+      const allUsers = await firstValueFrom(
+        client.send<UserResponseDto[]>(SERVICE_TCP_PATTERNS.ADMIN_USERS_LIST, {
+          headers: { cookie: adminCookie },
+          method: 'GET',
+        }),
+      );
+      expect(Array.isArray(allUsers)).toBe(true);
+      expect(allUsers.length).toBeGreaterThanOrEqual(3);
 
-      await request(app.getHttpServer())
-        .delete(`/admin/users/${customerA.id}/sessions`)
-        .set('Cookie', adminCookie)
-        .expect(200)
-        .expect({ revokedCount: 1 });
+      await firstValueFrom(
+        client.send<UserResponseDto>(SERVICE_TCP_PATTERNS.USERS_GET, {
+          id: customerB.id,
+          headers: { cookie: adminCookie },
+          method: 'GET',
+        }),
+      );
 
-      await request(app.getHttpServer()).get('/auth/me').set('Cookie', cookieA).expect(401);
+      const revokeRes = await firstValueFrom(
+        client.send<RevokeUserSessionsResponseDto>(
+          SERVICE_TCP_PATTERNS.ADMIN_USERS_REVOKE_SESSIONS,
+          {
+            id: customerA.id,
+            headers: { cookie: adminCookie },
+            method: 'DELETE',
+          },
+        ),
+      );
+      expect(revokeRes).toEqual({ revokedCount: 1 });
+
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_ME,
+        { headers: { cookie: cookieA }, method: 'GET' },
+        401,
+      );
     });
 
-    it('blocks cross-site and untrusted-origin state-changing requests via enableCsrfProtection', async () => {
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .set('Sec-Fetch-Site', 'cross-site')
-        .set('Origin', 'https://evil.example.com')
-        .send({ email: 'cust-b@example.com', password: 'ValidPass123!' })
-        .expect(403);
+    it('blocks cross-site and untrusted-origin state-changing requests', async () => {
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_LOGIN,
+        {
+          headers: {
+            'sec-fetch-site': 'cross-site',
+            origin: 'https://evil.example.com',
+          },
+          body: { email: 'cust-b@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        },
+        403,
+      );
 
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .set('Origin', 'https://evil.example.com')
-        .send({ email: 'cust-b@example.com', password: 'ValidPass123!' })
-        .expect(403);
+      await sendRpcExpectingError(
+        client,
+        SERVICE_TCP_PATTERNS.AUTH_LOGIN,
+        {
+          headers: {
+            origin: 'https://evil.example.com',
+          },
+          body: { email: 'cust-b@example.com', password: 'ValidPass123!' },
+          method: 'POST',
+        },
+        403,
+      );
     });
   });
 });

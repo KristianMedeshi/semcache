@@ -16,7 +16,8 @@ This document defines mandatory architectural principles, constraints, and code 
    - `llm-service` — LLM provider integration, response generation, and embedding vector generation.
    - `knowledge-base-service` — managing knowledge base articles/documents and vector context retrieval.
 3. **Inter-Service Communication**:
-   - Communication between microservices happens **exclusively synchronously via REST API** (HTTP/JSON).
+   - External client communication with `api-gateway` uses HTTP/REST (`http://localhost:3000`).
+   - Communication between internal microservices (`auth-service`, `dialog-service`, `semantic-cache-service`, `llm-service`, `knowledge-base-service`) and from `api-gateway` to internal microservices happens **exclusively synchronously via NestJS TCP transport** (`@nestjs/microservices`, `Transport.TCP`) using canonical message patterns (`SERVICE_TCP_PATTERNS`).
    - **Prohibited**: adding message brokers (RabbitMQ, Kafka, Redis Pub/Sub, etc.) unless explicitly approved by an architecture change.
 
 ---
@@ -27,7 +28,7 @@ This document defines mandatory architectural principles, constraints, and code 
    - Initially, all services may share a single physical PostgreSQL 17 instance (with the `pgvector` extension), yet **each microservice owns exclusively its own tables and migrations**.
 2. **Strict Prohibition of Direct Cross-Service Table Access**:
    - **STRICTLY PROHIBITED**: one microservice executing SQL queries (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `JOIN`) against the internal tables of another microservice.
-   - All data belonging to another domain must be requested exclusively through the public REST API of the owning microservice.
+   - All data belonging to another domain must be requested exclusively through the TCP microservice API (`@MessagePattern` / `SERVICE_TCP_PATTERNS`) of the owning microservice.
 3. **ORM Usage**:
    - **Drizzle ORM** and **Drizzle Kit** are used for database operations.
    - **Prohibited**: creating a single shared database schema package (`shared-db` or similar) in `packages/`. Table schemas (`schema.ts`) and migration configurations (`drizzle.config.ts`) must reside inside each respective microservice.
@@ -66,7 +67,7 @@ This document defines mandatory architectural principles, constraints, and code 
 
 1. **Testing Levels**:
    - **Unit tests (`*.spec.ts`)**: placed alongside source code in each microservice's `src/` directory and executed with Jest (`pnpm test`).
-   - **Service E2E tests (`test/*.e2e-spec.ts`)**: test the HTTP layer of an individual NestJS service in isolation (`pnpm test:e2e`).
+   - **Service E2E tests (`test/*.e2e-spec.ts`)**: test the transport layer (`HTTP` for `api-gateway`, `Transport.TCP` for internal microservices) of an individual NestJS service in isolation (`pnpm test:e2e`).
    - **System integration and load tests**: located in the root `tests/` directory (`tests/integration`, `tests/e2e`, `tests/load`).
 2. **Mandatory Checks Before Task Completion**:
    - Before reporting completion of any development stage, the following commands must pass:

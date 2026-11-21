@@ -23,7 +23,7 @@ semcache/
 │
 ├── packages/
 │   ├── shared-types/             # Shared domain TypeScript types and enums
-│   ├── shared-dtos/              # Contracts and DTOs for inter-service REST communication
+│   ├── shared-dtos/              # Contracts and DTOs for HTTP gateway and TCP inter-service communication
 │   ├── shared-config/            # Shared configuration utilities and port constants
 │   └── eslint-config/            # Shared linter configurations (Oxlint)
 │
@@ -62,7 +62,7 @@ semcache/
 
 | Application                | Package                            | Default Port | Purpose                                                                                                                                                      |
 | :------------------------- | :--------------------------------- | :----------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **API Gateway**            | `@semcache/api-gateway`            |    `3000`    | Routes external client requests to internal microservices via REST API.                                                                                      |
+| **API Gateway**            | `@semcache/api-gateway`            |    `3000`    | Routes external HTTP/REST client requests to internal microservices over NestJS TCP (`Transport.TCP`).                                                       |
 | **Auth Service**           | `@semcache/auth-service`           |    `3001`    | Manages user accounts, sessions, and access permissions.                                                                                                     |
 | **Dialog Service**         | `@semcache/dialog-service`         |    `3002`    | Orchestrates client dialogs, persists message history, and coordinates query processing.                                                                     |
 | **Semantic Cache Service** | `@semcache/semantic-cache-service` |    `3003`    | Searches semantically similar queries in PostgreSQL (`pgvector`, HNSW, Cosine distance), calculates local cluster density, and computes adaptive thresholds. |
@@ -74,8 +74,8 @@ semcache/
 
 ## Shared Packages (`packages/`)
 
-- **`@semcache/shared-types`** — contains shared immutable enums (`ServiceName`, `QueryCategory`, `CacheHitStatus`) and base interfaces for semantic evaluation metadata.
-- **`@semcache/shared-dtos`** — contains exclusively data contracts (DTOs) for inter-service communication over REST API.
+- **`@semcache/shared-types`** — contains shared immutable enums (`ServiceName`, `QueryCategory`, `CacheHitStatus`), canonical TCP patterns (`SERVICE_TCP_PATTERNS`), and base interfaces for semantic evaluation metadata.
+- **`@semcache/shared-dtos`** — contains exclusively data contracts (DTOs) for HTTP API Gateway endpoints and TCP inter-service communication (`AuthTcpRequestDto`, `AuthTcpResponseDto`, `DialogTcpRequestDto`, `RpcErrorPayloadDto`).
 - **`@semcache/shared-config`** — contains helper functions for safely reading environment variables (`getRequiredEnv`, `getOptionalEnv`, `getNumericEnv`) and the default service port mapping.
 - **`@semcache/eslint-config`** — contains shared static code analysis (**Oxlint**) configurations for base packages (`base.json`), NestJS services (`nestjs.json`), and the React application (`react.json`).
 

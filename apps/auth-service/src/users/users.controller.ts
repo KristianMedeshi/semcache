@@ -1,48 +1,39 @@
-import {
-  Body,
-  Controller,
-  type ExecutionContext,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-} from '@nestjs/common';
+import { Controller, type ExecutionContext, ParseUUIDPipe } from '@nestjs/common';
 import { CurrentSession, CurrentUser, type SessionRecord } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
-import type { UserResponseDto } from '@semcache/shared-dtos';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import type { AuthTcpResponseDto, UserResponseDto } from '@semcache/shared-dtos';
+import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 import { UserPolicy } from '../auth/policies/user.policy';
 import { UsersService } from './users.service';
 
 function resolveTargetUserId(ctx: ExecutionContext): [string] {
-  const req = ctx
-    .switchToHttp()
-    .getRequest<{ params?: Record<string, string | string[] | undefined> }>();
-  const id = req.params?.id;
-  return [Array.isArray(id) ? (id[0] ?? '') : (id ?? '')];
+  const data = ctx.switchToRpc().getData<{ id?: unknown } | undefined>();
+  return [typeof data?.id === 'string' ? data.id : ''];
 }
 
-@Controller('users')
+@Controller()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get(':id')
+  @MessagePattern(SERVICE_TCP_PATTERNS.USERS_GET)
   @Can(UserPolicy, 'viewProfile', resolveTargetUserId)
   async getUser(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Payload('id', ParseUUIDPipe) id: string,
     @CurrentUser() actor: UserResponseDto,
   ): Promise<UserResponseDto> {
     return this.usersService.getUserProfile(actor, id);
   }
 
-  @Patch(':id')
+  @MessagePattern(SERVICE_TCP_PATTERNS.USERS_UPDATE)
   @Can(UserPolicy, 'updateProfile', resolveTargetUserId)
   async updateUser(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateProfileDto,
+    @Payload('id', ParseUUIDPipe) id: string,
+    @Payload('body') dto: UpdateProfileDto,
     @CurrentUser() actor: UserResponseDto,
-    @CurrentSession() session?: SessionRecord,
-  ): Promise<UserResponseDto> {
-    return this.usersService.updateUserProfile(actor, id, dto, session?.id);
+    @CurrentSession() session?: SessionRecord | null,
+  ): Promise<AuthTcpResponseDto<UserResponseDto>> {
+    return this.usersService.updateUserProfile(actor, id, dto, session ?? undefined);
   }
 }

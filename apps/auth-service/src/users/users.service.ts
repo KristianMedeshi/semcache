@@ -1,7 +1,11 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PasswordHasher, SessionService, SignInService } from '@nestjs/authentication';
+import { PasswordHasher, type SessionRecord, SessionService } from '@nestjs/authentication';
 import { AuthorizationService } from '@nestjs/authorization';
-import type { RevokeUserSessionsResponseDto, UserResponseDto } from '@semcache/shared-dtos';
+import type {
+  AuthTcpResponseDto,
+  RevokeUserSessionsResponseDto,
+  UserResponseDto,
+} from '@semcache/shared-dtos';
 import type { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 import { UserPolicy } from '../auth/policies/user.policy';
 import { UsersRepository, normalizeEmail } from './users.repository';
@@ -14,7 +18,6 @@ export class UsersService {
     private readonly usersRepository: UsersRepository,
     private readonly passwordHasher: PasswordHasher,
     private readonly sessionService: SessionService,
-    private readonly signInService: SignInService,
     private readonly authorizationService: AuthorizationService,
   ) {}
 
@@ -33,8 +36,8 @@ export class UsersService {
     actor: UserResponseDto,
     targetUserId: string,
     dto: UpdateProfileDto,
-    currentSessionId?: string,
-  ): Promise<UserResponseDto> {
+    currentSession?: SessionRecord | string,
+  ): Promise<AuthTcpResponseDto<UserResponseDto>> {
     await this.authorizationService.authorize(UserPolicy, 'updateProfile', actor, targetUserId);
 
     const existingUser = await this.usersRepository.findById(targetUserId);
@@ -57,7 +60,7 @@ export class UsersService {
     }
 
     if (normalizedEmail === undefined && passwordHash === undefined) {
-      return existingUser;
+      return { data: existingUser };
     }
 
     const updatedUser = await this.usersRepository.updateProfile(targetUserId, {
@@ -68,10 +71,19 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
+    let setCookie: string | undefined;
     if (passwordHash !== undefined) {
       if (actor.id === targetUserId) {
-        const rotated = await this.signInService.rotateSession();
-        const keptSessionId = rotated?.session.id ?? currentSessionId;
+        const rotated =
+          typeof currentSession === 'object' && currentSession !== null
+            ? await this.sessionService.rotate(currentSession)
+            : null;
+        const keptSessionId =
+          rotated?.session.id ??
+          (typeof currentSession === 'string' ? currentSession : currentSession?.id);
+        if (rotated?.cookie) {
+          setCookie = rotated.cookie;
+        }
         await this.sessionService.revokeAll(
           targetUserId,
           keptSessionId ? { except: keptSessionId } : undefined,
@@ -90,7 +102,10 @@ export class UsersService {
       }),
     );
 
-    return updatedUser;
+    return {
+      data: updatedUser,
+      ...(setCookie ? { setCookie } : {}),
+    };
   }
 
   async listAllUsers(actor: UserResponseDto): Promise<UserResponseDto[]> {
