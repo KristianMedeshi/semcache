@@ -107,16 +107,16 @@ When starting a new session or empty conversation, customers see:
   5. **SIM & eSIM** — _"How do I activate my eSIM?"_
   6. **Technical Support** — _"My mobile internet isn't working."_
 
-### 4.3 Message Rendering & Feedback (`ChatMessageItem`)
+### 4.3 Message Rendering, Branching & Feedback (`ChatMessageItem`)
 
-- **Customer messages**: right-aligned, primary blue surface, timestamp (`HH:mm`).
+- **Customer messages**: right-aligned, primary blue surface, timestamp (`HH:mm`), inline **Edit message** action creating a new sibling branch in the conversation graph, and branch switcher toggle (`< 1 / N >`) when multiple versions exist at that node.
 - **Assistant messages**: left-aligned, white card surface, timestamp, structured Markdown rendering (`MarkdownContent` supporting headings, lists, blockquotes/callouts, code/instruction blocks, inline formatting, and links).
 - **Feedback controls**: Thumbs up (`Helpful response`), Thumbs down (`Not helpful response`), and Copy (`Copy response`).
 - **Typing indicator**: animated three-dot indicator with `"Telecom Assistant is typing..."` while awaiting response.
 
 ### 4.4 Conversation History & Responsive Layout (`ConversationSidebarContent` / `MobileConversationDrawer`)
 
-- **Desktop**: collapsible secondary sidebar (`280px–320px`) displaying `"New conversation"`, optional conversation search, conversation title, last message preview, relative timestamp (`date-fns`), and active indicator bar.
+- **Desktop**: collapsible secondary sidebar (`280px–320px`) displaying `"New conversation"`, optional conversation search, conversation title, inline **Edit conversation title** and **Delete conversation** actions, last message preview, relative timestamp (`date-fns`), and active indicator bar.
 - **Mobile & Tablet**: single-column chat layout with compact header and slide-over `SheetContent` drawer for conversation history.
 
 ---

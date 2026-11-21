@@ -68,13 +68,17 @@ Stream Events (`Observable<LlmChatStreamEventDto>` for `llm.chat.stream`):
 
 - `POST /dialogs` -> `dialogs.create` — creates a new dialog for the authenticated user (`CreateDialogRequestDto` -> `DialogResponseDto`).
 - `GET /dialogs` -> `dialogs.list` — lists dialogs owned by the authenticated user (`DialogResponseDto[]`).
-- `GET /dialogs/:id/messages` -> `dialogs.messages.list` — lists ordered messages for an owned dialog (`DialogMessageResponseDto[]`).
-- `POST /dialogs/:id/messages` -> `dialogs.messages.send` — executes a LangGraph turn (`SendMessageRequestDto` -> `SendMessageResponseDto`) containing `{ dialog, userMessage, assistantMessage }`.
+- `PATCH /dialogs/:id` -> `dialogs.update` — updates an owned dialog's title (`UpdateDialogRequestDto` -> `DialogResponseDto`).
+- `DELETE /dialogs/:id` -> `dialogs.delete` — deletes an owned dialog and cascades its messages (`DeleteDialogResponseDto`).
+- `GET /dialogs/:id/messages` -> `dialogs.messages.list` — lists ordered messages for an owned dialog (`DialogMessageResponseDto[]`, each carrying `parentMessageId` for tree/branch reconstruction).
+- `POST /dialogs/:id/messages` -> `dialogs.messages.send` — executes a LangGraph turn (`SendMessageRequestDto` -> `SendMessageResponseDto`) containing `{ dialog, userMessage, assistantMessage }`, optionally continuing from `parentMessageId`.
 - `POST /dialogs/:id/messages/stream` -> `dialogs.messages.stream` — streams a dialog turn over Server-Sent Events (`text/event-stream`) emitting `DialogMessageStreamEventDto` frames:
   - `{ type: 'user_message', userMessage: DialogMessageResponseDto }`
   - `{ type: 'delta', delta: string }`
   - `{ type: 'done', dialog, userMessage, assistantMessage }`
   - `{ type: 'error', statusCode: number, message: string }` (if an error occurs after SSE headers are sent)
+- `POST /dialogs/:id/messages/:messageId/edit` -> `dialogs.messages.edit` — creates a sibling branch from an existing user message (`EditMessageRequestDto` -> `SendMessageResponseDto`) sharing `targetMessage.parentMessageId` and generates a new assistant reply using only the ancestor branch history.
+- `POST /dialogs/:id/messages/:messageId/edit/stream` -> `dialogs.messages.edit.stream` — streams a branched message edit turn over Server-Sent Events (`text/event-stream`).
 
 ---
 

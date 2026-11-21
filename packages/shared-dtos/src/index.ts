@@ -205,6 +205,21 @@ export interface CreateDialogRequestDto {
 }
 
 /**
+ * DTO contract for updating an existing dialog conversation's title.
+ */
+export interface UpdateDialogRequestDto {
+  title: string;
+}
+
+/**
+ * DTO returned after deleting a dialog conversation.
+ */
+export interface DeleteDialogResponseDto {
+  id: string;
+  deleted: true;
+}
+
+/**
  * DTO representing a user dialog thread.
  */
 export interface DialogResponseDto {
@@ -221,6 +236,7 @@ export interface DialogResponseDto {
 export interface DialogMessageResponseDto {
   id: string;
   dialogId: string;
+  parentMessageId?: string | null;
   role: ChatMessageRole;
   content: string;
   model: string | null;
@@ -233,6 +249,15 @@ export interface DialogMessageResponseDto {
  * DTO contract for sending a user message inside a dialog.
  */
 export interface SendMessageRequestDto {
+  content: string;
+  model?: string;
+  parentMessageId?: string | null;
+}
+
+/**
+ * DTO contract for editing an existing user message to create a new conversation branch.
+ */
+export interface EditMessageRequestDto {
   content: string;
   model?: string;
 }
@@ -325,5 +350,6 @@ export interface AuthTcpResponseDto<TData> {
 export interface DialogTcpRequestDto<TBody = undefined> {
   headers: Record<string, string>;
   dialogId?: string;
+  messageId?: string;
   body?: TBody;
 }

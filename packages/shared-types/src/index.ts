@@ -122,9 +122,13 @@ export const SERVICE_TCP_PATTERNS = {
   ADMIN_USERS_REVOKE_SESSIONS: 'admin.users.revokeSessions',
   DIALOGS_CREATE: 'dialogs.create',
   DIALOGS_LIST: 'dialogs.list',
+  DIALOGS_UPDATE: 'dialogs.update',
+  DIALOGS_DELETE: 'dialogs.delete',
   DIALOGS_MESSAGES_LIST: 'dialogs.messages.list',
   DIALOGS_MESSAGES_SEND: 'dialogs.messages.send',
   DIALOGS_MESSAGES_STREAM: 'dialogs.messages.stream',
+  DIALOGS_MESSAGES_EDIT: 'dialogs.messages.edit',
+  DIALOGS_MESSAGES_EDIT_STREAM: 'dialogs.messages.edit.stream',
   LLM_CHAT: 'llm.chat',
   LLM_CHAT_STREAM: 'llm.chat.stream',
 } as const;
