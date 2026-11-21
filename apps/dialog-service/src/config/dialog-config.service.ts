@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   type NodeEnvironment,
-  getNodeEnv,
-  getOptionalEnv,
-  getRequiredEnv,
-  resolveSecretEnv,
+  createValidatedConfigService,
+  dialogEnvSchema,
+  resolveSecretFromConfig,
   resolveServiceTcpEndpoint,
 } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
@@ -19,20 +19,25 @@ export class DialogConfigService {
   readonly llmServicePort: number;
   readonly internalServiceSecret: string;
 
-  constructor() {
-    this.nodeEnv = getNodeEnv();
-    this.databaseUrl =
-      this.nodeEnv === 'test' ? getOptionalEnv('DATABASE_URL', '') : getRequiredEnv('DATABASE_URL');
+  constructor(
+    @Optional()
+    private readonly configService: ConfigService = createValidatedConfigService(dialogEnvSchema),
+  ) {
+    this.nodeEnv = this.configService.getOrThrow<NodeEnvironment>('NODE_ENV');
+    this.databaseUrl = this.configService.get<string>('DATABASE_URL') ?? '';
 
-    const llmEndpoint = resolveServiceTcpEndpoint(ServiceName.LLM_SERVICE, {
+    const llmEndpoint = resolveServiceTcpEndpoint(this.configService, ServiceName.LLM_SERVICE, {
       hostKey: 'LLM_SERVICE_HOST',
       portKey: 'LLM_SERVICE_PORT',
       urlKey: 'LLM_SERVICE_URL',
     });
     this.llmServiceHost = llmEndpoint.host;
     this.llmServicePort = llmEndpoint.port;
-    this.internalServiceSecret = resolveSecretEnv('INTERNAL_SERVICE_SECRET', this.nodeEnv, (msg) =>
-      this.logger.warn(msg),
+    this.internalServiceSecret = resolveSecretFromConfig(
+      this.configService,
+      'INTERNAL_SERVICE_SECRET',
+      this.nodeEnv,
+      (msg: string) => this.logger.warn(msg),
     );
   }
 }

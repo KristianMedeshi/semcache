@@ -1,20 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   type AuthEnvironmentConfig,
-  DEFAULT_LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
-  DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS,
-  DEFAULT_SESSION_COOKIE_NAME,
-  DEFAULT_SESSION_IDLE_TIMEOUT,
-  DEFAULT_SESSION_TTL,
   type DurationValue,
   type NodeEnvironment,
-  getCorsOriginsEnv,
-  getDurationEnv,
-  getNodeEnv,
-  getOptionalEnv,
-  getPositiveIntEnv,
-  getRequiredEnv,
-  resolveSecretEnv,
+  authEnvSchema,
+  createValidatedConfigService,
+  resolveSecretFromConfig,
 } from '@semcache/shared-config';
 
 @Injectable()
@@ -32,38 +24,32 @@ export class AuthConfigService implements AuthEnvironmentConfig {
   readonly loginRateLimitMaxAttempts: number;
   readonly secureCookies: boolean;
 
-  constructor() {
-    this.nodeEnv = getNodeEnv();
+  constructor(
+    @Optional()
+    private readonly configService: ConfigService = createValidatedConfigService(authEnvSchema),
+  ) {
+    this.nodeEnv = this.configService.getOrThrow<NodeEnvironment>('NODE_ENV');
     const isProduction = this.nodeEnv === 'production';
-    const isTest = this.nodeEnv === 'test';
 
-    this.databaseUrl = isTest ? getOptionalEnv('DATABASE_URL', '') : getRequiredEnv('DATABASE_URL');
-
-    this.internalServiceSecret = resolveSecretEnv('INTERNAL_SERVICE_SECRET', this.nodeEnv, (msg) =>
-      this.logger.warn(msg),
+    this.databaseUrl = this.configService.get<string>('DATABASE_URL') ?? '';
+    this.internalServiceSecret = resolveSecretFromConfig(
+      this.configService,
+      'INTERNAL_SERVICE_SECRET',
+      this.nodeEnv,
+      (msg: string) => this.logger.warn(msg),
     );
-
-    this.sessionCookieName = getOptionalEnv('SESSION_COOKIE_NAME', DEFAULT_SESSION_COOKIE_NAME);
-
-    this.sessionTtl = getDurationEnv('SESSION_TTL', DEFAULT_SESSION_TTL);
-    this.sessionIdleTimeout = getDurationEnv(
-      'SESSION_IDLE_TIMEOUT',
-      DEFAULT_SESSION_IDLE_TIMEOUT,
-      { allowZero: true },
-    );
-
-    this.loginRateLimitWindowMs = getPositiveIntEnv(
+    this.sessionCookieName = this.configService.getOrThrow<string>('SESSION_COOKIE_NAME');
+    this.sessionTtl = this.configService.getOrThrow<DurationValue>('SESSION_TTL');
+    this.sessionIdleTimeout = this.configService.getOrThrow<DurationValue>('SESSION_IDLE_TIMEOUT');
+    this.loginRateLimitWindowMs = this.configService.getOrThrow<number>(
       'LOGIN_RATE_LIMIT_WINDOW_MS',
-      DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS,
     );
-    this.loginRateLimitMaxAttempts = getPositiveIntEnv(
+    this.loginRateLimitMaxAttempts = this.configService.getOrThrow<number>(
       'LOGIN_RATE_LIMIT_MAX_ATTEMPTS',
-      DEFAULT_LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
     );
+    this.corsOrigin = this.configService.getOrThrow<string[]>('CORS_ORIGIN');
 
-    this.corsOrigin = getCorsOriginsEnv();
-
-    const secureCookieOverride = getOptionalEnv('SECURE_COOKIES', '');
+    const secureCookieOverride = this.configService.get<string>('SECURE_COOKIES') ?? '';
     this.secureCookies =
       secureCookieOverride === 'true'
         ? true

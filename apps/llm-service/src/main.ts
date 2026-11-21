@@ -1,26 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { type MicroserviceOptions, Transport } from '@nestjs/microservices';
-import {
-  DEFAULT_SERVICE_HOST,
-  DEFAULT_SERVICE_PORTS,
-  getNumericEnv,
-  getOptionalEnv,
-  loadEnv,
-} from '@semcache/shared-config';
+import { llmEnvSchema, resolveMicroserviceTcpOptions } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  loadEnv();
-  const host = getOptionalEnv('LLM_SERVICE_HOST', getOptionalEnv('HOST', DEFAULT_SERVICE_HOST));
-  const port = getNumericEnv(
-    'LLM_SERVICE_PORT',
-    getNumericEnv('PORT', DEFAULT_SERVICE_PORTS[ServiceName.LLM_SERVICE]),
-  );
+  const { host, port } = resolveMicroserviceTcpOptions(llmEnvSchema, ServiceName.LLM_SERVICE, {
+    hostKey: 'LLM_SERVICE_HOST',
+    portKey: 'LLM_SERVICE_PORT',
+  });
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
     transport: Transport.TCP,
     options: { host, port },
   });
+  app.enableShutdownHooks();
   await app.listen();
 }
 void bootstrap();

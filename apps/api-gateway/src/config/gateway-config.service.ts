@@ -1,11 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
-  DEFAULT_SESSION_COOKIE_NAME,
   type NodeEnvironment,
-  getCorsOriginsEnv,
-  getNodeEnv,
-  getOptionalEnv,
-  resolveSecretEnv,
+  createValidatedConfigService,
+  gatewayEnvSchema,
+  resolveSecretFromConfig,
   resolveServiceTcpEndpoint,
 } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
@@ -23,28 +22,38 @@ export class GatewayConfigService {
   readonly sessionCookieName: string;
   readonly corsOrigin: string[];
 
-  constructor() {
-    this.nodeEnv = getNodeEnv();
+  constructor(
+    @Optional()
+    private readonly configService: ConfigService = createValidatedConfigService(gatewayEnvSchema),
+  ) {
+    this.nodeEnv = this.configService.getOrThrow<NodeEnvironment>('NODE_ENV');
 
-    const authEndpoint = resolveServiceTcpEndpoint(ServiceName.AUTH_SERVICE, {
+    const authEndpoint = resolveServiceTcpEndpoint(this.configService, ServiceName.AUTH_SERVICE, {
       hostKey: 'AUTH_SERVICE_HOST',
       portKey: 'AUTH_SERVICE_PORT',
       urlKey: 'AUTH_SERVICE_URL',
     });
-    const dialogEndpoint = resolveServiceTcpEndpoint(ServiceName.DIALOG_SERVICE, {
-      hostKey: 'DIALOG_SERVICE_HOST',
-      portKey: 'DIALOG_SERVICE_PORT',
-      urlKey: 'DIALOG_SERVICE_URL',
-    });
+    const dialogEndpoint = resolveServiceTcpEndpoint(
+      this.configService,
+      ServiceName.DIALOG_SERVICE,
+      {
+        hostKey: 'DIALOG_SERVICE_HOST',
+        portKey: 'DIALOG_SERVICE_PORT',
+        urlKey: 'DIALOG_SERVICE_URL',
+      },
+    );
 
     this.authServiceHost = authEndpoint.host;
     this.authServicePort = authEndpoint.port;
     this.dialogServiceHost = dialogEndpoint.host;
     this.dialogServicePort = dialogEndpoint.port;
-    this.sessionCookieName = getOptionalEnv('SESSION_COOKIE_NAME', DEFAULT_SESSION_COOKIE_NAME);
-    this.internalServiceSecret = resolveSecretEnv('INTERNAL_SERVICE_SECRET', this.nodeEnv, (msg) =>
-      this.logger.warn(msg),
+    this.sessionCookieName = this.configService.getOrThrow<string>('SESSION_COOKIE_NAME');
+    this.internalServiceSecret = resolveSecretFromConfig(
+      this.configService,
+      'INTERNAL_SERVICE_SECRET',
+      this.nodeEnv,
+      (msg: string) => this.logger.warn(msg),
     );
-    this.corsOrigin = getCorsOriginsEnv();
+    this.corsOrigin = this.configService.getOrThrow<string[]>('CORS_ORIGIN');
   }
 }

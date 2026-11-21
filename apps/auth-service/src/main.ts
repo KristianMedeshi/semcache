@@ -1,26 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { type MicroserviceOptions, Transport } from '@nestjs/microservices';
-import {
-  DEFAULT_SERVICE_HOST,
-  DEFAULT_SERVICE_PORTS,
-  getNumericEnv,
-  getOptionalEnv,
-  loadEnv,
-} from '@semcache/shared-config';
+import { authEnvSchema, resolveMicroserviceTcpOptions } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  loadEnv();
-  const host = getOptionalEnv('AUTH_SERVICE_HOST', getOptionalEnv('HOST', DEFAULT_SERVICE_HOST));
-  const port = getNumericEnv(
-    'AUTH_SERVICE_PORT',
-    getNumericEnv('PORT', DEFAULT_SERVICE_PORTS[ServiceName.AUTH_SERVICE]),
-  );
+  const { host, port } = resolveMicroserviceTcpOptions(authEnvSchema, ServiceName.AUTH_SERVICE, {
+    hostKey: 'AUTH_SERVICE_HOST',
+    portKey: 'AUTH_SERVICE_PORT',
+  });
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
     transport: Transport.TCP,
     options: { host, port },
   });
+  app.enableShutdownHooks();
   await app.listen();
 }
 void bootstrap();
