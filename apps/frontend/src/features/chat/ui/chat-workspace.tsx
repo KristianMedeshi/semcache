@@ -6,10 +6,11 @@ import { useSignOutMutation } from '@/features/auth/model/use-auth';
 import { AdminOperatorDialog } from '@/features/auth/ui/admin-operator-dialog';
 import { ProfileSettingsDialog } from '@/features/auth/ui/profile-settings-dialog';
 import {
+  STREAMING_ASSISTANT_MESSAGE_ID,
   useCreateDialogMutation,
   useDialogMessagesQuery,
   useDialogsQuery,
-  useSendMessageMutation,
+  useStreamMessageMutation,
 } from '@/features/chat/model/use-chat';
 import { ChatComposer } from '@/features/chat/ui/chat-composer';
 import { ChatHeader } from '@/features/chat/ui/chat-header';
@@ -47,11 +48,15 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
 
   const messagesQuery = useDialogMessagesQuery(activeDialogId);
   const createDialogMutation = useCreateDialogMutation();
-  const sendMessageMutation = useSendMessageMutation();
+  const streamMessageMutation = useStreamMessageMutation();
   const signOutMutation = useSignOutMutation();
 
-  const isSending = createDialogMutation.isPending || sendMessageMutation.isPending;
+  const isSending = createDialogMutation.isPending || streamMessageMutation.isPending;
   const activeMessages = messagesQuery.data ?? [];
+  const hasStreamingAssistantContent = activeMessages.some(
+    (msg) => msg.id === STREAMING_ASSISTANT_MESSAGE_ID && msg.content.length > 0,
+  );
+  const lastMessageContent = activeMessages[activeMessages.length - 1]?.content ?? '';
 
   useEffect(() => {
     if (activeDialogId && activeMessages.length > 0) {
@@ -64,7 +69,7 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeMessages.length, isSending]);
+  }, [activeMessages.length, lastMessageContent, isSending]);
 
   const handleSelectDialog = (dialogId: string) => {
     setIsNewChatPending(false);
@@ -98,7 +103,7 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
       }
 
       setDraft('');
-      await sendMessageMutation.mutateAsync({
+      await streamMessageMutation.mutateAsync({
         dialogId: targetDialogId,
         dto: { content },
       });
@@ -186,7 +191,7 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
                 ))
               )}
 
-              {sendMessageMutation.isPending ? (
+              {streamMessageMutation.isPending && !hasStreamingAssistantContent ? (
                 <div role="status" aria-live="polite" className="flex items-center gap-3">
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
                     <Headset className="size-4" />

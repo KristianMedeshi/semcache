@@ -6,7 +6,7 @@ import type {
   LlmChatCompletionResponseDto,
 } from '@semcache/shared-dtos';
 import { ChatMessageRole, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
-import { of } from 'rxjs';
+import { firstValueFrom, of, toArray } from 'rxjs';
 import { DialogGraphService } from './dialog-graph.service';
 import type { DialogsRepository } from './dialogs.repository';
 import { DialogsService } from './dialogs.service';
@@ -104,5 +104,94 @@ describe('DialogsService & DialogGraphService', () => {
         '22222222-2222-4222-8222-222222222222',
       ),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('streams user_message, delta chunks, and done event while persisting messages', async () => {
+    const userId = '11111111-1111-4111-8111-111111111111';
+    const dialogId = '22222222-2222-4222-8222-222222222222';
+    let dialog: DialogResponseDto = {
+      id: dialogId,
+      userId,
+      title: 'New Conversation',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const storedMessages: DialogMessageResponseDto[] = [];
+
+    const mockRepo: Partial<DialogsRepository> = {
+      findDialogByIdForUser: jest.fn(async (id, owner) =>
+        id === dialog.id && owner === userId ? dialog : null,
+      ),
+      insertMessage: jest.fn(async (input) => {
+        const msg: DialogMessageResponseDto = {
+          id: `msg-${storedMessages.length + 1}`,
+          dialogId: input.dialogId,
+          role: input.role,
+          content: input.content,
+          model: input.model ?? null,
+          latencyMs: input.latencyMs ?? null,
+          usage: input.usage ?? null,
+          createdAt: '2026-01-01T00:00:01.000Z',
+        };
+        storedMessages.push(msg);
+        return msg;
+      }),
+      findMessagesByDialog: jest.fn(async () => [...storedMessages]),
+      touchDialog: jest.fn(async (_id, title) => {
+        dialog = {
+          ...dialog,
+          title: title ?? dialog.title,
+          updatedAt: '2026-01-01T00:00:02.000Z',
+        };
+        return dialog;
+      }),
+    };
+
+    const sendMock = jest.fn(() =>
+      of(
+        { type: 'delta', delta: 'You can reset ' },
+        { type: 'delta', delta: 'your password in Settings.' },
+        {
+          type: 'done',
+          completion: {
+            content: 'You can reset your password in Settings.',
+            model: 'openrouter/free',
+            latencyMs: 95,
+            usage: { promptTokens: 20, completionTokens: 9, totalTokens: 29 },
+          },
+        },
+      ),
+    );
+    const mockLlmClient = { send: sendMock } as unknown as ClientProxy;
+
+    const graphService = new DialogGraphService(mockRepo as DialogsRepository, mockLlmClient);
+    const service = new DialogsService(mockRepo as DialogsRepository, graphService);
+
+    const events = await firstValueFrom(
+      service
+        .streamMessage(userId, dialogId, {
+          content: 'How do I reset my password?',
+          model: 'openrouter/free',
+        })
+        .pipe(toArray()),
+    );
+
+    expect(sendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM, {
+      messages: expect.any(Array),
+      model: 'openrouter/free',
+    });
+    expect(events).toHaveLength(4);
+    expect(events[0]?.type).toBe('user_message');
+    expect(events[1]).toEqual({ type: 'delta', delta: 'You can reset ' });
+    expect(events[2]).toEqual({ type: 'delta', delta: 'your password in Settings.' });
+    expect(events[3]).toMatchObject({
+      type: 'done',
+      dialog: { id: dialogId, title: 'How do I reset my password?' },
+      assistantMessage: {
+        content: 'You can reset your password in Settings.',
+        model: 'openrouter/free',
+        latencyMs: 95,
+      },
+    });
   });
 });

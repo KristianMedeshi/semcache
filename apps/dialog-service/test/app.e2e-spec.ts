@@ -14,8 +14,10 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createSignedInternalHeaders, extractRpcErrorPayload } from '@semcache/shared-config';
 import type {
   DialogMessageResponseDto,
+  DialogMessageStreamEventDto,
   DialogResponseDto,
   LlmChatCompletionResponseDto,
+  LlmChatStreamEventDto,
   LlmTokenUsageDto,
   SendMessageResponseDto,
 } from '@semcache/shared-dtos';
@@ -25,7 +27,7 @@ import {
   ServiceName,
   UserRole,
 } from '@semcache/shared-types';
-import { firstValueFrom } from 'rxjs';
+import { type Observable, firstValueFrom, of, toArray } from 'rxjs';
 import { AppModule } from '../src/app.module';
 import { DIALOG_PG_POOL } from '../src/db/database.module';
 import { DEFAULT_DIALOG_TITLE, DialogsRepository } from '../src/dialogs/dialogs.repository';
@@ -40,6 +42,23 @@ class MockLlmController {
       latencyMs: 85,
       usage: { promptTokens: 20, completionTokens: 6, totalTokens: 26 },
     };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM)
+  streamChat(@Payload() payload: { model?: string }): Observable<LlmChatStreamEventDto> {
+    return of<LlmChatStreamEventDto[]>(
+      { type: 'delta', delta: 'Streamed ' },
+      { type: 'delta', delta: 'assistant answer' },
+      {
+        type: 'done',
+        completion: {
+          content: 'Streamed assistant answer',
+          model: payload.model ?? 'openrouter/free',
+          latencyMs: 90,
+          usage: { promptTokens: 18, completionTokens: 4, totalTokens: 22 },
+        },
+      },
+    );
   }
 }
 
@@ -262,5 +281,50 @@ describe('Dialog Service (TCP e2e)', () => {
     }
 
     expect(extractRpcErrorPayload(caughtError)?.statusCode).toBe(400);
+  });
+
+  it('streams user_message, delta chunks, and done over dialogs.messages.stream', async () => {
+    const internalHeaders = createSignedInternalHeaders(
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        email: 'customer@example.com',
+        role: UserRole.CUSTOMER,
+        sessionId: 'session-123',
+      },
+      secret,
+    );
+
+    const createdDialog = await firstValueFrom(
+      client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_CREATE, {
+        headers: internalHeaders,
+        body: {},
+      }),
+    );
+
+    const events = await firstValueFrom(
+      client
+        .send<DialogMessageStreamEventDto>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM, {
+          headers: internalHeaders,
+          dialogId: createdDialog.id,
+          body: { content: 'Stream my bill details', model: 'openrouter/free' },
+        })
+        .pipe(toArray()),
+    );
+
+    expect(events.map((e) => e.type)).toEqual(['user_message', 'delta', 'delta', 'done']);
+    const doneEvent = events[3];
+    expect(doneEvent).toMatchObject({
+      type: 'done',
+      dialog: { id: createdDialog.id, title: 'Stream my bill details' },
+      assistantMessage: { content: 'Streamed assistant answer' },
+    });
+
+    const messages = await firstValueFrom(
+      client.send<DialogMessageResponseDto[]>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_LIST, {
+        headers: internalHeaders,
+        dialogId: createdDialog.id,
+      }),
+    );
+    expect(messages).toHaveLength(2);
   });
 });

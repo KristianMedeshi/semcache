@@ -82,4 +82,22 @@ export class GatewayDialogsController {
       },
     );
   }
+
+  @Post(':id/messages/stream')
+  async streamMessage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: GatewaySendMessageDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.dialogProxyService.streamDialogRequest(
+      req,
+      res,
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM,
+      {
+        dialogId: id,
+        body,
+      },
+    );
+  }
 }

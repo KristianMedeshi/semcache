@@ -2,10 +2,12 @@ import { Controller, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import type {
   DialogMessageResponseDto,
+  DialogMessageStreamEventDto,
   DialogResponseDto,
   SendMessageResponseDto,
 } from '@semcache/shared-dtos';
 import { type AuthenticatedUser, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
+import type { Observable } from 'rxjs';
 import { CurrentInternalUser, InternalAuthGuard } from '../auth/internal-auth.guard';
 import { DialogsService } from './dialogs.service';
 import { CreateDialogDto, SendMessageDto } from './dto/dialog.dto';
@@ -43,5 +45,14 @@ export class DialogsController {
     @Payload('body') dto: SendMessageDto,
   ): Promise<SendMessageResponseDto> {
     return this.dialogsService.sendMessage(user.id, id, dto);
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM)
+  streamMessage(
+    @CurrentInternalUser() user: AuthenticatedUser,
+    @Payload('dialogId', ParseUUIDPipe) id: string,
+    @Payload('body') dto: SendMessageDto,
+  ): Observable<DialogMessageStreamEventDto> {
+    return this.dialogsService.streamMessage(user.id, id, dto);
   }
 }

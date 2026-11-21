@@ -43,7 +43,7 @@ To prevent accidental paid usage during thesis development and evaluation, SemCa
 
 ## 3. HTTP & TCP Contracts (`@semcache/shared-dtos` & `SERVICE_TCP_PATTERNS`)
 
-### `llm-service` (`SERVICE_TCP_PATTERNS.LLM_CHAT` = `'llm.chat'` over `Transport.TCP`)
+### `llm-service` (`SERVICE_TCP_PATTERNS.LLM_CHAT` = `'llm.chat'` & `SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM` = `'llm.chat.stream'` over `Transport.TCP`)
 
 Request (`LlmChatCompletionRequestDto`):
 
@@ -52,12 +52,17 @@ Request (`LlmChatCompletionRequestDto`):
 - `temperature?`: `0..2`
 - `maxTokens?`: `1..4096`
 
-Response (`LlmChatCompletionResponseDto`):
+Response (`LlmChatCompletionResponseDto` for `llm.chat`):
 
 - `content`: assistant reply text
 - `model`: model ID used
 - `latencyMs`: provider round-trip duration in milliseconds
 - `usage`: `{ promptTokens, completionTokens, totalTokens }`
+
+Stream Events (`Observable<LlmChatStreamEventDto>` for `llm.chat.stream`):
+
+- `{ type: 'delta', delta: string }` — incremental text chunk from `AiService.streamText()`
+- `{ type: 'done', completion: LlmChatCompletionResponseDto }` — final completion payload with usage & latency
 
 ### `dialog-service` (`Transport.TCP`) & `api-gateway` (HTTP `/dialogs`)
 
@@ -65,6 +70,11 @@ Response (`LlmChatCompletionResponseDto`):
 - `GET /dialogs` -> `dialogs.list` — lists dialogs owned by the authenticated user (`DialogResponseDto[]`).
 - `GET /dialogs/:id/messages` -> `dialogs.messages.list` — lists ordered messages for an owned dialog (`DialogMessageResponseDto[]`).
 - `POST /dialogs/:id/messages` -> `dialogs.messages.send` — executes a LangGraph turn (`SendMessageRequestDto` -> `SendMessageResponseDto`) containing `{ dialog, userMessage, assistantMessage }`.
+- `POST /dialogs/:id/messages/stream` -> `dialogs.messages.stream` — streams a dialog turn over Server-Sent Events (`text/event-stream`) emitting `DialogMessageStreamEventDto` frames:
+  - `{ type: 'user_message', userMessage: DialogMessageResponseDto }`
+  - `{ type: 'delta', delta: string }`
+  - `{ type: 'done', dialog, userMessage, assistantMessage }`
+  - `{ type: 'error', statusCode: number, message: string }` (if an error occurs after SSE headers are sent)
 
 ---
 

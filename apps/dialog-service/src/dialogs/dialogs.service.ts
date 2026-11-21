@@ -2,10 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type {
   CreateDialogRequestDto,
   DialogMessageResponseDto,
+  DialogMessageStreamEventDto,
   DialogResponseDto,
   SendMessageRequestDto,
   SendMessageResponseDto,
 } from '@semcache/shared-dtos';
+import { type Observable, from, mergeMap } from 'rxjs';
 import { DialogGraphService } from './dialog-graph.service';
 import { DialogsRepository } from './dialogs.repository';
 
@@ -40,6 +42,22 @@ export class DialogsService {
       content: dto.content,
       model: dto.model,
     });
+  }
+
+  streamMessage(
+    userId: string,
+    dialogId: string,
+    dto: SendMessageRequestDto,
+  ): Observable<DialogMessageStreamEventDto> {
+    return from(this.requireOwnedDialog(userId, dialogId)).pipe(
+      mergeMap((dialog) =>
+        this.dialogGraphService.streamTurn({
+          dialog,
+          content: dto.content,
+          model: dto.model,
+        }),
+      ),
+    );
   }
 
   private async requireOwnedDialog(userId: string, dialogId: string): Promise<DialogResponseDto> {

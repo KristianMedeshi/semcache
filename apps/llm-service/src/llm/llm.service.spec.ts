@@ -7,6 +7,7 @@ import { AiModule, AiService } from '@nestjs/ai';
 import { FakeModel, overrideModels, providerError } from '@nestjs/ai/testing';
 import { Test } from '@nestjs/testing';
 import { ChatMessageRole } from '@semcache/shared-types';
+import { firstValueFrom, toArray } from 'rxjs';
 import { LlmConfigModule } from '../config/llm-config.module';
 import { LlmConfigService } from '../config/llm-config.service';
 import { LlmModule } from './llm.module';
@@ -249,5 +250,108 @@ describe('LlmService', () => {
     expect(() => new LlmConfigService()).toThrow(
       /OPENROUTER_TIMEOUT_MS must be a positive integer/,
     );
+  });
+
+  it('streams delta chunks and a final done event via streamChatCompletion', async () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_DEFAULT_MODEL = 'openrouter/free';
+
+    const fake = new FakeModel([
+      {
+        text: 'Hello from stream!',
+        usage: { inputTokens: 11, outputTokens: 4 },
+      },
+    ]);
+
+    const moduleRef = await overrideModels(
+      Test.createTestingModule({
+        imports: [LlmConfigModule, LlmModule],
+      }),
+      { default: fake },
+    ).compile();
+
+    const service = moduleRef.get(LlmService);
+    const events = await firstValueFrom(
+      service
+        .streamChatCompletion({
+          messages: [{ role: ChatMessageRole.USER, content: 'Stream please' }],
+        })
+        .pipe(toArray()),
+    );
+
+    const deltas = events.filter((event) => event.type === 'delta');
+    const done = events.find((event) => event.type === 'done');
+
+    expect(deltas.length).toBeGreaterThan(0);
+    expect(deltas.map((event) => event.delta).join('')).toBe('Hello from stream!');
+    expect(done).toEqual({
+      type: 'done',
+      completion: {
+        content: 'Hello from stream!',
+        model: 'openrouter/free',
+        latencyMs: expect.any(Number),
+        usage: {
+          promptTokens: 11,
+          completionTokens: 4,
+          totalTokens: 15,
+        },
+      },
+    });
+    expect(fake.lastCall?.stream).toBe(true);
+    await moduleRef.close();
+  });
+
+  it('emits BadRequestException on streamChatCompletion for non-free models', async () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.OPENROUTER_API_KEY;
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [LlmConfigModule, LlmModule],
+    }).compile();
+
+    const service = moduleRef.get(LlmService);
+
+    await expect(
+      firstValueFrom(
+        service
+          .streamChatCompletion({
+            model: 'openai/gpt-4o',
+            messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
+          })
+          .pipe(toArray()),
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    await moduleRef.close();
+  });
+
+  it('wraps upstream provider stream errors into BadGatewayException', async () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.OPENROUTER_API_KEY;
+
+    const fake = new FakeModel([
+      providerError(500, { message: 'Stream down' }),
+      providerError(500, { message: 'Stream down' }),
+    ]);
+    const moduleRef = await overrideModels(
+      Test.createTestingModule({
+        imports: [LlmConfigModule, LlmModule],
+      }),
+      { default: fake },
+    ).compile();
+
+    const service = moduleRef.get(LlmService);
+    await expect(
+      firstValueFrom(
+        service
+          .streamChatCompletion({
+            messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
+          })
+          .pipe(toArray()),
+      ),
+    ).rejects.toThrow(BadGatewayException);
+
+    await moduleRef.close();
   });
 });

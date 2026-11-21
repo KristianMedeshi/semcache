@@ -124,7 +124,9 @@ export const SERVICE_TCP_PATTERNS = {
   DIALOGS_LIST: 'dialogs.list',
   DIALOGS_MESSAGES_LIST: 'dialogs.messages.list',
   DIALOGS_MESSAGES_SEND: 'dialogs.messages.send',
+  DIALOGS_MESSAGES_STREAM: 'dialogs.messages.stream',
   LLM_CHAT: 'llm.chat',
+  LLM_CHAT_STREAM: 'llm.chat.stream',
 } as const;
 
 export type ServiceTcpPattern = (typeof SERVICE_TCP_PATTERNS)[keyof typeof SERVICE_TCP_PATTERNS];

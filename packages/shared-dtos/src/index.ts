@@ -177,6 +177,27 @@ export interface LlmChatCompletionResponseDto {
 }
 
 /**
+ * Text delta chunk emitted by `llm-service` over `llm.chat.stream`.
+ */
+export interface LlmChatStreamDeltaEventDto {
+  type: 'delta';
+  delta: string;
+}
+
+/**
+ * Final completion event emitted by `llm-service` over `llm.chat.stream`.
+ */
+export interface LlmChatStreamDoneEventDto {
+  type: 'done';
+  completion: LlmChatCompletionResponseDto;
+}
+
+/**
+ * Union of stream events emitted by `llm-service` on `llm.chat.stream`.
+ */
+export type LlmChatStreamEventDto = LlmChatStreamDeltaEventDto | LlmChatStreamDoneEventDto;
+
+/**
  * DTO contract for creating a new dialog conversation.
  */
 export interface CreateDialogRequestDto {
@@ -224,6 +245,50 @@ export interface SendMessageResponseDto {
   userMessage: DialogMessageResponseDto;
   assistantMessage: DialogMessageResponseDto;
 }
+
+/**
+ * Persisted user message event emitted at the start of `dialogs.messages.stream`.
+ */
+export interface DialogMessageStreamUserMessageEventDto {
+  type: 'user_message';
+  userMessage: DialogMessageResponseDto;
+}
+
+/**
+ * Assistant response text delta event emitted during `dialogs.messages.stream`.
+ */
+export interface DialogMessageStreamDeltaEventDto {
+  type: 'delta';
+  delta: string;
+}
+
+/**
+ * Final completion event emitted when `dialogs.messages.stream` finishes persisting the turn.
+ */
+export interface DialogMessageStreamDoneEventDto {
+  type: 'done';
+  dialog: DialogResponseDto;
+  userMessage: DialogMessageResponseDto;
+  assistantMessage: DialogMessageResponseDto;
+}
+
+/**
+ * Error event emitted as SSE when a failure occurs after streaming headers are sent.
+ */
+export interface DialogMessageStreamErrorEventDto {
+  type: 'error';
+  statusCode: number;
+  message: string;
+}
+
+/**
+ * Union of stream events emitted by `dialog-service` (`dialogs.messages.stream`) and `api-gateway` SSE.
+ */
+export type DialogMessageStreamEventDto =
+  | DialogMessageStreamUserMessageEventDto
+  | DialogMessageStreamDeltaEventDto
+  | DialogMessageStreamDoneEventDto
+  | DialogMessageStreamErrorEventDto;
 
 /**
  * Structured RPC error payload serialized over NestJS TCP transport.

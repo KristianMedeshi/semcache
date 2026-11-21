@@ -35,8 +35,10 @@ export function getApiBaseUrl(): string {
   );
 }
 
-function extractAxiosErrorMessage(error: AxiosError<{ message?: string | string[] }>): string {
-  const payload = error.response?.data;
+export function extractPayloadErrorMessage(
+  payload: { message?: string | string[] } | undefined,
+  fallback: string,
+): string {
   if (payload) {
     if (Array.isArray(payload.message)) {
       return payload.message.join(', ');
@@ -45,11 +47,24 @@ function extractAxiosErrorMessage(error: AxiosError<{ message?: string | string[
       return payload.message;
     }
   }
-  return error.response?.statusText || error.message || 'Request failed';
+  return fallback;
+}
+
+function extractAxiosErrorMessage(error: AxiosError<{ message?: string | string[] }>): string {
+  return extractPayloadErrorMessage(
+    error.response?.data,
+    error.response?.statusText || error.message || 'Request failed',
+  );
 }
 
 type UnauthorizedListener = () => void;
 const unauthorizedListeners = new Set<UnauthorizedListener>();
+
+export function notifyUnauthorized(): void {
+  for (const listener of unauthorizedListeners) {
+    listener();
+  }
+}
 
 export function onUnauthorizedResponse(listener: UnauthorizedListener): () => void {
   unauthorizedListeners.add(listener);
@@ -80,9 +95,7 @@ export function createApiClient(): AxiosInstance {
         const message = extractAxiosErrorMessage(error);
 
         if (status === 401) {
-          for (const listener of unauthorizedListeners) {
-            listener();
-          }
+          notifyUnauthorized();
         }
 
         return Promise.reject(new ApiError(status, message));

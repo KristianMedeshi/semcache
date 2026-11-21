@@ -9,8 +9,18 @@ import {
   Transport,
 } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import type { AuthTcpRequestDto, DialogTcpRequestDto } from '@semcache/shared-dtos';
-import { SERVICE_TCP_PATTERNS, ServiceName, UserRole } from '@semcache/shared-types';
+import type {
+  AuthTcpRequestDto,
+  DialogMessageStreamEventDto,
+  DialogTcpRequestDto,
+} from '@semcache/shared-dtos';
+import {
+  ChatMessageRole,
+  SERVICE_TCP_PATTERNS,
+  ServiceName,
+  UserRole,
+} from '@semcache/shared-types';
+import { type Observable, of } from 'rxjs';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { configureGatewayApp } from '../src/app.bootstrap';
@@ -70,6 +80,54 @@ class MockDialogController {
   listDialogs(@Payload() payload: DialogTcpRequestDto<unknown>) {
     capturedDialogRequests.push({ pattern: SERVICE_TCP_PATTERNS.DIALOGS_LIST, payload });
     return { ok: true, pattern: SERVICE_TCP_PATTERNS.DIALOGS_LIST };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM)
+  streamMessages(
+    @Payload() payload: DialogTcpRequestDto<unknown>,
+  ): Observable<DialogMessageStreamEventDto> {
+    capturedDialogRequests.push({
+      pattern: SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM,
+      payload,
+    });
+    const dialogId = payload.dialogId ?? '11111111-1111-4111-8111-111111111111';
+    const userMessage = {
+      id: 'm-1',
+      dialogId,
+      role: ChatMessageRole.USER,
+      content: 'Hello',
+      model: null,
+      latencyMs: null,
+      usage: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    const assistantMessage = {
+      id: 'm-2',
+      dialogId,
+      role: ChatMessageRole.ASSISTANT,
+      content: 'Streamed reply',
+      model: 'openrouter/free',
+      latencyMs: 50,
+      usage: null,
+      createdAt: '2026-01-01T00:00:01.000Z',
+    };
+    return of<DialogMessageStreamEventDto[]>(
+      { type: 'user_message', userMessage },
+      { type: 'delta', delta: 'Streamed ' },
+      { type: 'delta', delta: 'reply' },
+      {
+        type: 'done',
+        dialog: {
+          id: dialogId,
+          userId: '11111111-1111-4111-8111-111111111111',
+          title: 'Hello',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:01.000Z',
+        },
+        userMessage,
+        assistantMessage,
+      },
+    );
   }
 }
 
@@ -217,5 +275,21 @@ describe('API Gateway (e2e)', () => {
       .set('Cookie', 'semcache_sid=opaque-test-token')
       .send({ content: 'Hello', model: 'openai/gpt-4o' })
       .expect(400);
+  });
+
+  it('streams SSE events from POST /dialogs/:id/messages/stream', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/dialogs/11111111-1111-4111-8111-111111111111/messages/stream')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .send({ content: 'Hello' })
+      .expect(200);
+
+    expect(res.headers['content-type']).toContain('text/event-stream');
+    expect(res.text).toContain('"type":"user_message"');
+    expect(res.text).toContain('"type":"delta","delta":"Streamed "');
+    expect(res.text).toContain('"type":"delta","delta":"reply"');
+    expect(res.text).toContain('"type":"done"');
+    expect(capturedDialogRequests).toHaveLength(1);
+    expect(capturedDialogRequests[0]?.pattern).toBe(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM);
   });
 });

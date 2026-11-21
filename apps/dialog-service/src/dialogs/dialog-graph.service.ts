@@ -2,6 +2,7 @@ import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import {
   BadGatewayException,
   BadRequestException,
+  HttpException,
   Inject,
   Injectable,
   Logger,
@@ -11,14 +12,16 @@ import { ClientProxy } from '@nestjs/microservices';
 import { extractRpcErrorPayload, formatRpcErrorMessage } from '@semcache/shared-config';
 import type {
   DialogMessageResponseDto,
+  DialogMessageStreamEventDto,
   DialogResponseDto,
   LlmChatCompletionRequestDto,
   LlmChatCompletionResponseDto,
   LlmChatMessageDto,
+  LlmChatStreamEventDto,
   SendMessageResponseDto,
 } from '@semcache/shared-dtos';
 import { ChatMessageRole, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
-import { firstValueFrom } from 'rxjs';
+import { Observable, type Subscription, firstValueFrom } from 'rxjs';
 import { DEFAULT_DIALOG_TITLE, DialogsRepository } from './dialogs.repository';
 
 export const LLM_SERVICE_CLIENT = Symbol('LLM_SERVICE_CLIENT');
@@ -91,6 +94,126 @@ export class DialogGraphService {
     };
   }
 
+  streamTurn(input: {
+    dialog: DialogResponseDto;
+    content: string;
+    model?: string;
+  }): Observable<DialogMessageStreamEventDto> {
+    return new Observable<DialogMessageStreamEventDto>((subscriber) => {
+      let unsubscribed = false;
+      let llmSubscription: Subscription | undefined;
+
+      const start = async () => {
+        const { userMessage, history } = await this.recordUserMessage({
+          dialog: input.dialog,
+          userContent: input.content,
+          requestedModel: input.model,
+          history: [],
+          userMessage: null,
+          llmCompletion: null,
+          assistantMessage: null,
+          updatedDialog: null,
+        });
+
+        if (unsubscribed || !userMessage || !history) {
+          return;
+        }
+
+        subscriber.next({ type: 'user_message', userMessage });
+
+        let accumulatedContent = '';
+        let finalCompletion: LlmChatCompletionResponseDto | null = null;
+
+        llmSubscription = this.llmClient
+          .send<LlmChatStreamEventDto, LlmChatCompletionRequestDto>(
+            SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM,
+            {
+              messages: history,
+              ...(input.model ? { model: input.model } : {}),
+            },
+          )
+          .subscribe({
+            next: (event) => {
+              if (unsubscribed) {
+                return;
+              }
+              if (event.type === 'delta') {
+                accumulatedContent += event.delta;
+                subscriber.next({ type: 'delta', delta: event.delta });
+              } else if (event.type === 'done') {
+                finalCompletion = event.completion;
+              }
+            },
+            error: (error: unknown) => {
+              if (!unsubscribed) {
+                subscriber.error(this.translateLlmRpcError(error, input.dialog.id));
+              }
+            },
+            complete: () => {
+              if (unsubscribed) {
+                return;
+              }
+              if (!finalCompletion) {
+                subscriber.error(new BadGatewayException('Missing LLM completion payload'));
+                return;
+              }
+
+              const completionPayload: LlmChatCompletionResponseDto = {
+                ...finalCompletion,
+                content: finalCompletion.content || accumulatedContent,
+              };
+
+              void this.recordAssistantMessage({
+                dialog: input.dialog,
+                userContent: input.content,
+                requestedModel: input.model,
+                history,
+                userMessage,
+                llmCompletion: completionPayload,
+                assistantMessage: null,
+                updatedDialog: null,
+              }).then(
+                ({ assistantMessage, updatedDialog }) => {
+                  if (unsubscribed) {
+                    return;
+                  }
+                  if (!assistantMessage || !updatedDialog) {
+                    subscriber.error(
+                      new BadGatewayException('Dialog orchestration failed to persist reply'),
+                    );
+                    return;
+                  }
+                  subscriber.next({
+                    type: 'done',
+                    dialog: updatedDialog,
+                    userMessage,
+                    assistantMessage,
+                  });
+                  subscriber.complete();
+                },
+                (err: unknown) => {
+                  if (!unsubscribed) {
+                    subscriber.error(err);
+                  }
+                },
+              );
+            },
+          });
+      };
+
+      void start().catch((error: unknown) => {
+        if (!unsubscribed) {
+          subscriber.error(error);
+        }
+      });
+
+      return () => {
+        unsubscribed = true;
+        llmSubscription?.unsubscribe();
+      };
+    });
+  }
+
   private async recordUserMessage(
     state: DialogTurnStateType,
   ): Promise<Partial<DialogTurnStateType>> {
@@ -128,27 +251,31 @@ export class DialogGraphService {
       );
       return { llmCompletion };
     } catch (error) {
-      const rpcError = extractRpcErrorPayload(error);
-      if (rpcError) {
-        const message = formatRpcErrorMessage(rpcError, 'LLM service error');
-        if (rpcError.statusCode === 400) {
-          throw new BadRequestException(message);
-        }
-        if (rpcError.statusCode === 503) {
-          throw new ServiceUnavailableException(message);
-        }
-        throw new BadGatewayException(message);
-      }
-
-      this.logger.error(
-        JSON.stringify({
-          event: 'dialog.llm_service.network_error',
-          dialogId: state.dialog.id,
-          error: error instanceof Error ? error.message : 'Unknown TCP error',
-        }),
-      );
-      throw new BadGatewayException('LLM service unavailable');
+      throw this.translateLlmRpcError(error, state.dialog.id);
     }
+  }
+
+  private translateLlmRpcError(error: unknown, dialogId: string): HttpException {
+    const rpcError = extractRpcErrorPayload(error);
+    if (rpcError) {
+      const message = formatRpcErrorMessage(rpcError, 'LLM service error');
+      if (rpcError.statusCode === 400) {
+        return new BadRequestException(message);
+      }
+      if (rpcError.statusCode === 503) {
+        return new ServiceUnavailableException(message);
+      }
+      return new BadGatewayException(message);
+    }
+
+    this.logger.error(
+      JSON.stringify({
+        event: 'dialog.llm_service.network_error',
+        dialogId,
+        error: error instanceof Error ? error.message : 'Unknown TCP error',
+      }),
+    );
+    return new BadGatewayException('LLM service unavailable');
   }
 
   private async recordAssistantMessage(

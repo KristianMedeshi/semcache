@@ -17,6 +17,7 @@ vi.mock('@/features/chat/api/chat.client', () => ({
   createDialog: vi.fn(),
   getDialogMessages: vi.fn(),
   sendDialogMessage: vi.fn(),
+  streamDialogMessage: vi.fn(),
 }));
 
 const testUser: UserResponseDto = {
@@ -76,11 +77,23 @@ describe('ChatWorkspace', () => {
     vi.mocked(chatClient.listDialogs).mockResolvedValueOnce([]);
     vi.mocked(chatClient.createDialog).mockResolvedValueOnce(createdDialog);
     vi.mocked(chatClient.getDialogMessages).mockResolvedValue([]);
-    vi.mocked(chatClient.sendDialogMessage).mockResolvedValueOnce({
-      dialog: { ...createdDialog, title: 'How do I activate my eSIM?' },
-      userMessage: userMsg,
-      assistantMessage: assistantMsg,
-    });
+    vi.mocked(chatClient.streamDialogMessage).mockImplementationOnce(
+      async (_dialogId, _dto, callbacks) => {
+        callbacks?.onUserMessage?.(userMsg);
+        callbacks?.onDelta?.('### eSIM Activation Steps\n\n', '### eSIM Activation Steps\n\n');
+        callbacks?.onDelta?.(
+          '1. Open **Settings > Cellular**.\n2. Scan your QR code.',
+          assistantMsg.content,
+        );
+        const turn = {
+          dialog: { ...createdDialog, title: 'How do I activate my eSIM?' },
+          userMessage: userMsg,
+          assistantMessage: assistantMsg,
+        };
+        callbacks?.onDone?.(turn);
+        return turn;
+      },
+    );
 
     renderChatWorkspace();
 
@@ -96,9 +109,14 @@ describe('ChatWorkspace', () => {
     await user.click(screen.getByRole('button', { name: /how do i activate my esim\?/i }));
 
     await waitFor(() => {
-      expect(chatClient.sendDialogMessage).toHaveBeenCalledWith(createdDialog.id, {
-        content: 'How do I activate my eSIM?',
-      });
+      expect(chatClient.streamDialogMessage).toHaveBeenCalledWith(
+        createdDialog.id,
+        { content: 'How do I activate my eSIM?' },
+        expect.objectContaining({
+          onUserMessage: expect.any(Function),
+          onDelta: expect.any(Function),
+        }),
+      );
     });
 
     expect(await screen.findByText('eSIM Activation Steps')).toBeVisible();
@@ -124,7 +142,7 @@ describe('ChatWorkspace', () => {
 
     vi.mocked(chatClient.listDialogs).mockResolvedValueOnce([existingDialog]);
     vi.mocked(chatClient.getDialogMessages).mockResolvedValue([]);
-    vi.mocked(chatClient.sendDialogMessage).mockResolvedValueOnce({
+    vi.mocked(chatClient.streamDialogMessage).mockResolvedValueOnce({
       dialog: existingDialog,
       userMessage: {
         id: 'm-10',
@@ -154,9 +172,14 @@ describe('ChatWorkspace', () => {
     await user.type(input, 'Line 1{Shift>}{Enter}{/Shift}Line 2{Enter}');
 
     await waitFor(() => {
-      expect(chatClient.sendDialogMessage).toHaveBeenCalledWith(existingDialog.id, {
-        content: 'Line 1\nLine 2',
-      });
+      expect(chatClient.streamDialogMessage).toHaveBeenCalledWith(
+        existingDialog.id,
+        { content: 'Line 1\nLine 2' },
+        expect.objectContaining({
+          onUserMessage: expect.any(Function),
+          onDelta: expect.any(Function),
+        }),
+      );
     });
 
     const escalationButtons = screen.getAllByRole('button', { name: /talk to a human agent/i });

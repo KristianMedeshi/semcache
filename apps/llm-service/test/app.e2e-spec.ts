@@ -9,8 +9,9 @@ import {
 } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { extractRpcErrorPayload } from '@semcache/shared-config';
+import type { LlmChatStreamEventDto } from '@semcache/shared-dtos';
 import { ChatMessageRole, SERVICE_TCP_PATTERNS, ServiceName } from '@semcache/shared-types';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, toArray } from 'rxjs';
 import { AppModule } from '../src/app.module';
 
 describe('LLM Service (TCP e2e)', () => {
@@ -95,6 +96,56 @@ describe('LLM Service (TCP e2e)', () => {
           model: 'openai/gpt-4o',
           messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
         }),
+      );
+    } catch (error) {
+      caughtError = error;
+    }
+
+    const rpcError = extractRpcErrorPayload(caughtError);
+    expect(rpcError?.statusCode).toBe(400);
+    expect(JSON.stringify(rpcError)).toContain('Only free OpenRouter models');
+  });
+
+  it('llm.chat.stream emits delta chunks and final done event over TCP', async () => {
+    const events = await firstValueFrom(
+      client
+        .send<LlmChatStreamEventDto>(SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM, {
+          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+          messages: [{ role: ChatMessageRole.USER, content: 'Stream test' }],
+        })
+        .pipe(toArray()),
+    );
+
+    const deltas = events.filter((event) => event.type === 'delta');
+    const done = events.find((event) => event.type === 'done');
+
+    expect(deltas.length).toBeGreaterThan(0);
+    expect(deltas.map((event) => event.delta).join('')).toBe('Mocked free assistant response');
+    expect(done).toEqual({
+      type: 'done',
+      completion: {
+        content: 'Mocked free assistant response',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        latencyMs: expect.any(Number),
+        usage: {
+          promptTokens: 15,
+          completionTokens: 7,
+          totalTokens: 22,
+        },
+      },
+    });
+  });
+
+  it('llm.chat.stream rejects paid models with 400 Bad Request RPC error', async () => {
+    let caughtError: unknown;
+    try {
+      await firstValueFrom(
+        client
+          .send(SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM, {
+            model: 'openai/gpt-4o',
+            messages: [{ role: ChatMessageRole.USER, content: 'Hi' }],
+          })
+          .pipe(toArray()),
       );
     } catch (error) {
       caughtError = error;
