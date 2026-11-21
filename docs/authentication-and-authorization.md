@@ -12,7 +12,7 @@ SemCache implements browser-based session authentication and policy-based author
   - `HttpOnly: true`, `SameSite=Lax`, and `Secure: true` in production (`SECURE_COOKIES` override available for local configuration).
   - Session rotation on sign-in (`SignInService.signIn()`) deletes any prior session carried by the browser to prevent session fixation.
   - Password updates revoke other active sessions and rotate the current browser session.
-  - Absolute lifetime (`SESSION_TTL_MS`, default 24 hours) and sliding idle timeout (`SESSION_IDLE_TIMEOUT_MS`, default 30 minutes).
+  - Absolute lifetime (`SESSION_TTL`, default `24h`) and sliding idle timeout (`SESSION_IDLE_TIMEOUT`, default `30m`).
 - **Password security**:
   - Passwords are hashed with Node.js `crypto.scrypt` via `PasswordHasher` from `@nestjs/authentication`.
   - Email addresses are normalized via `trim().normalize('NFC').toLowerCase()`.
@@ -125,8 +125,8 @@ pnpm --filter @semcache/auth-service db:migrate
 | `AUTH_SERVICE_PORT`             | `3001`                                        | Required if non-default   | TCP port of `auth-service` for `api-gateway`   |
 | `INTERNAL_SERVICE_SECRET`       | Ephemeral 32-byte random                      | Required (min 32 chars)   | HMAC secret for signing `x-internal-*` headers |
 | `SESSION_COOKIE_NAME`           | `semcache_sid`                                | Optional                  | Name of the HttpOnly session cookie            |
-| `SESSION_TTL_MS`                | `86400000` (24h)                              | Optional                  | Absolute session expiration in ms              |
-| `SESSION_IDLE_TIMEOUT_MS`       | `1800000` (30m)                               | Optional                  | Sliding idle session timeout in ms             |
+| `SESSION_TTL`                   | `24h`                                         | Optional                  | Absolute session expiration (`Duration`: e.g. `30d`, `24h`, or ms) |
+| `SESSION_IDLE_TIMEOUT`          | `30m`                                         | Optional                  | Sliding idle session timeout (`Duration`: e.g. `7d`, `30m`, or `0` to disable) |
 | `LOGIN_RATE_LIMIT_WINDOW_MS`    | `900000` (15m)                                | Optional                  | Throttling window for failed logins in ms      |
 | `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` | `5`                                           | Optional                  | Max login attempts per account+IP per window   |
 | `CORS_ORIGIN`                   | `http://localhost:5173,http://127.0.0.1:5173` | Set to frontend origin(s) | Allowed CORS and CSRF trusted origins          |

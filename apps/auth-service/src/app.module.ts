@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
 import { ThrottlerGuard, ThrottlerModule, minutes, normalizeIp } from '@nestjs/throttler';
+import { durationToMs } from '@semcache/shared-config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import './auth/auth-types';
@@ -69,23 +70,26 @@ class RpcThrottlerGuard extends ThrottlerGuard {
     }),
     AuthenticationModule.forRootAsync({
       inject: [AuthConfigService],
-      useFactory: (config: AuthConfigService) => ({
-        session: {
-          cookieName: config.sessionCookieName,
-          absoluteTtl: config.sessionTtlMs,
-          idleTtl: config.sessionIdleTimeoutMs,
-          touchInterval: Math.min(60_000, Math.max(0, Math.floor(config.sessionIdleTimeoutMs / 2))),
-          trustedOrigins: config.corsOrigin,
-          cookie: {
-            secure: config.secureCookies,
-            sameSite: 'lax',
-            path: '/',
+      useFactory: (config: AuthConfigService) => {
+        const idleTtlMs = durationToMs(config.sessionIdleTimeout);
+        return {
+          session: {
+            cookieName: config.sessionCookieName,
+            absoluteTtl: config.sessionTtl,
+            idleTtl: config.sessionIdleTimeout,
+            touchInterval: idleTtlMs > 0 ? Math.min(60_000, Math.floor(idleTtlMs / 2)) : 0,
+            trustedOrigins: config.corsOrigin,
+            cookie: {
+              secure: config.secureCookies,
+              sameSite: 'lax',
+              path: '/',
+            },
+            metadata: (request) => ({
+              userAgent: request.headers['user-agent'],
+            }),
           },
-          metadata: (request) => ({
-            userAgent: request.headers['user-agent'],
-          }),
-        },
-      }),
+        };
+      },
     }),
     AuthorizationModule.forRoot(),
     UsersModule,

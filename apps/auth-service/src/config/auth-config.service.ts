@@ -4,10 +4,12 @@ import {
   DEFAULT_LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
   DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS,
   DEFAULT_SESSION_COOKIE_NAME,
-  DEFAULT_SESSION_IDLE_TIMEOUT_MS,
-  DEFAULT_SESSION_TTL_MS,
+  DEFAULT_SESSION_IDLE_TIMEOUT,
+  DEFAULT_SESSION_TTL,
+  type DurationValue,
   type NodeEnvironment,
   getCorsOriginsEnv,
+  getDurationEnv,
   getNodeEnv,
   getOptionalEnv,
   getPositiveIntEnv,
@@ -23,8 +25,8 @@ export class AuthConfigService implements AuthEnvironmentConfig {
   readonly databaseUrl: string;
   readonly internalServiceSecret: string;
   readonly sessionCookieName: string;
-  readonly sessionTtlMs: number;
-  readonly sessionIdleTimeoutMs: number;
+  readonly sessionTtl: DurationValue;
+  readonly sessionIdleTimeout: DurationValue;
   readonly corsOrigin: string[];
   readonly loginRateLimitWindowMs: number;
   readonly loginRateLimitMaxAttempts: number;
@@ -43,10 +45,11 @@ export class AuthConfigService implements AuthEnvironmentConfig {
 
     this.sessionCookieName = getOptionalEnv('SESSION_COOKIE_NAME', DEFAULT_SESSION_COOKIE_NAME);
 
-    this.sessionTtlMs = getPositiveIntEnv('SESSION_TTL_MS', DEFAULT_SESSION_TTL_MS);
-    this.sessionIdleTimeoutMs = getPositiveIntEnv(
-      'SESSION_IDLE_TIMEOUT_MS',
-      DEFAULT_SESSION_IDLE_TIMEOUT_MS,
+    this.sessionTtl = getDurationEnv('SESSION_TTL', DEFAULT_SESSION_TTL);
+    this.sessionIdleTimeout = getDurationEnv(
+      'SESSION_IDLE_TIMEOUT',
+      DEFAULT_SESSION_IDLE_TIMEOUT,
+      { allowZero: true },
     );
 
     this.loginRateLimitWindowMs = getPositiveIntEnv(
