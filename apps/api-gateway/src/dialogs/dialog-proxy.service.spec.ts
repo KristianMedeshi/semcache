@@ -149,4 +149,40 @@ describe('DialogProxyService', () => {
     );
     expect(end).toHaveBeenCalledTimes(1);
   });
+
+  it('forwards dialogId and messageId in DialogTcpRequestDto when provided', async () => {
+    const config = new GatewayConfigService();
+    const authClient = { send: jest.fn() } as unknown as ClientProxy;
+    const dialogSendMock = jest.fn(() => of({ ok: true }));
+    const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
+    const authProxy = new AuthProxyService(config, authClient);
+    jest.spyOn(authProxy, 'resolveCurrentUser').mockResolvedValue({
+      id: '11111111-1111-4111-8111-111111111111',
+      email: 'alice@example.com',
+      role: UserRole.CUSTOMER,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const proxy = new DialogProxyService(authProxy, dialogClient);
+    const req = { method: 'POST', headers: { cookie: 'semcache_sid=abc' } } as Request;
+    const json = jest.fn();
+    const status = jest.fn().mockReturnValue({ json });
+    const res = { status, json } as unknown as Response;
+
+    await proxy.forwardDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT, {
+      dialogId: 'dialog-1',
+      messageId: 'msg-1',
+      body: { content: 'Edited' },
+    });
+
+    expect(dialogSendMock).toHaveBeenCalledWith(
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT,
+      expect.objectContaining({
+        dialogId: 'dialog-1',
+        messageId: 'msg-1',
+        body: { content: 'Edited' },
+      }),
+    );
+  });
 });

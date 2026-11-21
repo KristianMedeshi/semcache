@@ -82,6 +82,72 @@ class MockDialogController {
     return { ok: true, pattern: SERVICE_TCP_PATTERNS.DIALOGS_LIST };
   }
 
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_UPDATE)
+  updateDialog(@Payload() payload: DialogTcpRequestDto<{ title: string }>) {
+    capturedDialogRequests.push({ pattern: SERVICE_TCP_PATTERNS.DIALOGS_UPDATE, payload });
+    return {
+      id: payload.dialogId,
+      userId: '11111111-1111-4111-8111-111111111111',
+      title: payload.body?.title ?? 'Renamed',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:01:00.000Z',
+    };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_DELETE)
+  deleteDialog(@Payload() payload: DialogTcpRequestDto<unknown>) {
+    capturedDialogRequests.push({ pattern: SERVICE_TCP_PATTERNS.DIALOGS_DELETE, payload });
+    return { id: payload.dialogId, deleted: true };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT)
+  editMessage(@Payload() payload: DialogTcpRequestDto<{ content: string }>) {
+    capturedDialogRequests.push({ pattern: SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT, payload });
+    const dialogId = payload.dialogId ?? '11111111-1111-4111-8111-111111111111';
+    return {
+      dialog: {
+        id: dialogId,
+        userId: '11111111-1111-4111-8111-111111111111',
+        title: 'Edited',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:01:00.000Z',
+      },
+      userMessage: {
+        id: 'm-edited-1',
+        dialogId,
+        parentMessageId: null,
+        role: ChatMessageRole.USER,
+        content: payload.body?.content ?? 'Edited',
+        model: null,
+        latencyMs: null,
+        usage: null,
+        createdAt: '2026-01-01T00:01:00.000Z',
+      },
+      assistantMessage: {
+        id: 'm-edited-2',
+        dialogId,
+        parentMessageId: 'm-edited-1',
+        role: ChatMessageRole.ASSISTANT,
+        content: 'Updated answer',
+        model: 'openrouter/free',
+        latencyMs: 50,
+        usage: null,
+        createdAt: '2026-01-01T00:01:01.000Z',
+      },
+    };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT_STREAM)
+  streamEditMessage(
+    @Payload() payload: DialogTcpRequestDto<{ content: string }>,
+  ): Observable<DialogMessageStreamEventDto> {
+    capturedDialogRequests.push({
+      pattern: SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT_STREAM,
+      payload,
+    });
+    return this.streamMessages(payload);
+  }
+
   @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM)
   streamMessages(
     @Payload() payload: DialogTcpRequestDto<unknown>,
@@ -291,5 +357,36 @@ describe('API Gateway (e2e)', () => {
     expect(res.text).toContain('"type":"done"');
     expect(capturedDialogRequests).toHaveLength(1);
     expect(capturedDialogRequests[0]?.pattern).toBe(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM);
+  });
+
+  it('forwards PATCH /dialogs/:id, DELETE /dialogs/:id, and POST /dialogs/:id/messages/:messageId/edit', async () => {
+    const dialogId = '11111111-1111-4111-8111-111111111111';
+    const messageId = '22222222-2222-4222-8222-222222222222';
+
+    const patchRes = await request(app.getHttpServer())
+      .patch(`/dialogs/${dialogId}`)
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .send({ title: 'Updated Title' })
+      .expect(200);
+    expect(patchRes.body.title).toBe('Updated Title');
+
+    const editRes = await request(app.getHttpServer())
+      .post(`/dialogs/${dialogId}/messages/${messageId}/edit`)
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .send({ content: 'Edited question' })
+      .expect(200);
+    expect(editRes.body.userMessage.content).toBe('Edited question');
+
+    const deleteRes = await request(app.getHttpServer())
+      .delete(`/dialogs/${dialogId}`)
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .expect(200);
+    expect(deleteRes.body).toEqual({ id: dialogId, deleted: true });
+
+    expect(capturedDialogRequests.map((r) => r.pattern)).toEqual([
+      SERVICE_TCP_PATTERNS.DIALOGS_UPDATE,
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT,
+      SERVICE_TCP_PATTERNS.DIALOGS_DELETE,
+    ]);
   });
 });

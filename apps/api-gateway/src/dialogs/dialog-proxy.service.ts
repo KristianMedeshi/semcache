@@ -43,7 +43,7 @@ export class DialogProxyService {
     req: Request,
     res: Response,
     pattern: string,
-    options?: { dialogId?: string; body?: TBody; statusCode?: number },
+    options?: { dialogId?: string; messageId?: string; body?: TBody; statusCode?: number },
   ): Promise<void> {
     const payload = await this.buildAuthenticatedDialogPayload(req, options);
 
@@ -61,7 +61,7 @@ export class DialogProxyService {
     req: Request,
     res: Response,
     pattern: string,
-    options?: { dialogId?: string; body?: TBody },
+    options?: { dialogId?: string; messageId?: string; body?: TBody },
   ): Promise<void> {
     const payload = await this.buildAuthenticatedDialogPayload(req, options);
 
@@ -129,7 +129,7 @@ export class DialogProxyService {
 
   private async buildAuthenticatedDialogPayload<TBody>(
     req: Request,
-    options?: { dialogId?: string; body?: TBody },
+    options?: { dialogId?: string; messageId?: string; body?: TBody },
   ): Promise<DialogTcpRequestDto<TBody>> {
     const user =
       this.authContext?.user ??
@@ -148,6 +148,7 @@ export class DialogProxyService {
     return {
       headers: identityHeaders,
       ...(options?.dialogId !== undefined ? { dialogId: options.dialogId } : {}),
+      ...(options?.messageId !== undefined ? { messageId: options.messageId } : {}),
       ...(options?.body !== undefined ? { body: options.body } : {}),
     };
   }
