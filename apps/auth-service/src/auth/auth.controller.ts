@@ -1,6 +1,11 @@
-import { createHash } from 'node:crypto';
 import { Controller, ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
-import { CurrentUser, Public, SessionService } from '@nestjs/authentication';
+import {
+  CurrentSession,
+  CurrentUser,
+  Public,
+  type SessionRecord,
+  SessionService,
+} from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { SkipThrottle, Throttle, hours, minutes } from '@nestjs/throttler';
@@ -66,24 +71,14 @@ export class AuthController {
     };
   }
 
-  @Public()
+  @Can(UserPolicy, 'readSelf')
   @MessagePattern(SERVICE_TCP_PATTERNS.AUTH_LOGOUT)
   async logout(
+    @CurrentSession() session: SessionRecord,
     @RpcRequestContext() reqContext: RpcRequestContextData,
   ): Promise<AuthTcpResponseDto<LogoutResponseDto>> {
     this.assertAllowedOrigin(reqContext);
-    const token = this.sessionService.tokenFrom(reqContext);
-    if (!token) {
-      throw new UnauthorizedException('Authentication required');
-    }
-
-    const session = await this.sessionService.validate(token);
-    await this.sessionService.discard(
-      session?.id ?? createHash('sha256').update(token).digest('base64url'),
-    );
-    if (!session) {
-      throw new UnauthorizedException('Authentication required');
-    }
+    await this.sessionService.discard(session.id);
 
     this.logger.log(JSON.stringify({ event: 'auth.logout.success' }));
     return {

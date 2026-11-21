@@ -5,8 +5,10 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
+import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
 import { extractRpcErrorPayload, formatRpcErrorMessage } from '@semcache/shared-config';
 import type {
@@ -34,6 +36,7 @@ export class DialogProxyService {
   constructor(
     private readonly authProxyService: AuthProxyService,
     @Inject(DIALOG_SERVICE_CLIENT) private readonly dialogClient: ClientProxy,
+    @Optional() private readonly authContext?: AuthenticationContext,
   ) {}
 
   async forwardDialogRequest<TBody = undefined>(
@@ -128,7 +131,9 @@ export class DialogProxyService {
     req: Request,
     options?: { dialogId?: string; body?: TBody },
   ): Promise<DialogTcpRequestDto<TBody>> {
-    const user = await this.authProxyService.resolveCurrentUser(req.headers.cookie);
+    const user =
+      this.authContext?.user ??
+      (await this.authProxyService.resolveCurrentUser(req.headers.cookie));
     if (!user) {
       throw new UnauthorizedException('Authentication required');
     }

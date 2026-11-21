@@ -1,12 +1,13 @@
 import { Inject, Module, type OnModuleDestroy } from '@nestjs/common';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
-import { InternalAuthGuard } from '../auth/internal-auth.guard';
+import { InternalIdentityAuth } from '../auth/internal-identity.provider';
 import { DialogConfigService } from '../config/dialog-config.service';
 import { DatabaseModule } from '../db/database.module';
 import { DialogGraphService, LLM_SERVICE_CLIENT } from './dialog-graph.service';
 import { DialogsController } from './dialogs.controller';
 import { DialogsRepository } from './dialogs.repository';
 import { DialogsService } from './dialogs.service';
+import { DialogPolicy } from './policies/dialog.policy';
 
 @Module({
   imports: [DatabaseModule],
@@ -24,12 +25,13 @@ import { DialogsService } from './dialogs.service';
           },
         }),
     },
-    InternalAuthGuard,
+    InternalIdentityAuth,
+    DialogPolicy,
     DialogsRepository,
     DialogGraphService,
     DialogsService,
   ],
-  exports: [DialogsService, DialogsRepository],
+  exports: [DialogsService, DialogsRepository, DialogPolicy],
 })
 export class DialogsModule implements OnModuleDestroy {
   constructor(@Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy) {}

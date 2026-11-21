@@ -1,5 +1,4 @@
 import { Controller, type ExecutionContext, ParseUUIDPipe } from '@nestjs/common';
-import { CurrentSession, CurrentUser, type SessionRecord } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import type { AuthTcpResponseDto, UserResponseDto } from '@semcache/shared-dtos';
@@ -19,11 +18,8 @@ export class UsersController {
 
   @MessagePattern(SERVICE_TCP_PATTERNS.USERS_GET)
   @Can(UserPolicy, 'viewProfile', resolveTargetUserId)
-  async getUser(
-    @Payload('id', ParseUUIDPipe) id: string,
-    @CurrentUser() actor: UserResponseDto,
-  ): Promise<UserResponseDto> {
-    return this.usersService.getUserProfile(actor, id);
+  async getUser(@Payload('id', ParseUUIDPipe) id: string): Promise<UserResponseDto> {
+    return this.usersService.getUserProfile(id);
   }
 
   @MessagePattern(SERVICE_TCP_PATTERNS.USERS_UPDATE)
@@ -31,9 +27,7 @@ export class UsersController {
   async updateUser(
     @Payload('id', ParseUUIDPipe) id: string,
     @Payload('body') dto: UpdateProfileDto,
-    @CurrentUser() actor: UserResponseDto,
-    @CurrentSession() session?: SessionRecord | null,
   ): Promise<AuthTcpResponseDto<UserResponseDto>> {
-    return this.usersService.updateUserProfile(actor, id, dto, session ?? undefined);
+    return this.usersService.updateUserProfile(id, dto);
   }
 }

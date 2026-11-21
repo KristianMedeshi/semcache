@@ -1,9 +1,13 @@
 import { Body, Controller, Get, HttpStatus, Post, Req, Res } from '@nestjs/common';
+import { Public } from '@nestjs/authentication';
+import { Can } from '@nestjs/authorization';
 import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { AuthProxyService } from './auth-proxy.service';
 import { GatewayLoginDto, GatewayRegisterDto } from './dto/gateway-auth.dto';
+import { GatewayAccessPolicy } from './policies/gateway-access.policy';
 
+@Public()
 @Controller('auth')
 export class GatewayAuthController {
   constructor(private readonly authProxyService: AuthProxyService) {}
@@ -32,6 +36,7 @@ export class GatewayAuthController {
     });
   }
 
+  @Can(GatewayAccessPolicy, 'proxyAuthRequest')
   @Post('logout')
   async logout(@Req() req: Request, @Res() res: Response): Promise<void> {
     await this.authProxyService.forwardRequest(req, res, SERVICE_TCP_PATTERNS.AUTH_LOGOUT, {
@@ -39,6 +44,7 @@ export class GatewayAuthController {
     });
   }
 
+  @Can(GatewayAccessPolicy, 'proxyAuthRequest')
   @Get('me')
   async me(@Req() req: Request, @Res() res: Response): Promise<void> {
     await this.authProxyService.forwardRequest(req, res, SERVICE_TCP_PATTERNS.AUTH_ME, {

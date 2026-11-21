@@ -1,9 +1,16 @@
-import { Policy } from '@nestjs/authorization';
+import { type Ability, Policy, type PolicyBefore } from '@nestjs/authorization';
 import type { UserResponseDto } from '@semcache/shared-dtos';
 import { UserRole } from '@semcache/shared-types';
 
 @Policy()
-export class UserPolicy {
+export class UserPolicy implements PolicyBefore<UserResponseDto, Ability<UserPolicy>> {
+  before(user: UserResponseDto | null, ability: Ability<UserPolicy>): boolean | undefined {
+    if (user?.role === UserRole.ADMIN && ability !== 'hasRole') {
+      return true;
+    }
+    return undefined;
+  }
+
   readSelf(user: UserResponseDto | null): boolean {
     return user !== null && (user.role === UserRole.CUSTOMER || user.role === UserRole.ADMIN);
   }

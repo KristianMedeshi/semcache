@@ -1,5 +1,10 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PasswordHasher, type SessionRecord, SessionService } from '@nestjs/authentication';
+import {
+  AuthenticationContext,
+  PasswordHasher,
+  type SessionRecord,
+  SessionService,
+} from '@nestjs/authentication';
 import { AuthorizationService } from '@nestjs/authorization';
 import type {
   AuthTcpResponseDto,
@@ -10,6 +15,17 @@ import type { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 import { UserPolicy } from '../auth/policies/user.policy';
 import { UsersRepository, normalizeEmail } from './users.repository';
 
+function isSessionRecord(value: unknown): value is SessionRecord {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'userId' in value &&
+    typeof (value as { id?: unknown }).id === 'string' &&
+    typeof (value as { userId?: unknown }).userId === 'string'
+  );
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -19,31 +35,42 @@ export class UsersService {
     private readonly passwordHasher: PasswordHasher,
     private readonly sessionService: SessionService,
     private readonly authorizationService: AuthorizationService,
+    private readonly authContext: AuthenticationContext,
   ) {}
 
-  async getUserProfile(actor: UserResponseDto, targetUserId: string): Promise<UserResponseDto> {
-    await this.authorizationService.authorize(UserPolicy, 'viewProfile', actor, targetUserId);
-
+  async getUserProfile(targetUserId: string, actor?: UserResponseDto): Promise<UserResponseDto> {
+    const resolvedActor = actor ?? this.authContext.requireUser();
     const user = await this.usersRepository.findById(targetUserId);
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
+    await this.authorizationService.authorize(UserPolicy, 'viewProfile', resolvedActor, user.id);
     return user;
   }
 
   async updateUserProfile(
-    actor: UserResponseDto,
     targetUserId: string,
     dto: UpdateProfileDto,
+    actor?: UserResponseDto,
     currentSession?: SessionRecord | string,
   ): Promise<AuthTcpResponseDto<UserResponseDto>> {
-    await this.authorizationService.authorize(UserPolicy, 'updateProfile', actor, targetUserId);
+    const resolvedActor = actor ?? this.authContext.requireUser();
+    const contextSession = this.authContext.session;
+    const resolvedSession: SessionRecord | string | undefined =
+      currentSession ?? (isSessionRecord(contextSession) ? contextSession : undefined);
 
     const existingUser = await this.usersRepository.findById(targetUserId);
     if (!existingUser) {
       throw new NotFoundException('User not found');
     }
+
+    await this.authorizationService.authorize(
+      UserPolicy,
+      'updateProfile',
+      resolvedActor,
+      existingUser.id,
+    );
 
     let normalizedEmail: string | undefined;
     if (dto.email !== undefined) {
@@ -73,14 +100,14 @@ export class UsersService {
 
     let setCookie: string | undefined;
     if (passwordHash !== undefined) {
-      if (actor.id === targetUserId) {
+      if (resolvedActor.id === targetUserId) {
         const rotated =
-          typeof currentSession === 'object' && currentSession !== null
-            ? await this.sessionService.rotate(currentSession)
+          typeof resolvedSession === 'object' && resolvedSession !== null
+            ? await this.sessionService.rotate(resolvedSession)
             : null;
         const keptSessionId =
           rotated?.session.id ??
-          (typeof currentSession === 'string' ? currentSession : currentSession?.id);
+          (typeof resolvedSession === 'string' ? resolvedSession : resolvedSession?.id);
         if (rotated?.cookie) {
           setCookie = rotated.cookie;
         }
@@ -96,7 +123,7 @@ export class UsersService {
     this.logger.log(
       JSON.stringify({
         event: 'users.profile.updated',
-        actorId: actor.id,
+        actorId: resolvedActor.id,
         targetUserId,
         passwordChanged: passwordHash !== undefined,
       }),
@@ -108,16 +135,18 @@ export class UsersService {
     };
   }
 
-  async listAllUsers(actor: UserResponseDto): Promise<UserResponseDto[]> {
-    await this.authorizationService.authorize(UserPolicy, 'manageUsers', actor);
+  async listAllUsers(actor?: UserResponseDto): Promise<UserResponseDto[]> {
+    const resolvedActor = actor ?? this.authContext.requireUser();
+    await this.authorizationService.authorize(UserPolicy, 'manageUsers', resolvedActor);
     return this.usersRepository.findAll();
   }
 
   async revokeUserSessions(
-    actor: UserResponseDto,
     targetUserId: string,
+    actor?: UserResponseDto,
   ): Promise<RevokeUserSessionsResponseDto> {
-    await this.authorizationService.authorize(UserPolicy, 'manageUsers', actor);
+    const resolvedActor = actor ?? this.authContext.requireUser();
+    await this.authorizationService.authorize(UserPolicy, 'manageUsers', resolvedActor);
 
     const targetUser = await this.usersRepository.findById(targetUserId);
     if (!targetUser) {
@@ -130,7 +159,7 @@ export class UsersService {
     this.logger.log(
       JSON.stringify({
         event: 'auth.sessions.revoked',
-        actorId: actor.id,
+        actorId: resolvedActor.id,
         targetUserId,
         revokedCount: activeSessions.length,
       }),

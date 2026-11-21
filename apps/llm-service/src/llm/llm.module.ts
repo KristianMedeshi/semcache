@@ -5,6 +5,7 @@ import { FakeModel } from '@nestjs/ai/testing';
 import { LlmConfigService } from '../config/llm-config.service';
 import { LlmController } from './llm.controller';
 import { LlmService, OPENROUTER_PROVIDER } from './llm.service';
+import { LlmPolicy } from './policies/llm.policy';
 
 export function createOpenRouterProvider(config: LlmConfigService): OpenAICompatibleProvider {
   return createOpenAICompatible({
@@ -54,7 +55,8 @@ export function createOpenRouterProvider(config: LlmConfigService): OpenAICompat
       useFactory: (config: LlmConfigService) => createOpenRouterProvider(config),
     },
     LlmService,
+    LlmPolicy,
   ],
-  exports: [LlmService],
+  exports: [LlmService, LlmPolicy],
 })
 export class LlmModule {}

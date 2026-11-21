@@ -30,17 +30,39 @@ SemCache implements browser-based session authentication and policy-based author
 - **Roles (`@semcache/shared-types`)**:
   - `UserRole.CUSTOMER = 'customer'`
   - `UserRole.ADMIN = 'admin'`
-- **Default-deny guards**:
-  - Global `AuthenticationGuard` denies unauthenticated requests (`401 Unauthorized`) unless decorated with `@Public()`.
-  - Global `AuthorizationGuard` (`@nestjs/authorization`) denies authenticated requests (`403 Forbidden`) unless decorated with `@Can(...)` / `@Roles(...)` or `@Public()`.
-- **Policies (`UserPolicy` in `apps/auth-service/src/auth/policies/user.policy.ts`)**:
-  - `readSelf` — allows authenticated `CUSTOMER` or `ADMIN`.
-  - `viewProfile` — allows `ADMIN` or the owning `CUSTOMER`.
-  - `updateProfile` — allows `ADMIN` or the owning `CUSTOMER`.
-  - `manageUsers` — allows `ADMIN` only.
-  - `hasRole` — backs the reusable `@Roles(...roles)` decorator via `@Can(UserPolicy, 'hasRole', ...)`.
+- **Default-deny guards across all 6 NestJS services**:
+  - Every backend microservice (`api-gateway`, `auth-service`, `dialog-service`, `llm-service`, `semantic-cache-service`, `knowledge-base-service`) imports `AuthenticationModule` before `AuthorizationModule` so global `AuthenticationGuard` and `AuthorizationGuard` enforce default-deny on all routes and TCP message patterns.
+  - Global `AuthenticationGuard` denies unauthenticated requests (`401 Unauthorized`) unless decorated with `@Public()` or `@Authenticate({ optional: true })`.
+  - Global `AuthorizationGuard` (`@nestjs/authorization`) denies requests (`403 Forbidden` / `401 Unauthorized`) unless decorated with `@Can(...)`, `@Can.Anyone()`, or `@Public()`.
+- **Service Policies**:
+  - `auth-service` (`UserPolicy` implementing `PolicyBefore`):
+    - `readSelf` — allows authenticated `CUSTOMER` or `ADMIN`.
+    - `viewProfile` — allows `ADMIN` or the owning `CUSTOMER`.
+    - `updateProfile` — allows `ADMIN` or the owning `CUSTOMER`.
+    - `manageUsers` — allows `ADMIN` only.
+    - `hasRole` — backs `@Roles(...roles)` via `@Can(UserPolicy, 'hasRole', ...)`.
+    - `AuthEventsListener` subscribes to `AuthorizationEvents.events$` to log structured `authz.denied` audit events.
+  - `api-gateway` (`GatewayAccessPolicy` implementing `PolicyBefore`, `GatewaySessionAuth`):
+    - `GatewaySessionAuth` (`AuthenticationProvider`) validates session cookies via `AuthProxyService.resolveCurrentUser()` and populates `AuthenticationContext`.
+    - `accessDialogs` — allows authenticated `CUSTOMER` or `ADMIN` on `/dialogs/*`.
+    - `proxyAuthRequest` — allows forwarding `/auth/*`, `/users/*`, and `/admin/users/*` directly to `auth-service` without duplicate session resolution.
+    - `readSelf`, `viewProfile`, `updateProfile`, `manageUsers` — mirror domain access rules at the gateway.
+  - `dialog-service` (`DialogPolicy` implementing `PolicyBefore`, `InternalIdentityAuth`):
+    - `InternalIdentityAuth` (`AuthenticationProvider`) verifies HMAC-SHA256 signed `x-internal-*` headers over TCP and populates `AuthenticationContext`.
+    - `create`, `list`, `viewMessages`, `sendMessage`, `streamMessage` — require an authenticated `CUSTOMER` or `ADMIN`.
+    - `accessDialog` — record-level ownership check (`dialog.userId === user.id`) enforced via `AuthorizationService.authorize()`.
+  - `llm-service` (`LlmPolicy`):
+    - `generateCompletion`, `streamCompletion` — authorize internal TCP completion and streaming calls.
+    - `useModel` — enforces zero-cost OpenRouter models (`openrouter/free` or `*:free`).
+  - `semantic-cache-service` (`SemanticCachePolicy`):
+    - `lookup`, `store` — authorize internal semantic cache lookups and writes.
+    - `invalidate` — restricts cache invalidation to `ADMIN`.
+  - `knowledge-base-service` (`KnowledgeBasePolicy`):
+    - `retrieveContext` — authorizes internal RAG context retrieval.
+    - `readDocument` — requires authenticated `CUSTOMER` or `ADMIN`.
+    - `manageDocuments` — restricts document management to `ADMIN`.
 - **Service-level enforcement**:
-  - `UsersService` additionally calls `AuthorizationService.authorize(...)` for profile read/update and administrative operations so ownership checks remain enforced in business logic.
+  - `UsersService` and `DialogsService` read the actor from `AuthenticationContext` and call `AuthorizationService.authorize(...)` for record-level ownership checks.
 
 ---
 

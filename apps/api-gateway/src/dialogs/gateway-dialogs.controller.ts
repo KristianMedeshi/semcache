@@ -9,11 +9,14 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import { Can } from '@nestjs/authorization';
 import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
+import { GatewayAccessPolicy } from '../auth/policies/gateway-access.policy';
 import { DialogProxyService } from './dialog-proxy.service';
 import { GatewayCreateDialogDto, GatewaySendMessageDto } from './dto/gateway-dialogs.dto';
 
+@Can(GatewayAccessPolicy, 'accessDialogs')
 @Controller('dialogs')
 export class GatewayDialogsController {
   constructor(private readonly dialogProxyService: DialogProxyService) {}

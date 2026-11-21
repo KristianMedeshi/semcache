@@ -1,3 +1,6 @@
+import { AuthenticationContext } from '@nestjs/authentication';
+import { AuthorizationModule, AuthorizationService } from '@nestjs/authorization';
+import { Test } from '@nestjs/testing';
 import type { UserResponseDto } from '@semcache/shared-dtos';
 import { UserRole } from '@semcache/shared-types';
 import { UserPolicy } from './user.policy';
@@ -25,6 +28,16 @@ describe('UserPolicy', () => {
 
   beforeEach(() => {
     policy = new UserPolicy();
+  });
+
+  describe('before', () => {
+    it('allows admins ahead of ability checks except hasRole', () => {
+      expect(policy.before(adminUser, 'viewProfile')).toBe(true);
+      expect(policy.before(adminUser, 'updateProfile')).toBe(true);
+      expect(policy.before(adminUser, 'hasRole')).toBeUndefined();
+      expect(policy.before(customerA, 'viewProfile')).toBeUndefined();
+      expect(policy.before(null, 'viewProfile')).toBeUndefined();
+    });
   });
 
   describe('readSelf', () => {
@@ -83,6 +96,32 @@ describe('UserPolicy', () => {
       expect(policy.hasRole(customerA, [UserRole.ADMIN])).toBe(false);
       expect(policy.hasRole(customerA, [UserRole.CUSTOMER, UserRole.ADMIN])).toBe(true);
       expect(policy.hasRole(null, [UserRole.CUSTOMER])).toBe(false);
+    });
+  });
+
+  describe('AuthorizationService integration', () => {
+    it('enforces UserPolicy via AuthorizationModule and AuthenticationContext', async () => {
+      const moduleRef = await Test.createTestingModule({
+        imports: [AuthorizationModule.forRoot()],
+        providers: [
+          UserPolicy,
+          { provide: AuthenticationContext, useValue: { requireUser: () => customerA } },
+        ],
+      }).compile();
+      await moduleRef.init();
+
+      const authz = moduleRef.get(AuthorizationService);
+      await expect(
+        authz.authorize(UserPolicy, 'viewProfile', customerA, customerA.id),
+      ).resolves.toBeUndefined();
+      await expect(
+        authz.authorize(UserPolicy, 'viewProfile', customerA, customerBId),
+      ).rejects.toMatchObject({ reason: 'forbidden', ability: 'viewProfile' });
+      await expect(
+        authz.authorize(UserPolicy, 'viewProfile', null, customerA.id),
+      ).rejects.toMatchObject({ reason: 'unauthenticated', ability: 'viewProfile' });
+
+      await moduleRef.close();
     });
   });
 });

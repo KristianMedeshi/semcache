@@ -10,11 +10,16 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import { Public } from '@nestjs/authentication';
+import { Can } from '@nestjs/authorization';
 import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { AuthProxyService } from './auth-proxy.service';
 import { GatewayUpdateProfileDto } from './dto/gateway-auth.dto';
+import { GatewayAccessPolicy } from './policies/gateway-access.policy';
 
+@Public()
+@Can(GatewayAccessPolicy, 'proxyAuthRequest')
 @Controller('users')
 export class GatewayUsersController {
   constructor(private readonly authProxyService: AuthProxyService) {}
@@ -46,6 +51,8 @@ export class GatewayUsersController {
   }
 }
 
+@Public()
+@Can(GatewayAccessPolicy, 'proxyAuthRequest')
 @Controller('admin/users')
 export class GatewayAdminUsersController {
   constructor(private readonly authProxyService: AuthProxyService) {}
