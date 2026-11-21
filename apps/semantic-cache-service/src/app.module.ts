@@ -4,6 +4,8 @@ import { AuthorizationModule } from '@nestjs/authorization';
 import { SharedConfigModule, semanticCacheEnvSchema } from '@semcache/shared-config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import './auth/semantic-cache-auth-types';
+import { InternalIdentityAuth } from './auth/internal-identity.provider';
 import { SemanticCachePolicy } from './policies/semantic-cache.policy';
 
 @Module({
@@ -13,7 +15,7 @@ import { SemanticCachePolicy } from './policies/semantic-cache.policy';
     AuthorizationModule.forRoot(),
   ],
   controllers: [AppController],
-  providers: [AppService, SemanticCachePolicy],
+  providers: [AppService, InternalIdentityAuth, SemanticCachePolicy],
   exports: [SemanticCachePolicy],
 })
 export class AppModule {}

@@ -4,6 +4,8 @@ import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import './auth/llm-auth-types';
+import { InternalIdentityAuth } from './auth/internal-identity.provider';
 import { HttpToRpcExceptionFilter } from './common/http-to-rpc-exception.filter';
 import { LlmConfigModule } from './config/llm-config.module';
 import { LlmModule } from './llm/llm.module';
@@ -18,6 +20,7 @@ import { LlmModule } from './llm/llm.module';
   controllers: [AppController],
   providers: [
     AppService,
+    InternalIdentityAuth,
     {
       provide: APP_FILTER,
       useClass: HttpToRpcExceptionFilter,

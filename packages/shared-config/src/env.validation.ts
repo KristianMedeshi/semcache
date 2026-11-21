@@ -217,27 +217,36 @@ export const dialogEnvSchema = baseEnvSchema
     checkInternalSecret(data, ctx);
   });
 
-export const llmEnvSchema = baseEnvSchema.extend({
-  LLM_SERVICE_HOST: optionalString(),
-  LLM_SERVICE_PORT: positiveInt('LLM_SERVICE_PORT').optional(),
-  OPENROUTER_API_KEY: defaultString(''),
-  OPENROUTER_BASE_URL: defaultString(DEFAULT_OPENROUTER_BASE_URL).transform((val) =>
-    val.replace(/\/+$/, ''),
-  ),
-  OPENROUTER_DEFAULT_MODEL: freeOpenRouterModelEnvSchema,
-  OPENROUTER_TIMEOUT_MS: positiveInt('OPENROUTER_TIMEOUT_MS').default(
-    DEFAULT_OPENROUTER_TIMEOUT_MS,
-  ),
-});
+export const llmEnvSchema = baseEnvSchema
+  .extend({
+    LLM_SERVICE_HOST: optionalString(),
+    LLM_SERVICE_PORT: positiveInt('LLM_SERVICE_PORT').optional(),
+    OPENROUTER_API_KEY: defaultString(''),
+    OPENROUTER_BASE_URL: defaultString(DEFAULT_OPENROUTER_BASE_URL).transform((val) =>
+      val.replace(/\/+$/, ''),
+    ),
+    OPENROUTER_DEFAULT_MODEL: freeOpenRouterModelEnvSchema,
+    OPENROUTER_TIMEOUT_MS: positiveInt('OPENROUTER_TIMEOUT_MS').default(
+      DEFAULT_OPENROUTER_TIMEOUT_MS,
+    ),
+    INTERNAL_SERVICE_SECRET: defaultString(''),
+  })
+  .superRefine(checkInternalSecret);
 
-export const semanticCacheEnvSchema = baseEnvSchema.extend({
-  SEMANTIC_CACHE_SERVICE_HOST: optionalString(),
-  SEMANTIC_CACHE_SERVICE_PORT: positiveInt('SEMANTIC_CACHE_SERVICE_PORT').optional(),
-  DATABASE_URL: defaultString(''),
-});
+export const semanticCacheEnvSchema = baseEnvSchema
+  .extend({
+    SEMANTIC_CACHE_SERVICE_HOST: optionalString(),
+    SEMANTIC_CACHE_SERVICE_PORT: positiveInt('SEMANTIC_CACHE_SERVICE_PORT').optional(),
+    DATABASE_URL: defaultString(''),
+    INTERNAL_SERVICE_SECRET: defaultString(''),
+  })
+  .superRefine(checkInternalSecret);
 
-export const knowledgeBaseEnvSchema = baseEnvSchema.extend({
-  KNOWLEDGE_BASE_SERVICE_HOST: optionalString(),
-  KNOWLEDGE_BASE_SERVICE_PORT: positiveInt('KNOWLEDGE_BASE_SERVICE_PORT').optional(),
-  DATABASE_URL: defaultString(''),
-});
+export const knowledgeBaseEnvSchema = baseEnvSchema
+  .extend({
+    KNOWLEDGE_BASE_SERVICE_HOST: optionalString(),
+    KNOWLEDGE_BASE_SERVICE_PORT: positiveInt('KNOWLEDGE_BASE_SERVICE_PORT').optional(),
+    DATABASE_URL: defaultString(''),
+    INTERNAL_SERVICE_SECRET: defaultString(''),
+  })
+  .superRefine(checkInternalSecret);
