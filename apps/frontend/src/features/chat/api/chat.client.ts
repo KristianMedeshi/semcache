@@ -1,10 +1,13 @@
 import type {
   CreateDialogRequestDto,
+  DeleteDialogResponseDto,
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
   DialogResponseDto,
+  EditMessageRequestDto,
   SendMessageRequestDto,
   SendMessageResponseDto,
+  UpdateDialogRequestDto,
 } from '@semcache/shared-dtos';
 import {
   ApiError,
@@ -24,6 +27,24 @@ export async function createDialog(dto: CreateDialogRequestDto = {}): Promise<Di
   return data;
 }
 
+export async function updateDialog(
+  dialogId: string,
+  dto: UpdateDialogRequestDto,
+): Promise<DialogResponseDto> {
+  const { data } = await apiClient.patch<DialogResponseDto>(
+    `/dialogs/${encodeURIComponent(dialogId)}`,
+    dto,
+  );
+  return data;
+}
+
+export async function deleteDialog(dialogId: string): Promise<DeleteDialogResponseDto> {
+  const { data } = await apiClient.delete<DeleteDialogResponseDto>(
+    `/dialogs/${encodeURIComponent(dialogId)}`,
+  );
+  return data;
+}
+
 export async function getDialogMessages(dialogId: string): Promise<DialogMessageResponseDto[]> {
   const { data } = await apiClient.get<DialogMessageResponseDto[]>(
     `/dialogs/${encodeURIComponent(dialogId)}/messages`,
@@ -37,6 +58,18 @@ export async function sendDialogMessage(
 ): Promise<SendMessageResponseDto> {
   const { data } = await apiClient.post<SendMessageResponseDto>(
     `/dialogs/${encodeURIComponent(dialogId)}/messages`,
+    dto,
+  );
+  return data;
+}
+
+export async function editDialogMessage(
+  dialogId: string,
+  messageId: string,
+  dto: EditMessageRequestDto,
+): Promise<SendMessageResponseDto> {
+  const { data } = await apiClient.post<SendMessageResponseDto>(
+    `/dialogs/${encodeURIComponent(dialogId)}/messages/${encodeURIComponent(messageId)}/edit`,
     dto,
   );
   return data;
@@ -79,24 +112,21 @@ function parseSseDataBlocks(rawChunk: string): {
   return { events, remainder };
 }
 
-export async function streamDialogMessage(
-  dialogId: string,
-  dto: SendMessageRequestDto,
+async function streamSseDialogTurn(
+  url: string,
+  body: SendMessageRequestDto | EditMessageRequestDto,
   callbacks: StreamDialogMessageCallbacks = {},
 ): Promise<SendMessageResponseDto> {
-  const response = await fetch(
-    `${getApiBaseUrl()}/dialogs/${encodeURIComponent(dialogId)}/messages/stream`,
-    {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      },
-      body: JSON.stringify(dto),
-      signal: callbacks.signal,
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
     },
-  );
+    body: JSON.stringify(body),
+    signal: callbacks.signal,
+  });
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -175,4 +205,29 @@ export async function streamDialogMessage(
   }
 
   return finalTurn;
+}
+
+export async function streamDialogMessage(
+  dialogId: string,
+  dto: SendMessageRequestDto,
+  callbacks: StreamDialogMessageCallbacks = {},
+): Promise<SendMessageResponseDto> {
+  return streamSseDialogTurn(
+    `${getApiBaseUrl()}/dialogs/${encodeURIComponent(dialogId)}/messages/stream`,
+    dto,
+    callbacks,
+  );
+}
+
+export async function streamEditDialogMessage(
+  dialogId: string,
+  messageId: string,
+  dto: EditMessageRequestDto,
+  callbacks: StreamDialogMessageCallbacks = {},
+): Promise<SendMessageResponseDto> {
+  return streamSseDialogTurn(
+    `${getApiBaseUrl()}/dialogs/${encodeURIComponent(dialogId)}/messages/${encodeURIComponent(messageId)}/edit/stream`,
+    dto,
+    callbacks,
+  );
 }

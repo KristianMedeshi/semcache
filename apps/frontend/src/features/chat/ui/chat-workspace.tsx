@@ -1,16 +1,24 @@
 import type { UserResponseDto } from '@semcache/shared-dtos';
 import { Headset } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useSignOutMutation } from '@/features/auth/model/use-auth';
 import { AdminOperatorDialog } from '@/features/auth/ui/admin-operator-dialog';
 import { ProfileSettingsDialog } from '@/features/auth/ui/profile-settings-dialog';
 import {
+  type ActiveGraphNode,
+  getAdjacentBranchId,
+  resolveActiveMessagePath,
+} from '@/features/chat/model/message-graph';
+import {
   STREAMING_ASSISTANT_MESSAGE_ID,
   useCreateDialogMutation,
+  useDeleteDialogMutation,
   useDialogMessagesQuery,
   useDialogsQuery,
+  useStreamEditMessageMutation,
   useStreamMessageMutation,
+  useUpdateDialogMutation,
 } from '@/features/chat/model/use-chat';
 import { ChatComposer } from '@/features/chat/ui/chat-composer';
 import { ChatHeader } from '@/features/chat/ui/chat-header';
@@ -38,6 +46,9 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [lastMessagesByDialog, setLastMessagesByDialog] = useState<Record<string, string>>({});
+  const [selectedBranchesByDialog, setSelectedBranchesByDialog] = useState<
+    Record<string, Record<string, string>>
+  >({});
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -48,28 +59,47 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
 
   const messagesQuery = useDialogMessagesQuery(activeDialogId);
   const createDialogMutation = useCreateDialogMutation();
+  const updateDialogMutation = useUpdateDialogMutation();
+  const deleteDialogMutation = useDeleteDialogMutation();
   const streamMessageMutation = useStreamMessageMutation();
+  const streamEditMessageMutation = useStreamEditMessageMutation();
   const signOutMutation = useSignOutMutation();
 
-  const isSending = createDialogMutation.isPending || streamMessageMutation.isPending;
+  const isStreaming = streamMessageMutation.isPending || streamEditMessageMutation.isPending;
+  const isSending =
+    createDialogMutation.isPending ||
+    updateDialogMutation.isPending ||
+    deleteDialogMutation.isPending ||
+    isStreaming;
+
   const activeMessages = messagesQuery.data ?? [];
-  const hasStreamingAssistantContent = activeMessages.some(
-    (msg) => msg.id === STREAMING_ASSISTANT_MESSAGE_ID && msg.content.length > 0,
+  const activeBranchSelections = useMemo(
+    () => (activeDialogId ? (selectedBranchesByDialog[activeDialogId] ?? {}) : {}),
+    [activeDialogId, selectedBranchesByDialog],
   );
-  const lastMessageContent = activeMessages[activeMessages.length - 1]?.content ?? '';
+
+  const { nodes: activeGraphNodes, activeLeafMessageId } = useMemo(
+    () => resolveActiveMessagePath(activeMessages, activeBranchSelections),
+    [activeMessages, activeBranchSelections],
+  );
+
+  const hasStreamingAssistantContent = activeGraphNodes.some(
+    (node) => node.message.id === STREAMING_ASSISTANT_MESSAGE_ID && node.message.content.length > 0,
+  );
+  const lastMessageContent = activeGraphNodes[activeGraphNodes.length - 1]?.message.content ?? '';
 
   useEffect(() => {
-    if (activeDialogId && activeMessages.length > 0) {
-      const last = activeMessages[activeMessages.length - 1];
+    if (activeDialogId && activeGraphNodes.length > 0) {
+      const last = activeGraphNodes[activeGraphNodes.length - 1].message;
       setLastMessagesByDialog((prev) =>
         prev[activeDialogId] === last.content ? prev : { ...prev, [activeDialogId]: last.content },
       );
     }
-  }, [activeDialogId, activeMessages]);
+  }, [activeDialogId, activeGraphNodes]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeMessages.length, lastMessageContent, isSending]);
+  }, [activeGraphNodes.length, lastMessageContent, isStreaming]);
 
   const handleSelectDialog = (dialogId: string) => {
     setIsNewChatPending(false);
@@ -87,6 +117,84 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
     }
   };
 
+  const handleRenameDialog = async (dialogId: string, title: string) => {
+    try {
+      await updateDialogMutation.mutateAsync({ dialogId, dto: { title } });
+      toast.success('Conversation renamed');
+    } catch (error) {
+      toast.error(getAuthServerError(error as Error, 'Failed to rename conversation'));
+    }
+  };
+
+  const handleDeleteDialog = async (dialogId: string) => {
+    try {
+      await deleteDialogMutation.mutateAsync(dialogId);
+      if (selectedDialogId === dialogId || activeDialogId === dialogId) {
+        setSelectedDialogId(null);
+      }
+      setSelectedBranchesByDialog((prev) => {
+        if (!(dialogId in prev)) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[dialogId];
+        return next;
+      });
+      toast.success('Conversation deleted');
+    } catch (error) {
+      toast.error(getAuthServerError(error as Error, 'Failed to delete conversation'));
+    }
+  };
+
+  const handleSelectBranch = (node: ActiveGraphNode, direction: 'prev' | 'next') => {
+    if (!activeDialogId) {
+      return;
+    }
+    const targetId = getAdjacentBranchId(node, direction);
+    if (!targetId) {
+      return;
+    }
+    setSelectedBranchesByDialog((prev) => ({
+      ...prev,
+      [activeDialogId]: {
+        ...(prev[activeDialogId] ?? {}),
+        [node.parentKey]: targetId,
+      },
+    }));
+  };
+
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    if (!activeDialogId || isSending) {
+      return;
+    }
+    const targetMessage = activeMessages.find((msg) => msg.id === messageId);
+    if (!targetMessage) {
+      return;
+    }
+
+    const parentMessageId = targetMessage.parentMessageId ?? null;
+
+    try {
+      await streamEditMessageMutation.mutateAsync({
+        dialogId: activeDialogId,
+        messageId,
+        parentMessageId,
+        dto: { content: newContent },
+        onBranchCreated: (parentKey, createdMessageId) => {
+          setSelectedBranchesByDialog((prev) => ({
+            ...prev,
+            [activeDialogId]: {
+              ...(prev[activeDialogId] ?? {}),
+              [parentKey]: createdMessageId,
+            },
+          }));
+        },
+      });
+    } catch (error) {
+      toast.error(getAuthServerError(error as Error, 'Unable to edit message. Please try again.'));
+    }
+  };
+
   const submitMessage = async (rawContent: string) => {
     const content = rawContent.trim();
     if (!content || isSending) {
@@ -95,9 +203,11 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
 
     try {
       let targetDialogId = activeDialogId;
+      let parentMessageId = activeLeafMessageId;
       if (!targetDialogId) {
         const created = await createDialogMutation.mutateAsync({});
         targetDialogId = created.id;
+        parentMessageId = null;
         setIsNewChatPending(false);
         setSelectedDialogId(created.id);
       }
@@ -105,7 +215,10 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
       setDraft('');
       await streamMessageMutation.mutateAsync({
         dialogId: targetDialogId,
-        dto: { content },
+        dto: {
+          content,
+          ...(parentMessageId ? { parentMessageId } : {}),
+        },
       });
     } catch (error) {
       setDraft(content);
@@ -123,7 +236,7 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   };
 
   const showWelcomeState =
-    !activeDialogId || (!messagesQuery.isPending && activeMessages.length === 0);
+    !activeDialogId || (!messagesQuery.isPending && activeGraphNodes.length === 0);
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
@@ -150,6 +263,8 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
               isBusy={isSending}
               onSelectDialog={handleSelectDialog}
               onNewConversation={handleNewConversation}
+              onRenameDialog={handleRenameDialog}
+              onDeleteDialog={handleDeleteDialog}
             />
           </aside>
         ) : null}
@@ -186,12 +301,20 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
                   disabled={isSending}
                 />
               ) : (
-                activeMessages.map((message) => (
-                  <ChatMessageItem key={message.id} message={message} />
+                activeGraphNodes.map((node) => (
+                  <ChatMessageItem
+                    key={node.message.id}
+                    message={node.message}
+                    siblingIndex={node.siblingIndex}
+                    siblingCount={node.siblingCount}
+                    onSelectBranch={(direction) => handleSelectBranch(node, direction)}
+                    onEditMessage={handleEditMessage}
+                    isBusy={isSending}
+                  />
                 ))
               )}
 
-              {streamMessageMutation.isPending && !hasStreamingAssistantContent ? (
+              {isStreaming && !hasStreamingAssistantContent ? (
                 <div role="status" aria-live="polite" className="flex items-center gap-3">
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
                     <Headset className="size-4" />
@@ -231,6 +354,8 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
         isBusy={isSending}
         onSelectDialog={handleSelectDialog}
         onNewConversation={handleNewConversation}
+        onRenameDialog={handleRenameDialog}
+        onDeleteDialog={handleDeleteDialog}
       />
 
       <HumanEscalationDialog

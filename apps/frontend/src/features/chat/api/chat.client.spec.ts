@@ -5,8 +5,13 @@ import type {
 } from '@semcache/shared-dtos';
 import { ChatMessageRole } from '@semcache/shared-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { streamDialogMessage } from '@/features/chat/api/chat.client';
-import { ApiError } from '@/shared/api/api-client';
+import {
+  deleteDialog,
+  streamDialogMessage,
+  streamEditDialogMessage,
+  updateDialog,
+} from '@/features/chat/api/chat.client';
+import { ApiError, apiClient } from '@/shared/api/api-client';
 
 function createSseStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -123,6 +128,82 @@ describe('streamDialogMessage', () => {
 
     await expect(streamDialogMessage('missing', { content: 'Hello' })).rejects.toThrowError(
       new ApiError(404, 'Dialog not found'),
+    );
+  });
+
+  it('calls PATCH /dialogs/:id and DELETE /dialogs/:id for updateDialog and deleteDialog', async () => {
+    const patchSpy = vi.spyOn(apiClient, 'patch').mockResolvedValueOnce({
+      data: {
+        id: 'dialog-1',
+        userId: 'user-1',
+        title: 'Renamed',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:01:00.000Z',
+      },
+    });
+    const deleteSpy = vi.spyOn(apiClient, 'delete').mockResolvedValueOnce({
+      data: { id: 'dialog-1', deleted: true },
+    });
+
+    const updated = await updateDialog('dialog-1', { title: 'Renamed' });
+    expect(patchSpy).toHaveBeenCalledWith('/dialogs/dialog-1', { title: 'Renamed' });
+    expect(updated.title).toBe('Renamed');
+
+    const deleted = await deleteDialog('dialog-1');
+    expect(deleteSpy).toHaveBeenCalledWith('/dialogs/dialog-1');
+    expect(deleted).toEqual({ id: 'dialog-1', deleted: true });
+  });
+
+  it('streams SSE events from /dialogs/:id/messages/:messageId/edit/stream', async () => {
+    const dialog: DialogResponseDto = {
+      id: 'dialog-1',
+      userId: 'user-1',
+      title: 'Hello',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:02.000Z',
+    };
+    const userMessage: DialogMessageResponseDto = {
+      id: 'msg-3',
+      dialogId: 'dialog-1',
+      parentMessageId: null,
+      role: ChatMessageRole.USER,
+      content: 'Edited hello',
+      model: null,
+      latencyMs: null,
+      usage: null,
+      createdAt: '2026-01-01T00:00:02.000Z',
+    };
+    const assistantMessage: DialogMessageResponseDto = {
+      id: 'msg-4',
+      dialogId: 'dialog-1',
+      parentMessageId: 'msg-3',
+      role: ChatMessageRole.ASSISTANT,
+      content: 'Updated reply',
+      model: 'openrouter/free',
+      latencyMs: 40,
+      usage: null,
+      createdAt: '2026-01-01T00:00:03.000Z',
+    };
+
+    const events: DialogMessageStreamEventDto[] = [
+      { type: 'user_message', userMessage },
+      { type: 'delta', delta: 'Updated reply' },
+      { type: 'done', dialog, userMessage, assistantMessage },
+    ];
+    const raw = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
+
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(createSseStream([raw]), {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+
+    const turn = await streamEditDialogMessage('dialog-1', 'msg-1', { content: 'Edited hello' });
+    expect(turn).toEqual({ dialog, userMessage, assistantMessage });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/dialogs/dialog-1/messages/msg-1/edit/stream'),
+      expect.objectContaining({ method: 'POST' }),
     );
   });
 });

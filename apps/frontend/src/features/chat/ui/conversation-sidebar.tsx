@@ -1,6 +1,6 @@
 import type { DialogResponseDto } from '@semcache/shared-dtos';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquarePlus, MessagesSquare, Search } from 'lucide-react';
+import { Check, MessageSquarePlus, MessagesSquare, Pencil, Search, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
@@ -15,6 +15,8 @@ export interface ConversationSidebarProps {
   isBusy: boolean;
   onSelectDialog: (dialogId: string) => void;
   onNewConversation: () => void;
+  onRenameDialog?: (dialogId: string, title: string) => Promise<void> | void;
+  onDeleteDialog?: (dialogId: string) => Promise<void> | void;
 }
 
 function formatRelativeTime(isoDate: string): string {
@@ -33,13 +35,37 @@ export function ConversationSidebarContent({
   isBusy,
   onSelectDialog,
   onNewConversation,
+  onRenameDialog,
+  onDeleteDialog,
 }: ConversationSidebarProps) {
   const [search, setSearch] = useState('');
+  const [editingDialogId, setEditingDialogId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
 
   const normalizedQuery = search.trim().toLowerCase();
   const filteredDialogs = normalizedQuery
     ? dialogs.filter((d) => d.title.toLowerCase().includes(normalizedQuery))
     : dialogs;
+
+  const startEditing = (dialog: DialogResponseDto) => {
+    setEditingDialogId(dialog.id);
+    setEditingTitle(dialog.title);
+  };
+
+  const cancelEditing = () => {
+    setEditingDialogId(null);
+    setEditingTitle('');
+  };
+
+  const submitEditing = async (dialogId: string) => {
+    const trimmed = editingTitle.trim();
+    if (!trimmed || !onRenameDialog) {
+      return;
+    }
+    await onRenameDialog(dialogId, trimmed);
+    setEditingDialogId(null);
+    setEditingTitle('');
+  };
 
   return (
     <div className="flex h-full flex-col bg-secondary/35">
@@ -91,16 +117,14 @@ export function ConversationSidebarContent({
         ) : (
           filteredDialogs.map((dialog) => {
             const isSelected = dialog.id === activeDialogId;
+            const isEditing = editingDialogId === dialog.id;
             const preview = lastMessagesByDialog[dialog.id] ?? 'Telecom support conversation';
 
             return (
-              <button
+              <div
                 key={dialog.id}
-                type="button"
-                onClick={() => onSelectDialog(dialog.id)}
-                aria-current={isSelected ? 'true' : undefined}
                 className={cn(
-                  'group relative flex w-full flex-col gap-1 rounded-xl border px-3 py-2.5 text-left transition-all',
+                  'group relative flex w-full items-start gap-1 rounded-xl border px-3 py-2.5 transition-all',
                   isSelected
                     ? 'border-primary/25 bg-card text-foreground shadow-xs'
                     : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-card/70 hover:text-foreground',
@@ -113,22 +137,108 @@ export function ConversationSidebarContent({
                   />
                 ) : null}
 
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={cn(
-                      'truncate text-xs',
-                      isSelected ? 'font-semibold text-foreground' : 'font-medium text-foreground',
-                    )}
+                {isEditing ? (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void submitEditing(dialog.id);
+                    }}
+                    className="flex w-full items-center gap-1"
                   >
-                    {dialog.title}
-                  </span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">
-                    {formatRelativeTime(dialog.updatedAt)}
-                  </span>
-                </div>
+                    <Input
+                      value={editingTitle}
+                      onChange={(event) => setEditingTitle(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          cancelEditing();
+                        }
+                      }}
+                      aria-label="Edit conversation title"
+                      maxLength={120}
+                      autoFocus
+                      className="h-7 flex-1 rounded-md bg-background px-2 text-xs"
+                    />
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Save conversation title"
+                      disabled={isBusy || editingTitle.trim().length === 0}
+                      className="size-7 shrink-0 rounded-md text-emerald-600 hover:text-emerald-700"
+                    >
+                      <Check className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Cancel title edit"
+                      onClick={cancelEditing}
+                      className="size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </form>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onSelectDialog(dialog.id)}
+                      aria-current={isSelected ? 'true' : undefined}
+                      className="flex min-w-0 flex-1 flex-col gap-1 text-left"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={cn(
+                            'truncate text-xs',
+                            isSelected
+                              ? 'font-semibold text-foreground'
+                              : 'font-medium text-foreground',
+                          )}
+                        >
+                          {dialog.title}
+                        </span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                          {formatRelativeTime(dialog.updatedAt)}
+                        </span>
+                      </div>
 
-                <p className="truncate text-[11px] text-muted-foreground">{preview}</p>
-              </button>
+                      <p className="truncate text-[11px] text-muted-foreground">{preview}</p>
+                    </button>
+
+                    {(onRenameDialog || onDeleteDialog) && (
+                      <div className="flex shrink-0 items-center gap-0.5 opacity-80 transition-opacity group-hover:opacity-100">
+                        {onRenameDialog ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Rename ${dialog.title}`}
+                            disabled={isBusy}
+                            onClick={() => startEditing(dialog)}
+                            className="size-6 rounded-md text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                        ) : null}
+                        {onDeleteDialog ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Delete ${dialog.title}`}
+                            disabled={isBusy}
+                            onClick={() => void onDeleteDialog(dialog.id)}
+                            className="size-6 rounded-md text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        ) : null}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             );
           })
         )}
