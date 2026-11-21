@@ -19,6 +19,14 @@ export class DialogPolicy implements PolicyBefore<AuthenticatedUser, Ability<Dia
     return this.isAuthenticatedUser(user);
   }
 
+  update(user: AuthenticatedUser | null): boolean {
+    return this.isAuthenticatedUser(user);
+  }
+
+  delete(user: AuthenticatedUser | null): boolean {
+    return this.isAuthenticatedUser(user);
+  }
+
   viewMessages(user: AuthenticatedUser | null): boolean {
     return this.isAuthenticatedUser(user);
   }
@@ -28,6 +36,14 @@ export class DialogPolicy implements PolicyBefore<AuthenticatedUser, Ability<Dia
   }
 
   streamMessage(user: AuthenticatedUser | null): boolean {
+    return this.isAuthenticatedUser(user);
+  }
+
+  editMessage(user: AuthenticatedUser | null): boolean {
+    return this.isAuthenticatedUser(user);
+  }
+
+  streamEditMessage(user: AuthenticatedUser | null): boolean {
     return this.isAuthenticatedUser(user);
   }
 

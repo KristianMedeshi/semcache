@@ -38,14 +38,22 @@ describe('DialogPolicy', () => {
     expect(policy.before(customer)).toBeUndefined();
     expect(policy.create(null)).toBe(false);
     expect(policy.list(null)).toBe(false);
+    expect(policy.update(null)).toBe(false);
+    expect(policy.delete(null)).toBe(false);
     expect(policy.viewMessages(null)).toBe(false);
     expect(policy.sendMessage(null)).toBe(false);
     expect(policy.streamMessage(null)).toBe(false);
+    expect(policy.editMessage(null)).toBe(false);
+    expect(policy.streamEditMessage(null)).toBe(false);
   });
 
   it('allows authenticated users on route abilities and enforces dialog ownership', () => {
     expect(policy.create(customer)).toBe(true);
     expect(policy.list(customer)).toBe(true);
+    expect(policy.update(customer)).toBe(true);
+    expect(policy.delete(customer)).toBe(true);
+    expect(policy.editMessage(customer)).toBe(true);
+    expect(policy.streamEditMessage(customer)).toBe(true);
     expect(policy.accessDialog(customer, dialog)).toBe(true);
     expect(policy.accessDialog(otherCustomer, dialog)).toBe(false);
   });

@@ -8,6 +8,13 @@
       "when": 1795188904912,
       "tag": "0000_create_dialogs_and_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795278907641,
+      "tag": "0001_add_parent_message_id",
+      "breakpoints": true
     }
   ]
 }

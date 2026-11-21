@@ -28,6 +28,7 @@ export function toDialogMessageResponseDto(record: DialogMessageRecord): DialogM
   return {
     id: record.id,
     dialogId: record.dialogId,
+    parentMessageId: record.parentMessageId ?? null,
     role: record.role as ChatMessageRole,
     content: record.content,
     model: record.model,
@@ -89,8 +90,23 @@ export class DialogsRepository {
     return rows.map(toDialogMessageResponseDto);
   }
 
+  async findMessageByIdForDialog(
+    dialogId: string,
+    messageId: string,
+  ): Promise<DialogMessageResponseDto | null> {
+    const rows = await this.db
+      .select()
+      .from(dialogMessages)
+      .where(and(eq(dialogMessages.dialogId, dialogId), eq(dialogMessages.id, messageId)))
+      .limit(1);
+
+    const record = rows[0];
+    return record ? toDialogMessageResponseDto(record) : null;
+  }
+
   async insertMessage(input: {
     dialogId: string;
+    parentMessageId?: string | null;
     role: ChatMessageRole;
     content: string;
     model?: string;
@@ -101,6 +117,7 @@ export class DialogsRepository {
       .insert(dialogMessages)
       .values({
         dialogId: input.dialogId,
+        parentMessageId: input.parentMessageId ?? null,
         role: input.role,
         content: input.content,
         model: input.model ?? null,
@@ -116,6 +133,31 @@ export class DialogsRepository {
       throw new Error('Failed to insert dialog message');
     }
     return toDialogMessageResponseDto(created);
+  }
+
+  async updateDialogTitle(dialogId: string, title: string): Promise<DialogResponseDto> {
+    const rows = await this.db
+      .update(dialogs)
+      .set({
+        title: title.trim(),
+        updatedAt: new Date(),
+      })
+      .where(eq(dialogs.id, dialogId))
+      .returning();
+
+    const updated = rows[0];
+    if (!updated) {
+      throw new Error('Failed to update dialog title');
+    }
+    return toDialogResponseDto(updated);
+  }
+
+  async deleteDialog(dialogId: string): Promise<boolean> {
+    const rows = await this.db
+      .delete(dialogs)
+      .where(eq(dialogs.id, dialogId))
+      .returning({ id: dialogs.id });
+    return rows.length > 0;
   }
 
   async touchDialog(dialogId: string, title?: string): Promise<DialogResponseDto> {

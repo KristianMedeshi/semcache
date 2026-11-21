@@ -99,8 +99,17 @@ class InMemoryDialogsRepository {
     return [...(this.messageRows.get(dialogId) ?? [])];
   }
 
+  async findMessageByIdForDialog(
+    dialogId: string,
+    messageId: string,
+  ): Promise<DialogMessageResponseDto | null> {
+    const messages = this.messageRows.get(dialogId) ?? [];
+    return messages.find((m) => m.id === messageId) ?? null;
+  }
+
   async insertMessage(input: {
     dialogId: string;
+    parentMessageId?: string | null;
     role: ChatMessageRole;
     content: string;
     model?: string;
@@ -110,6 +119,7 @@ class InMemoryDialogsRepository {
     const msg: DialogMessageResponseDto = {
       id: randomUUID(),
       dialogId: input.dialogId,
+      parentMessageId: input.parentMessageId ?? null,
       role: input.role,
       content: input.content,
       model: input.model ?? null,
@@ -121,6 +131,25 @@ class InMemoryDialogsRepository {
     existing.push(msg);
     this.messageRows.set(input.dialogId, existing);
     return msg;
+  }
+
+  async updateDialogTitle(dialogId: string, title: string): Promise<DialogResponseDto> {
+    const dialog = this.dialogRows.get(dialogId);
+    if (!dialog) {
+      throw new Error('Dialog not found');
+    }
+    const updated: DialogResponseDto = {
+      ...dialog,
+      title: title.trim(),
+      updatedAt: new Date().toISOString(),
+    };
+    this.dialogRows.set(dialogId, updated);
+    return updated;
+  }
+
+  async deleteDialog(dialogId: string): Promise<boolean> {
+    this.messageRows.delete(dialogId);
+    return this.dialogRows.delete(dialogId);
   }
 
   async touchDialog(dialogId: string, title?: string): Promise<DialogResponseDto> {
@@ -326,5 +355,60 @@ describe('Dialog Service (TCP e2e)', () => {
       }),
     );
     expect(messages).toHaveLength(2);
+  });
+
+  it('renames a dialog, edits a user message into a new branch, and deletes the dialog', async () => {
+    const internalHeaders = createSignedInternalHeaders(
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        email: 'customer@example.com',
+        role: UserRole.CUSTOMER,
+        sessionId: 'session-123',
+      },
+      secret,
+    );
+
+    const createdDialog = await firstValueFrom(
+      client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_CREATE, {
+        headers: internalHeaders,
+        body: { title: 'Initial' },
+      }),
+    );
+
+    const renamed = await firstValueFrom(
+      client.send<DialogResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_UPDATE, {
+        headers: internalHeaders,
+        dialogId: createdDialog.id,
+        body: { title: 'Renamed Conversation' },
+      }),
+    );
+    expect(renamed.title).toBe('Renamed Conversation');
+
+    const firstTurn = await firstValueFrom(
+      client.send<SendMessageResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_SEND, {
+        headers: internalHeaders,
+        dialogId: createdDialog.id,
+        body: { content: 'Original question' },
+      }),
+    );
+
+    const editedTurn = await firstValueFrom(
+      client.send<SendMessageResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT, {
+        headers: internalHeaders,
+        dialogId: createdDialog.id,
+        messageId: firstTurn.userMessage.id,
+        body: { content: 'Edited question' },
+      }),
+    );
+    expect(editedTurn.userMessage.parentMessageId).toBeNull();
+    expect(editedTurn.assistantMessage.parentMessageId).toBe(editedTurn.userMessage.id);
+
+    const deleted = await firstValueFrom(
+      client.send<{ id: string; deleted: boolean }>(SERVICE_TCP_PATTERNS.DIALOGS_DELETE, {
+        headers: internalHeaders,
+        dialogId: createdDialog.id,
+      }),
+    );
+    expect(deleted).toEqual({ id: createdDialog.id, deleted: true });
   });
 });

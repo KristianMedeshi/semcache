@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   index,
   integer,
   pgEnum,
@@ -30,6 +31,9 @@ export const dialogMessages = pgTable(
     dialogId: uuid('dialog_id')
       .notNull()
       .references(() => dialogs.id, { onDelete: 'cascade' }),
+    parentMessageId: uuid('parent_message_id').references((): AnyPgColumn => dialogMessages.id, {
+      onDelete: 'cascade',
+    }),
     role: dialogMessageRoleEnum('role').notNull(),
     content: text('content').notNull(),
     model: varchar('model', { length: 120 }),
@@ -39,7 +43,10 @@ export const dialogMessages = pgTable(
     totalTokens: integer('total_tokens'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
-  (table) => [index('dialog_messages_dialog_id_idx').on(table.dialogId)],
+  (table) => [
+    index('dialog_messages_dialog_id_idx').on(table.dialogId),
+    index('dialog_messages_parent_message_id_idx').on(table.parentMessageId),
+  ],
 );
 
 export type DialogRecord = typeof dialogs.$inferSelect;

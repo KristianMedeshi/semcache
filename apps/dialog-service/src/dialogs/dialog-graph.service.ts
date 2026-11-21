@@ -33,6 +33,7 @@ const DialogTurnState = Annotation.Root({
   dialog: Annotation<DialogResponseDto>,
   userContent: Annotation<string>,
   requestedModel: Annotation<string | undefined>,
+  parentMessageId: Annotation<string | null | undefined>,
   history: Annotation<LlmChatMessageDto[]>,
   userMessage: Annotation<DialogMessageResponseDto | null>,
   llmCompletion: Annotation<LlmChatCompletionResponseDto | null>,
@@ -45,6 +46,24 @@ type DialogTurnStateType = typeof DialogTurnState.State;
 function deriveTitleFromMessage(content: string): string {
   const collapsed = content.replace(/\s+/g, ' ').trim();
   return collapsed.length > 60 ? `${collapsed.slice(0, 57)}...` : collapsed;
+}
+
+export function buildBranchHistory(
+  messages: DialogMessageResponseDto[],
+  leafMessageId: string,
+): DialogMessageResponseDto[] {
+  const byId = new Map(messages.map((message) => [message.id, message]));
+  const chain: DialogMessageResponseDto[] = [];
+  const visited = new Set<string>();
+
+  let current: DialogMessageResponseDto | undefined = byId.get(leafMessageId);
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    chain.push(current);
+    current = current.parentMessageId ? byId.get(current.parentMessageId) : undefined;
+  }
+
+  return chain.reverse();
 }
 
 @Injectable()
@@ -71,11 +90,13 @@ export class DialogGraphService {
     dialog: DialogResponseDto;
     content: string;
     model?: string;
+    parentMessageId?: string | null;
   }): Promise<SendMessageResponseDto> {
     const finalState = await this.compiledGraph.invoke({
       dialog: input.dialog,
       userContent: input.content,
       requestedModel: input.model,
+      parentMessageId: input.parentMessageId,
       history: [],
       userMessage: null,
       llmCompletion: null,
@@ -98,6 +119,7 @@ export class DialogGraphService {
     dialog: DialogResponseDto;
     content: string;
     model?: string;
+    parentMessageId?: string | null;
   }): Observable<DialogMessageStreamEventDto> {
     return new Observable<DialogMessageStreamEventDto>((subscriber) => {
       let unsubscribed = false;
@@ -108,6 +130,7 @@ export class DialogGraphService {
           dialog: input.dialog,
           userContent: input.content,
           requestedModel: input.model,
+          parentMessageId: input.parentMessageId,
           history: [],
           userMessage: null,
           llmCompletion: null,
@@ -167,6 +190,7 @@ export class DialogGraphService {
                 dialog: input.dialog,
                 userContent: input.content,
                 requestedModel: input.model,
+                parentMessageId: input.parentMessageId,
                 history,
                 userMessage,
                 llmCompletion: completionPayload,
@@ -217,16 +241,23 @@ export class DialogGraphService {
   private async recordUserMessage(
     state: DialogTurnStateType,
   ): Promise<Partial<DialogTurnStateType>> {
+    const existingMessages = await this.dialogsRepository.findMessagesByDialog(state.dialog.id);
+    const resolvedParentId =
+      state.parentMessageId !== undefined
+        ? state.parentMessageId
+        : (existingMessages.at(-1)?.id ?? null);
+
     const userMessage = await this.dialogsRepository.insertMessage({
       dialogId: state.dialog.id,
+      parentMessageId: resolvedParentId,
       role: ChatMessageRole.USER,
       content: state.userContent,
     });
 
-    const persistedMessages = await this.dialogsRepository.findMessagesByDialog(state.dialog.id);
+    const branchMessages = buildBranchHistory([...existingMessages, userMessage], userMessage.id);
     const history: LlmChatMessageDto[] = [
       { role: ChatMessageRole.SYSTEM, content: CUSTOMER_SUPPORT_SYSTEM_PROMPT },
-      ...persistedMessages.map((message) => ({
+      ...branchMessages.map((message) => ({
         role: message.role,
         content: message.content,
       })),
@@ -287,6 +318,7 @@ export class DialogGraphService {
 
     const assistantMessage = await this.dialogsRepository.insertMessage({
       dialogId: state.dialog.id,
+      parentMessageId: state.userMessage?.id ?? null,
       role: ChatMessageRole.ASSISTANT,
       content: state.llmCompletion.content,
       model: state.llmCompletion.model,

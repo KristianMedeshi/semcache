@@ -1,0 +1,3 @@
+ALTER TABLE "dialog_messages" ADD COLUMN "parent_message_id" uuid;--> statement-breakpoint
+ALTER TABLE "dialog_messages" ADD CONSTRAINT "dialog_messages_parent_message_id_dialog_messages_id_fk" FOREIGN KEY ("parent_message_id") REFERENCES "public"."dialog_messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "dialog_messages_parent_message_id_idx" ON "dialog_messages" USING btree ("parent_message_id");
