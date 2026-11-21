@@ -9,21 +9,8 @@ import {
   durationEnvSchema,
   optionalString,
   positiveInt,
+  z,
 } from '@semcache/shared-config';
-
-/**
- * Configuration parameters for session-based authentication and security controls.
- */
-export interface AuthEnvironmentConfig {
-  internalServiceSecret: string;
-  sessionCookieName: string;
-  sessionTtl: DurationValue;
-  sessionIdleTimeout: DurationValue;
-  corsOrigin: string[];
-  loginRateLimitWindowMs: number;
-  loginRateLimitMaxAttempts: number;
-  secureCookies: boolean;
-}
 
 export const DEFAULT_SESSION_TTL: DurationValue = '24h';
 export const DEFAULT_SESSION_IDLE_TIMEOUT: DurationValue = '30m';
@@ -54,3 +41,5 @@ export const authEnvSchema = baseEnvSchema
     checkDatabaseUrl(data, ctx);
     checkInternalSecret(data, ctx);
   });
+
+export type AuthEnv = z.infer<typeof authEnvSchema>;

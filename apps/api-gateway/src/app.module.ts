@@ -2,17 +2,18 @@ import { type MiddlewareConsumer, Module, type NestModule, ValidationPipe } from
 import { APP_PIPE } from '@nestjs/core';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
+import { SharedConfigModule } from '@semcache/shared-config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import './auth/gateway-auth-types';
 import { GatewayAuthModule } from './auth/gateway-auth.module';
 import { StripInternalHeadersMiddleware } from './auth/strip-internal-headers.middleware';
-import { GatewayConfigModule } from './config/gateway-config.module';
+import { gatewayEnvSchema } from './config/gateway.env';
 import { GatewayDialogsModule } from './dialogs/gateway-dialogs.module';
 
 @Module({
   imports: [
-    GatewayConfigModule,
+    SharedConfigModule.forRoot(gatewayEnvSchema),
     AuthenticationModule.forRoot({}),
     AuthorizationModule.forRoot(),
     GatewayAuthModule,

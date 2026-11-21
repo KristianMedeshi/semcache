@@ -6,10 +6,10 @@ import {
 import { AiModule, AiService } from '@nestjs/ai';
 import { FakeModel, overrideModels, providerError } from '@nestjs/ai/testing';
 import { Test } from '@nestjs/testing';
+import { SharedConfigModule, createValidatedConfigService } from '@semcache/shared-config';
 import { ChatMessageRole } from '@semcache/shared-types';
 import { firstValueFrom, toArray } from 'rxjs';
-import { LlmConfigModule } from '../config/llm-config.module';
-import { LlmConfigService } from '../config/llm-config.service';
+import { llmEnvSchema } from '../config/llm.env';
 import { LlmModule } from './llm.module';
 import { LlmService, OPENROUTER_PROVIDER } from './llm.service';
 
@@ -34,7 +34,7 @@ describe('LlmService', () => {
 
     const moduleRef = await overrideModels(
       Test.createTestingModule({
-        imports: [LlmConfigModule, LlmModule],
+        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
       }),
       { default: fake },
     ).compile();
@@ -66,7 +66,7 @@ describe('LlmService', () => {
     const fake = new FakeModel(['Here is how to reset your password.']);
     const moduleRef = await overrideModels(
       Test.createTestingModule({
-        imports: [LlmConfigModule, LlmModule],
+        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
       }),
       { default: fake },
     ).compile();
@@ -90,7 +90,7 @@ describe('LlmService', () => {
     delete process.env.OPENROUTER_API_KEY;
 
     const moduleRef = await Test.createTestingModule({
-      imports: [LlmConfigModule, LlmModule],
+      imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
     }).compile();
 
     const service = moduleRef.get(LlmService);
@@ -109,7 +109,7 @@ describe('LlmService', () => {
     delete process.env.OPENROUTER_API_KEY;
 
     const moduleRef = await Test.createTestingModule({
-      imports: [LlmConfigModule, LlmModule],
+      imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
     }).compile();
 
     const service = moduleRef.get(LlmService);
@@ -126,7 +126,9 @@ describe('LlmService', () => {
 
   it('rejects non-free OPENROUTER_DEFAULT_MODEL at startup', () => {
     process.env.OPENROUTER_DEFAULT_MODEL = 'anthropic/claude-3.5-sonnet';
-    expect(() => new LlmConfigService()).toThrow(/Only free OpenRouter models/);
+    expect(() => createValidatedConfigService(llmEnvSchema, { loadEnvFiles: false })).toThrow(
+      /Only free OpenRouter models/,
+    );
   });
 
   it('throws ServiceUnavailableException outside test mode when OPENROUTER_API_KEY is missing', async () => {
@@ -135,7 +137,7 @@ describe('LlmService', () => {
 
     const moduleRef = await Test.createTestingModule({
       imports: [
-        LlmConfigModule,
+        SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }),
         AiModule.forRoot({
           models: { default: new FakeModel(['unused']) },
         }),
@@ -169,7 +171,7 @@ describe('LlmService', () => {
     ]);
     const moduleRef = await overrideModels(
       Test.createTestingModule({
-        imports: [LlmConfigModule, LlmModule],
+        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
       }),
       { default: fake },
     ).compile();
@@ -211,7 +213,7 @@ describe('LlmService', () => {
     });
 
     const moduleRef = await Test.createTestingModule({
-      imports: [LlmConfigModule],
+      imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true })],
       providers: [
         {
           provide: AiService,
@@ -241,13 +243,19 @@ describe('LlmService', () => {
 
   it('defaults requestTimeoutMs to 180000ms and allows OPENROUTER_TIMEOUT_MS override', () => {
     delete process.env.OPENROUTER_TIMEOUT_MS;
-    expect(new LlmConfigService().requestTimeoutMs).toBe(180_000);
+    const defaultConfig = createValidatedConfigService(llmEnvSchema, {
+      loadEnvFiles: false,
+    });
+    expect(defaultConfig.getOrThrow('OPENROUTER_TIMEOUT_MS')).toBe(180_000);
 
     process.env.OPENROUTER_TIMEOUT_MS = '240000';
-    expect(new LlmConfigService().requestTimeoutMs).toBe(240_000);
+    const overrideConfig = createValidatedConfigService(llmEnvSchema, {
+      loadEnvFiles: false,
+    });
+    expect(overrideConfig.getOrThrow('OPENROUTER_TIMEOUT_MS')).toBe(240_000);
 
     process.env.OPENROUTER_TIMEOUT_MS = '0';
-    expect(() => new LlmConfigService()).toThrow(
+    expect(() => createValidatedConfigService(llmEnvSchema, { loadEnvFiles: false })).toThrow(
       /OPENROUTER_TIMEOUT_MS must be a positive integer/,
     );
   });
@@ -266,7 +274,7 @@ describe('LlmService', () => {
 
     const moduleRef = await overrideModels(
       Test.createTestingModule({
-        imports: [LlmConfigModule, LlmModule],
+        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
       }),
       { default: fake },
     ).compile();
@@ -307,7 +315,7 @@ describe('LlmService', () => {
     delete process.env.OPENROUTER_API_KEY;
 
     const moduleRef = await Test.createTestingModule({
-      imports: [LlmConfigModule, LlmModule],
+      imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
     }).compile();
 
     const service = moduleRef.get(LlmService);
@@ -336,7 +344,7 @@ describe('LlmService', () => {
     ]);
     const moduleRef = await overrideModels(
       Test.createTestingModule({
-        imports: [LlmConfigModule, LlmModule],
+        imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true }), LlmModule],
       }),
       { default: fake },
     ).compile();

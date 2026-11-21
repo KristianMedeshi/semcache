@@ -13,7 +13,7 @@ import {
   verifySignedInternalHeaders,
 } from '@semcache/shared-config';
 import type { AuthenticatedUser } from '@semcache/shared-types';
-import { knowledgeBaseEnvSchema } from '../config/knowledge-base.env';
+import { type KnowledgeBaseEnv, knowledgeBaseEnvSchema } from '../config/knowledge-base.env';
 
 interface InternalRpcPayload {
   headers?: Record<string, string | string[] | undefined>;
@@ -27,7 +27,9 @@ export class InternalIdentityAuth extends AuthenticationProvider<AuthenticatedUs
   constructor(
     registry: AuthenticationRegistry,
     @Optional()
-    configService: ConfigService = createValidatedConfigService(knowledgeBaseEnvSchema),
+    configService: ConfigService<KnowledgeBaseEnv, true> = createValidatedConfigService(
+      knowledgeBaseEnvSchema,
+    ),
   ) {
     super();
     this.internalServiceSecret = resolveSecretFromConfig(

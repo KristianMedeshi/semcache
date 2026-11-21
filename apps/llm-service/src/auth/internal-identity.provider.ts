@@ -1,13 +1,17 @@
-import { type ExecutionContext, Injectable } from '@nestjs/common';
+import { type ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import {
   AuthenticationError,
   AuthenticationProvider,
   AuthenticationRegistry,
   type AuthenticationResult,
 } from '@nestjs/authentication';
-import { verifySignedInternalHeaders } from '@semcache/shared-config';
+import {
+  ConfigService,
+  resolveSecretFromConfig,
+  verifySignedInternalHeaders,
+} from '@semcache/shared-config';
 import type { AuthenticatedUser } from '@semcache/shared-types';
-import { LlmConfigService } from '../config/llm-config.service';
+import type { LlmEnv } from '../config/llm.env';
 
 interface InternalRpcPayload {
   headers?: Record<string, string | string[] | undefined>;
@@ -15,11 +19,20 @@ interface InternalRpcPayload {
 
 @Injectable()
 export class InternalIdentityAuth extends AuthenticationProvider<AuthenticatedUser> {
+  private readonly logger = new Logger(InternalIdentityAuth.name);
+  private readonly internalServiceSecret: string;
+
   constructor(
-    private readonly config: LlmConfigService,
+    config: ConfigService<LlmEnv, true>,
     registry: AuthenticationRegistry,
   ) {
     super();
+    this.internalServiceSecret = resolveSecretFromConfig(
+      config,
+      'INTERNAL_SERVICE_SECRET',
+      config.getOrThrow('NODE_ENV'),
+      (msg: string) => this.logger.warn(msg),
+    );
     registry.registerProvider(this);
   }
 
@@ -30,7 +43,7 @@ export class InternalIdentityAuth extends AuthenticationProvider<AuthenticatedUs
       return null;
     }
 
-    const user = verifySignedInternalHeaders(headers, this.config.internalServiceSecret);
+    const user = verifySignedInternalHeaders(headers, this.internalServiceSecret);
     if (!user) {
       throw new AuthenticationError('Invalid or missing internal identity signature');
     }

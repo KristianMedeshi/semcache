@@ -65,19 +65,26 @@ function loadEnvFilesIntoProcess(envFilePaths: string[]): void {
 export function createValidatedConfigService<TSchema extends z.ZodType>(
   schema: TSchema,
   options?: { loadEnvFiles?: boolean },
-): ConfigService {
+): ConfigService<z.output<TSchema>, true> {
   if (options?.loadEnvFiles !== false) {
     loadEnvFilesIntoProcess(resolveEnvFilePaths());
   }
-  return new ConfigService(schema.parse(process.env) as Record<string, unknown>);
+  return new ConfigService<z.output<TSchema>, true>(
+    schema.parse(process.env) as Record<string, unknown>,
+  );
 }
+
+type ConfigKeyOf<T> = keyof T extends never ? string | symbol : keyof T;
 
 /**
  * Resolves a microservice's TCP host/port from `ConfigService`, with optional fallback
  * to a legacy URL config key, generic `HOST`/`PORT`, and default service ports.
  */
-export function resolveServiceTcpEndpoint(
-  configService: ConfigService,
+export function resolveServiceTcpEndpoint<
+  TEnv extends Record<string, unknown>,
+  WasValidated extends boolean,
+>(
+  configService: ConfigService<TEnv, WasValidated>,
   service: ServiceName,
   options?: {
     hostKey?: string;
@@ -86,9 +93,15 @@ export function resolveServiceTcpEndpoint(
     fallbackToPortEnv?: boolean;
   },
 ): TcpEndpointConfig {
-  const hostVal = options?.hostKey ? configService.get<string>(options.hostKey)?.trim() : undefined;
-  const portVal = options?.portKey ? configService.get<number>(options.portKey) : undefined;
-  const urlVal = options?.urlKey ? configService.get<string>(options.urlKey)?.trim() : undefined;
+  const hostVal = options?.hostKey
+    ? configService.get<string>(options.hostKey as ConfigKeyOf<TEnv>)?.trim()
+    : undefined;
+  const portVal = options?.portKey
+    ? configService.get<number>(options.portKey as ConfigKeyOf<TEnv>)
+    : undefined;
+  const urlVal = options?.urlKey
+    ? configService.get<string>(options.urlKey as ConfigKeyOf<TEnv>)?.trim()
+    : undefined;
 
   let parsedHost: string | undefined;
   let parsedPort: number | undefined;
@@ -107,8 +120,10 @@ export function resolveServiceTcpEndpoint(
     }
   }
 
-  const genericHost = configService.get<string>('HOST')?.trim();
-  const genericPort = options?.fallbackToPortEnv ? configService.get<number>('PORT') : undefined;
+  const genericHost = configService.get<string>('HOST' as ConfigKeyOf<TEnv>)?.trim();
+  const genericPort = options?.fallbackToPortEnv
+    ? configService.get<number>('PORT' as ConfigKeyOf<TEnv>)
+    : undefined;
 
   return {
     host:
@@ -123,13 +138,16 @@ export function resolveServiceTcpEndpoint(
  * Resolves a secret from `ConfigService`, enforcing minimum length and
  * generating an ephemeral random secret in non-production environments when unset.
  */
-export function resolveSecretFromConfig(
-  configService: ConfigService,
+export function resolveSecretFromConfig<
+  TEnv extends Record<string, unknown>,
+  WasValidated extends boolean,
+>(
+  configService: ConfigService<TEnv, WasValidated>,
   key: string,
   nodeEnv: NodeEnvironment,
   onEphemeralWarning?: (message: string) => void,
 ): string {
-  const value = configService.get<string>(key)?.trim() ?? '';
+  const value = configService.get<string>(key as ConfigKeyOf<TEnv>)?.trim() ?? '';
 
   if (nodeEnv === 'production' && value.length === 0) {
     throw new Error(`Missing required environment variable: ${key}`);
@@ -153,7 +171,7 @@ export function resolveSecretFromConfig(
 /**
  * Validates the environment for a TCP microservice and resolves its bind `{ host, port }`.
  */
-export function resolveMicroserviceTcpOptions<TSchema extends z.ZodType>(
+export function resolveMicroserviceTcpOptions<TSchema extends z.ZodType<Record<string, unknown>>>(
   schema: TSchema,
   service: ServiceName,
   options: { hostKey: string; portKey: string },

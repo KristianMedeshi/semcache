@@ -1,7 +1,9 @@
 import { Inject, Module, type OnModuleDestroy } from '@nestjs/common';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { ConfigService, resolveServiceTcpEndpoint } from '@semcache/shared-config';
+import { ServiceName } from '@semcache/shared-types';
 import { GatewayAuthModule } from '../auth/gateway-auth.module';
-import { GatewayConfigService } from '../config/gateway-config.service';
+import type { GatewayEnv } from '../config/gateway.env';
 import { DIALOG_SERVICE_CLIENT, DialogProxyService } from './dialog-proxy.service';
 import { GatewayDialogsController } from './gateway-dialogs.controller';
 
@@ -11,15 +13,18 @@ import { GatewayDialogsController } from './gateway-dialogs.controller';
   providers: [
     {
       provide: DIALOG_SERVICE_CLIENT,
-      inject: [GatewayConfigService],
-      useFactory: (config: GatewayConfigService): ClientProxy =>
-        ClientProxyFactory.create({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<GatewayEnv, true>): ClientProxy => {
+        const { host, port } = resolveServiceTcpEndpoint(config, ServiceName.DIALOG_SERVICE, {
+          hostKey: 'DIALOG_SERVICE_HOST',
+          portKey: 'DIALOG_SERVICE_PORT',
+          urlKey: 'DIALOG_SERVICE_URL',
+        });
+        return ClientProxyFactory.create({
           transport: Transport.TCP,
-          options: {
-            host: config.dialogServiceHost,
-            port: config.dialogServicePort,
-          },
-        }),
+          options: { host, port },
+        });
+      },
     },
     DialogProxyService,
   ],

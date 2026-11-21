@@ -7,12 +7,16 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { extractRpcErrorPayload } from '@semcache/shared-config';
+import {
+  ConfigService,
+  extractRpcErrorPayload,
+  resolveSecretFromConfig,
+} from '@semcache/shared-config';
 import type { AuthTcpRequestDto, AuthTcpResponseDto, UserResponseDto } from '@semcache/shared-dtos';
 import { type AuthenticatedUser, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { firstValueFrom } from 'rxjs';
-import { GatewayConfigService } from '../config/gateway-config.service';
+import type { GatewayEnv } from '../config/gateway.env';
 import { createSignedInternalHeaders, stripForgedInternalHeaders } from './internal-identity.util';
 
 export const AUTH_SERVICE_CLIENT = Symbol('AUTH_SERVICE_CLIENT');
@@ -33,11 +37,19 @@ function isAuthTcpResponse(value: unknown): value is AuthTcpResponseDto<unknown>
 @Injectable()
 export class AuthProxyService {
   private readonly logger = new Logger(AuthProxyService.name);
+  private readonly internalServiceSecret: string;
 
   constructor(
-    private readonly config: GatewayConfigService,
+    config: ConfigService<GatewayEnv, true>,
     @Inject(AUTH_SERVICE_CLIENT) private readonly authClient: ClientProxy,
-  ) {}
+  ) {
+    this.internalServiceSecret = resolveSecretFromConfig(
+      config,
+      'INTERNAL_SERVICE_SECRET',
+      config.getOrThrow('NODE_ENV'),
+      (msg: string) => this.logger.warn(msg),
+    );
+  }
 
   async forwardRequest(
     req: Request,
@@ -118,6 +130,6 @@ export class AuthProxyService {
   }
 
   buildDownstreamIdentityHeaders(user: AuthenticatedUser): Record<string, string> {
-    return createSignedInternalHeaders(user, this.config.internalServiceSecret);
+    return createSignedInternalHeaders(user, this.internalServiceSecret);
   }
 }

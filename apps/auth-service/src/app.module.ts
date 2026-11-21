@@ -3,15 +3,14 @@ import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
 import { ThrottlerGuard, ThrottlerModule, minutes, normalizeIp } from '@nestjs/throttler';
-import { durationToMs } from '@semcache/shared-config';
+import { ConfigService, SharedConfigModule, durationToMs } from '@semcache/shared-config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import './auth/auth-types';
 import { accountEmail } from './auth/account-email';
 import { AuthModule } from './auth/auth.module';
 import { HttpToRpcExceptionFilter } from './common/http-to-rpc-exception.filter';
-import { AuthConfigModule } from './config/auth-config.module';
-import { AuthConfigService } from './config/auth-config.service';
+import { type AuthEnv, authEnvSchema } from './config/auth.env';
 import { DatabaseModule } from './db/database.module';
 import { UsersModule } from './users/users.module';
 
@@ -39,11 +38,11 @@ class RpcThrottlerGuard extends ThrottlerGuard {
 
 @Module({
   imports: [
-    AuthConfigModule,
+    SharedConfigModule.forRoot(authEnvSchema),
     DatabaseModule,
     ThrottlerModule.forRootAsync({
-      inject: [AuthConfigService],
-      useFactory: (config: AuthConfigService) => [
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AuthEnv, true>) => [
         {
           name: 'default',
           ttl: minutes(1),
@@ -51,8 +50,8 @@ class RpcThrottlerGuard extends ThrottlerGuard {
         },
         {
           name: 'account',
-          ttl: config.loginRateLimitWindowMs,
-          limit: config.loginRateLimitMaxAttempts,
+          ttl: config.getOrThrow('LOGIN_RATE_LIMIT_WINDOW_MS'),
+          limit: config.getOrThrow('LOGIN_RATE_LIMIT_MAX_ATTEMPTS'),
           skipIf: (context) => {
             const req =
               context.getType() === 'rpc'
@@ -69,18 +68,27 @@ class RpcThrottlerGuard extends ThrottlerGuard {
       ],
     }),
     AuthenticationModule.forRootAsync({
-      inject: [AuthConfigService],
-      useFactory: (config: AuthConfigService) => {
-        const idleTtlMs = durationToMs(config.sessionIdleTimeout);
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AuthEnv, true>) => {
+        const sessionIdleTimeout = config.getOrThrow('SESSION_IDLE_TIMEOUT');
+        const idleTtlMs = durationToMs(sessionIdleTimeout);
+        const secureCookieOverride = config.get('SECURE_COOKIES') ?? '';
+        const secureCookies =
+          secureCookieOverride === 'true'
+            ? true
+            : secureCookieOverride === 'false'
+              ? false
+              : config.getOrThrow('NODE_ENV') === 'production';
+
         return {
           session: {
-            cookieName: config.sessionCookieName,
-            absoluteTtl: config.sessionTtl,
-            idleTtl: config.sessionIdleTimeout,
+            cookieName: config.getOrThrow('SESSION_COOKIE_NAME'),
+            absoluteTtl: config.getOrThrow('SESSION_TTL'),
+            idleTtl: sessionIdleTimeout,
             touchInterval: idleTtlMs > 0 ? Math.min(60_000, Math.floor(idleTtlMs / 2)) : 0,
-            trustedOrigins: config.corsOrigin,
+            trustedOrigins: config.getOrThrow('CORS_ORIGIN'),
             cookie: {
-              secure: config.secureCookies,
+              secure: secureCookies,
               sameSite: 'lax',
               path: '/',
             },

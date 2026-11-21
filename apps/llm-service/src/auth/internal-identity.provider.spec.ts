@@ -1,19 +1,26 @@
 import type { ExecutionContext } from '@nestjs/common';
 import { AuthenticationError, AuthenticationRegistry } from '@nestjs/authentication';
-import { createSignedInternalHeaders } from '@semcache/shared-config';
+import { createSignedInternalHeaders, createValidatedConfigService } from '@semcache/shared-config';
 import { UserRole } from '@semcache/shared-types';
-import type { LlmConfigService } from '../config/llm-config.service';
+import { llmEnvSchema } from '../config/llm.env';
 import { InternalIdentityAuth } from './internal-identity.provider';
 
 describe('InternalIdentityAuth', () => {
   const secret = 'test-internal-service-secret-32-chars!!';
+  const originalEnv = { ...process.env };
   let registry: AuthenticationRegistry;
   let provider: InternalIdentityAuth;
 
   beforeEach(() => {
+    process.env.NODE_ENV = 'test';
+    process.env.INTERNAL_SERVICE_SECRET = secret;
     registry = new AuthenticationRegistry();
-    const config = { internalServiceSecret: secret } as LlmConfigService;
+    const config = createValidatedConfigService(llmEnvSchema, { loadEnvFiles: false });
     provider = new InternalIdentityAuth(config, registry);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
   });
 
   function createRpcContext(data: unknown): ExecutionContext {

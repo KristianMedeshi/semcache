@@ -1,10 +1,11 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { ClientProxy } from '@nestjs/microservices';
+import { createValidatedConfigService } from '@semcache/shared-config';
 import { INTERNAL_AUTH_HEADERS, SERVICE_TCP_PATTERNS, UserRole } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { Observable, of } from 'rxjs';
 import { AuthProxyService } from '../auth/auth-proxy.service';
-import { GatewayConfigService } from '../config/gateway-config.service';
+import { gatewayEnvSchema } from '../config/gateway.env';
 import { DialogProxyService } from './dialog-proxy.service';
 
 describe('DialogProxyService', () => {
@@ -20,7 +21,9 @@ describe('DialogProxyService', () => {
   });
 
   it('rejects unauthenticated callers before calling dialog-service', async () => {
-    const config = new GatewayConfigService();
+    const config = createValidatedConfigService(gatewayEnvSchema, {
+      loadEnvFiles: false,
+    });
     const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogClient = { send: jest.fn() } as unknown as ClientProxy;
     const authProxy = new AuthProxyService(config, authClient);
@@ -36,7 +39,9 @@ describe('DialogProxyService', () => {
   });
 
   it('forwards authenticated requests over TCP with signed internal identity headers', async () => {
-    const config = new GatewayConfigService();
+    const config = createValidatedConfigService(gatewayEnvSchema, {
+      loadEnvFiles: false,
+    });
     const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogSendMock = jest.fn(() => of([{ id: 'dialog-1' }]));
     const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
@@ -72,7 +77,9 @@ describe('DialogProxyService', () => {
   });
 
   it('streams SSE events over HTTP when streamDialogRequest receives TCP stream events', async () => {
-    const config = new GatewayConfigService();
+    const config = createValidatedConfigService(gatewayEnvSchema, {
+      loadEnvFiles: false,
+    });
     const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogSendMock = jest.fn(() =>
       of({ type: 'delta', delta: 'Hello ' }, { type: 'delta', delta: 'world' }),
@@ -110,7 +117,9 @@ describe('DialogProxyService', () => {
   });
 
   it('emits an SSE error event if TCP stream fails after headers are sent', async () => {
-    const config = new GatewayConfigService();
+    const config = createValidatedConfigService(gatewayEnvSchema, {
+      loadEnvFiles: false,
+    });
     const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogSendMock = jest.fn(
       () =>
@@ -151,7 +160,9 @@ describe('DialogProxyService', () => {
   });
 
   it('forwards dialogId and messageId in DialogTcpRequestDto when provided', async () => {
-    const config = new GatewayConfigService();
+    const config = createValidatedConfigService(gatewayEnvSchema, {
+      loadEnvFiles: false,
+    });
     const authClient = { send: jest.fn() } as unknown as ClientProxy;
     const dialogSendMock = jest.fn(() => of({ ok: true }));
     const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;

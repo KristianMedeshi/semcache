@@ -1,7 +1,9 @@
 import { Inject, Module, type OnModuleDestroy } from '@nestjs/common';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { ConfigService, resolveServiceTcpEndpoint } from '@semcache/shared-config';
+import { ServiceName } from '@semcache/shared-types';
 import { InternalIdentityAuth } from '../auth/internal-identity.provider';
-import { DialogConfigService } from '../config/dialog-config.service';
+import type { DialogEnv } from '../config/dialog.env';
 import { DatabaseModule } from '../db/database.module';
 import { DialogGraphService, LLM_SERVICE_CLIENT } from './dialog-graph.service';
 import { DialogsController } from './dialogs.controller';
@@ -15,15 +17,18 @@ import { DialogPolicy } from './policies/dialog.policy';
   providers: [
     {
       provide: LLM_SERVICE_CLIENT,
-      inject: [DialogConfigService],
-      useFactory: (config: DialogConfigService): ClientProxy =>
-        ClientProxyFactory.create({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<DialogEnv, true>): ClientProxy => {
+        const { host, port } = resolveServiceTcpEndpoint(config, ServiceName.LLM_SERVICE, {
+          hostKey: 'LLM_SERVICE_HOST',
+          portKey: 'LLM_SERVICE_PORT',
+          urlKey: 'LLM_SERVICE_URL',
+        });
+        return ClientProxyFactory.create({
           transport: Transport.TCP,
-          options: {
-            host: config.llmServiceHost,
-            port: config.llmServicePort,
-          },
-        }),
+          options: { host, port },
+        });
+      },
     },
     InternalIdentityAuth,
     DialogPolicy,

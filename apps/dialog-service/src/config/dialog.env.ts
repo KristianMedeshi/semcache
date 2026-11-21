@@ -5,6 +5,7 @@ import {
   defaultString,
   optionalString,
   positiveInt,
+  z,
 } from '@semcache/shared-config';
 
 export const dialogEnvSchema = baseEnvSchema
@@ -21,3 +22,5 @@ export const dialogEnvSchema = baseEnvSchema
     checkDatabaseUrl(data, ctx);
     checkInternalSecret(data, ctx);
   });
+
+export type DialogEnv = z.infer<typeof dialogEnvSchema>;

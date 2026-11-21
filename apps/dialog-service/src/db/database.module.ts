@@ -1,8 +1,8 @@
 import { Inject, Module, type OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@semcache/shared-config';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { DialogConfigModule } from '../config/dialog-config.module';
-import { DialogConfigService } from '../config/dialog-config.service';
+import type { DialogEnv } from '../config/dialog.env';
 import * as schema from './schema';
 
 export const DIALOG_PG_POOL = Symbol('DIALOG_PG_POOL');
@@ -10,13 +10,12 @@ export const DIALOG_DRIZZLE = Symbol('DIALOG_DRIZZLE');
 export type DialogDatabase = NodePgDatabase<typeof schema>;
 
 @Module({
-  imports: [DialogConfigModule],
   providers: [
     {
       provide: DIALOG_PG_POOL,
-      inject: [DialogConfigService],
-      useFactory: (config: DialogConfigService): Pool =>
-        new Pool({ connectionString: config.databaseUrl || undefined }),
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<DialogEnv, true>): Pool =>
+        new Pool({ connectionString: config.get('DATABASE_URL') || undefined }),
     },
     {
       provide: DIALOG_DRIZZLE,

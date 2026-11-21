@@ -13,7 +13,7 @@ import {
   verifySignedInternalHeaders,
 } from '@semcache/shared-config';
 import type { AuthenticatedUser } from '@semcache/shared-types';
-import { semanticCacheEnvSchema } from '../config/semantic-cache.env';
+import { type SemanticCacheEnv, semanticCacheEnvSchema } from '../config/semantic-cache.env';
 
 interface InternalRpcPayload {
   headers?: Record<string, string | string[] | undefined>;
@@ -27,7 +27,9 @@ export class InternalIdentityAuth extends AuthenticationProvider<AuthenticatedUs
   constructor(
     registry: AuthenticationRegistry,
     @Optional()
-    configService: ConfigService = createValidatedConfigService(semanticCacheEnvSchema),
+    configService: ConfigService<SemanticCacheEnv, true> = createValidatedConfigService(
+      semanticCacheEnvSchema,
+    ),
   ) {
     super();
     this.internalServiceSecret = resolveSecretFromConfig(

@@ -2,16 +2,19 @@ import { createOpenAICompatible, type OpenAICompatibleProvider } from '@ai-sdk/o
 import { Module } from '@nestjs/common';
 import { AiModule } from '@nestjs/ai';
 import { FakeModel } from '@nestjs/ai/testing';
-import { LlmConfigService } from '../config/llm-config.service';
+import { ConfigService } from '@semcache/shared-config';
+import type { LlmEnv } from '../config/llm.env';
 import { LlmController } from './llm.controller';
 import { LlmService, OPENROUTER_PROVIDER } from './llm.service';
 import { LlmPolicy } from './policies/llm.policy';
 
-export function createOpenRouterProvider(config: LlmConfigService): OpenAICompatibleProvider {
+export function createOpenRouterProvider(
+  config: ConfigService<LlmEnv, true>,
+): OpenAICompatibleProvider {
   return createOpenAICompatible({
     name: 'openrouter',
-    baseURL: config.openRouterBaseUrl,
-    apiKey: config.openRouterApiKey || 'unconfigured-api-key',
+    baseURL: config.getOrThrow('OPENROUTER_BASE_URL'),
+    apiKey: config.get('OPENROUTER_API_KEY') || 'unconfigured-api-key',
     headers: {
       'X-Title': 'SemCache',
     },
@@ -21,26 +24,28 @@ export function createOpenRouterProvider(config: LlmConfigService): OpenAICompat
 @Module({
   imports: [
     AiModule.forRootAsync({
-      inject: [LlmConfigService],
-      useFactory: (config: LlmConfigService) => {
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<LlmEnv, true>) => {
+        const openRouterApiKey = config.get('OPENROUTER_API_KEY') ?? '';
         const hasApiKey =
-          config.openRouterApiKey.length > 0 &&
-          config.openRouterApiKey !== 'replace_with_your_openrouter_api_key';
+          openRouterApiKey.length > 0 &&
+          openRouterApiKey !== 'replace_with_your_openrouter_api_key';
+        const defaultModelName = config.getOrThrow('OPENROUTER_DEFAULT_MODEL');
 
         const defaultModel =
-          config.nodeEnv === 'test' && !hasApiKey
+          config.getOrThrow('NODE_ENV') === 'test' && !hasApiKey
             ? new FakeModel(() => 'Simulated free OpenRouter assistant response', {
                 provider: 'openrouter',
-                modelId: config.defaultModel,
+                modelId: defaultModelName,
               })
-            : createOpenRouterProvider(config).chatModel(config.defaultModel);
+            : createOpenRouterProvider(config).chatModel(defaultModelName);
 
         return {
           models: {
             default: defaultModel,
           },
           defaults: {
-            timeout: config.requestTimeoutMs,
+            timeout: config.getOrThrow('OPENROUTER_TIMEOUT_MS'),
             retry: { attempts: 2 },
           },
         };
@@ -51,8 +56,8 @@ export function createOpenRouterProvider(config: LlmConfigService): OpenAICompat
   providers: [
     {
       provide: OPENROUTER_PROVIDER,
-      inject: [LlmConfigService],
-      useFactory: (config: LlmConfigService) => createOpenRouterProvider(config),
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<LlmEnv, true>) => createOpenRouterProvider(config),
     },
     LlmService,
     LlmPolicy,

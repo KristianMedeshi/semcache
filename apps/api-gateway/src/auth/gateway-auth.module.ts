@@ -1,6 +1,8 @@
 import { Inject, Module, type OnModuleDestroy } from '@nestjs/common';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
-import { GatewayConfigService } from '../config/gateway-config.service';
+import { ConfigService, resolveServiceTcpEndpoint } from '@semcache/shared-config';
+import { ServiceName } from '@semcache/shared-types';
+import type { GatewayEnv } from '../config/gateway.env';
 import { AUTH_SERVICE_CLIENT, AuthProxyService } from './auth-proxy.service';
 import { GatewayAuthController } from './gateway-auth.controller';
 import { GatewaySessionAuth } from './gateway-session.provider';
@@ -12,15 +14,18 @@ import { GatewayAccessPolicy } from './policies/gateway-access.policy';
   providers: [
     {
       provide: AUTH_SERVICE_CLIENT,
-      inject: [GatewayConfigService],
-      useFactory: (config: GatewayConfigService): ClientProxy =>
-        ClientProxyFactory.create({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<GatewayEnv, true>): ClientProxy => {
+        const { host, port } = resolveServiceTcpEndpoint(config, ServiceName.AUTH_SERVICE, {
+          hostKey: 'AUTH_SERVICE_HOST',
+          portKey: 'AUTH_SERVICE_PORT',
+          urlKey: 'AUTH_SERVICE_URL',
+        });
+        return ClientProxyFactory.create({
           transport: Transport.TCP,
-          options: {
-            host: config.authServiceHost,
-            port: config.authServicePort,
-          },
-        }),
+          options: { host, port },
+        });
+      },
     },
     AuthProxyService,
     GatewaySessionAuth,

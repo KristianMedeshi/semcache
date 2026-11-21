@@ -4,6 +4,7 @@ import {
   defaultString,
   optionalString,
   positiveInt,
+  z,
 } from '@semcache/shared-config';
 
 export const knowledgeBaseEnvSchema = baseEnvSchema
@@ -14,3 +15,5 @@ export const knowledgeBaseEnvSchema = baseEnvSchema
     INTERNAL_SERVICE_SECRET: defaultString(''),
   })
   .superRefine(checkInternalSecret);
+
+export type KnowledgeBaseEnv = z.infer<typeof knowledgeBaseEnvSchema>;

@@ -2,6 +2,7 @@ import type { ExecutionContext } from '@nestjs/common';
 import { AuthenticationError, AuthenticationRegistry } from '@nestjs/authentication';
 import { ConfigService, createSignedInternalHeaders } from '@semcache/shared-config';
 import { UserRole } from '@semcache/shared-types';
+import type { KnowledgeBaseEnv } from '../config/knowledge-base.env';
 import { InternalIdentityAuth } from './internal-identity.provider';
 
 describe('InternalIdentityAuth', () => {
@@ -11,7 +12,7 @@ describe('InternalIdentityAuth', () => {
 
   beforeEach(() => {
     registry = new AuthenticationRegistry();
-    const configService = new ConfigService({
+    const configService = new ConfigService<KnowledgeBaseEnv, true>({
       NODE_ENV: 'test',
       INTERNAL_SERVICE_SECRET: secret,
     });

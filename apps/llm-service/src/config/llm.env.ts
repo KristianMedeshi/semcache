@@ -4,6 +4,7 @@ import {
   defaultString,
   optionalString,
   positiveInt,
+  z,
 } from '@semcache/shared-config';
 
 export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -42,3 +43,5 @@ export const llmEnvSchema = baseEnvSchema
     INTERNAL_SERVICE_SECRET: defaultString(''),
   })
   .superRefine(checkInternalSecret);
+
+export type LlmEnv = z.infer<typeof llmEnvSchema>;

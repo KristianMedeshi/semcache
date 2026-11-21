@@ -4,6 +4,7 @@ import {
   defaultString,
   optionalString,
   positiveInt,
+  z,
 } from '@semcache/shared-config';
 
 export const semanticCacheEnvSchema = baseEnvSchema
@@ -14,3 +15,5 @@ export const semanticCacheEnvSchema = baseEnvSchema
     INTERNAL_SERVICE_SECRET: defaultString(''),
   })
   .superRefine(checkInternalSecret);
+
+export type SemanticCacheEnv = z.infer<typeof semanticCacheEnvSchema>;

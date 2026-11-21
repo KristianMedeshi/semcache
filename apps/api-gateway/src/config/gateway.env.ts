@@ -6,6 +6,7 @@ import {
   defaultString,
   optionalString,
   positiveInt,
+  z,
 } from '@semcache/shared-config';
 
 export const gatewayEnvSchema = baseEnvSchema
@@ -21,3 +22,5 @@ export const gatewayEnvSchema = baseEnvSchema
     CORS_ORIGIN: corsOriginsEnvSchema(),
   })
   .superRefine(checkInternalSecret);
+
+export type GatewayEnv = z.infer<typeof gatewayEnvSchema>;

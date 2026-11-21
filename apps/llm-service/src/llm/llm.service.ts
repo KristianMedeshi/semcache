@@ -9,7 +9,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { isFreeOpenRouterModel } from '../config/llm.env';
+import { ConfigService } from '@semcache/shared-config';
 import {
   FREE_OPENROUTER_MODEL_MESSAGE,
   type LlmChatCompletionRequestDto,
@@ -18,7 +18,7 @@ import {
 } from '@semcache/shared-dtos';
 import { ChatMessageRole } from '@semcache/shared-types';
 import { Observable } from 'rxjs';
-import { LlmConfigService } from '../config/llm-config.service';
+import { type LlmEnv, isFreeOpenRouterModel } from '../config/llm.env';
 
 export const OPENROUTER_PROVIDER = Symbol('OPENROUTER_PROVIDER');
 
@@ -35,7 +35,7 @@ export class LlmService {
 
   constructor(
     private readonly aiService: AiService,
-    private readonly config: LlmConfigService,
+    private readonly config: ConfigService<LlmEnv, true>,
     @Inject(OPENROUTER_PROVIDER) private readonly openRouterProvider: OpenAICompatibleProvider,
   ) {}
 
@@ -110,21 +110,22 @@ export class LlmService {
   }
 
   private prepareChatCall(dto: LlmChatCompletionRequestDto): PreparedChatCall {
-    const targetModel = dto.model?.trim() || this.config.defaultModel;
+    const defaultModel = this.config.getOrThrow('OPENROUTER_DEFAULT_MODEL');
+    const targetModel = dto.model?.trim() || defaultModel;
 
     if (!isFreeOpenRouterModel(targetModel)) {
       throw new BadRequestException(FREE_OPENROUTER_MODEL_MESSAGE);
     }
 
+    const openRouterApiKey = this.config.get('OPENROUTER_API_KEY') ?? '';
     const hasApiKey =
-      this.config.openRouterApiKey.length > 0 &&
-      this.config.openRouterApiKey !== PLACEHOLDER_API_KEY;
+      openRouterApiKey.length > 0 && openRouterApiKey !== PLACEHOLDER_API_KEY;
 
-    if (this.config.nodeEnv !== 'test' && !hasApiKey) {
+    if (this.config.getOrThrow('NODE_ENV') !== 'test' && !hasApiKey) {
       throw new ServiceUnavailableException('OPENROUTER_API_KEY is not configured');
     }
 
-    const useCustomModel = hasApiKey && targetModel !== this.config.defaultModel;
+    const useCustomModel = hasApiKey && targetModel !== defaultModel;
     const systemParts = dto.messages
       .filter((message) => message.role === ChatMessageRole.SYSTEM)
       .map((message) => message.content.trim())
