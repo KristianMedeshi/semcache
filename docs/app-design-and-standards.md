@@ -116,7 +116,7 @@ When starting a new session or empty conversation, customers see:
 
 ### 4.4 Conversation History & Responsive Layout (`ConversationSidebarContent` / `MobileConversationDrawer`)
 
-- **Desktop**: collapsible secondary sidebar (`280px–320px`) displaying `"New conversation"`, optional conversation search, conversation title, inline **Edit conversation title** and **Delete conversation** actions, last message preview, relative timestamp (`date-fns`), and active indicator bar.
+- **Desktop**: collapsible secondary sidebar (`280px–320px`) displaying `"New conversation"`, optional conversation search, conversation title, 3-dots context menu (`Rename` and `Delete` opening dedicated modal dialog windows for title editing and deletion confirmation), last message preview, relative timestamp (`date-fns`), and active indicator bar.
 - **Mobile & Tablet**: single-column chat layout with compact header and slide-over `SheetContent` drawer for conversation history.
 
 ---

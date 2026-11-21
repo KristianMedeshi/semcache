@@ -1,10 +1,31 @@
 import type { DialogResponseDto } from '@semcache/shared-dtos';
 import { formatDistanceToNow } from 'date-fns';
-import { Check, MessageSquarePlus, MessagesSquare, Pencil, Search, Trash2, X } from 'lucide-react';
+import {
+  MessageSquarePlus,
+  MessagesSquare,
+  MoreHorizontal,
+  Pencil,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
-import { Dialog, DialogDescription, DialogTitle, SheetContent } from '@/shared/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  SheetContent,
+} from '@/shared/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/shared/ui/dropdown-menu';
 import { Input } from '@/shared/ui/input';
 
 export interface ConversationSidebarProps {
@@ -39,32 +60,38 @@ export function ConversationSidebarContent({
   onDeleteDialog,
 }: ConversationSidebarProps) {
   const [search, setSearch] = useState('');
-  const [editingDialogId, setEditingDialogId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
+  const [renamingDialog, setRenamingDialog] = useState<DialogResponseDto | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [deletingDialog, setDeletingDialog] = useState<DialogResponseDto | null>(null);
 
   const normalizedQuery = search.trim().toLowerCase();
   const filteredDialogs = normalizedQuery
     ? dialogs.filter((d) => d.title.toLowerCase().includes(normalizedQuery))
     : dialogs;
 
-  const startEditing = (dialog: DialogResponseDto) => {
-    setEditingDialogId(dialog.id);
-    setEditingTitle(dialog.title);
+  const openRenameDialog = (dialog: DialogResponseDto) => {
+    setRenamingDialog(dialog);
+    setRenameTitle(dialog.title);
   };
 
-  const cancelEditing = () => {
-    setEditingDialogId(null);
-    setEditingTitle('');
-  };
-
-  const submitEditing = async (dialogId: string) => {
-    const trimmed = editingTitle.trim();
-    if (!trimmed || !onRenameDialog) {
+  const handleRenameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = renameTitle.trim();
+    if (!renamingDialog || !trimmed || !onRenameDialog) {
       return;
     }
-    await onRenameDialog(dialogId, trimmed);
-    setEditingDialogId(null);
-    setEditingTitle('');
+    const targetId = renamingDialog.id;
+    setRenamingDialog(null);
+    await onRenameDialog(targetId, trimmed);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingDialog || !onDeleteDialog) {
+      return;
+    }
+    const targetId = deletingDialog.id;
+    setDeletingDialog(null);
+    await onDeleteDialog(targetId);
   };
 
   return (
@@ -117,7 +144,6 @@ export function ConversationSidebarContent({
         ) : (
           filteredDialogs.map((dialog) => {
             const isSelected = dialog.id === activeDialogId;
-            const isEditing = editingDialogId === dialog.id;
             const preview = lastMessagesByDialog[dialog.id] ?? 'Telecom support conversation';
 
             return (
@@ -137,112 +163,135 @@ export function ConversationSidebarContent({
                   />
                 ) : null}
 
-                {isEditing ? (
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void submitEditing(dialog.id);
-                    }}
-                    className="flex w-full items-center gap-1"
-                  >
-                    <Input
-                      value={editingTitle}
-                      onChange={(event) => setEditingTitle(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') {
-                          cancelEditing();
-                        }
-                      }}
-                      aria-label="Edit conversation title"
-                      maxLength={120}
-                      autoFocus
-                      className="h-7 flex-1 rounded-md bg-background px-2 text-xs"
-                    />
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Save conversation title"
-                      disabled={isBusy || editingTitle.trim().length === 0}
-                      className="size-7 shrink-0 rounded-md text-emerald-600 hover:text-emerald-700"
+                <button
+                  type="button"
+                  onClick={() => onSelectDialog(dialog.id)}
+                  aria-current={isSelected ? 'true' : undefined}
+                  className="flex min-w-0 flex-1 flex-col gap-1 text-left"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={cn(
+                        'truncate text-xs',
+                        isSelected
+                          ? 'font-semibold text-foreground'
+                          : 'font-medium text-foreground',
+                      )}
                     >
-                      <Check className="size-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Cancel title edit"
-                      onClick={cancelEditing}
-                      className="size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="size-3.5" />
-                    </Button>
-                  </form>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onSelectDialog(dialog.id)}
-                      aria-current={isSelected ? 'true' : undefined}
-                      className="flex min-w-0 flex-1 flex-col gap-1 text-left"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            'truncate text-xs',
-                            isSelected
-                              ? 'font-semibold text-foreground'
-                              : 'font-medium text-foreground',
-                          )}
+                      {dialog.title}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {formatRelativeTime(dialog.updatedAt)}
+                    </span>
+                  </div>
+
+                  <p className="truncate text-[11px] text-muted-foreground">{preview}</p>
+                </button>
+
+                {(onRenameDialog || onDeleteDialog) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Actions for ${dialog.title}`}
+                        disabled={isBusy}
+                        className="size-7 shrink-0 rounded-md text-muted-foreground opacity-80 transition-opacity hover:text-foreground group-hover:opacity-100 data-[state=open]:opacity-100"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      {onRenameDialog ? (
+                        <DropdownMenuItem onSelect={() => openRenameDialog(dialog)}>
+                          <Pencil className="size-4 text-muted-foreground" />
+                          Rename
+                        </DropdownMenuItem>
+                      ) : null}
+                      {onDeleteDialog ? (
+                        <DropdownMenuItem
+                          onSelect={() => setDeletingDialog(dialog)}
+                          className="text-destructive focus:text-destructive"
                         >
-                          {dialog.title}
-                        </span>
-                        <span className="shrink-0 text-[10px] text-muted-foreground">
-                          {formatRelativeTime(dialog.updatedAt)}
-                        </span>
-                      </div>
-
-                      <p className="truncate text-[11px] text-muted-foreground">{preview}</p>
-                    </button>
-
-                    {(onRenameDialog || onDeleteDialog) && (
-                      <div className="flex shrink-0 items-center gap-0.5 opacity-80 transition-opacity group-hover:opacity-100">
-                        {onRenameDialog ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Rename ${dialog.title}`}
-                            disabled={isBusy}
-                            onClick={() => startEditing(dialog)}
-                            className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-                          >
-                            <Pencil className="size-3" />
-                          </Button>
-                        ) : null}
-                        {onDeleteDialog ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Delete ${dialog.title}`}
-                            disabled={isBusy}
-                            onClick={() => void onDeleteDialog(dialog.id)}
-                            className="size-6 rounded-md text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="size-3" />
-                          </Button>
-                        ) : null}
-                      </div>
-                    )}
-                  </>
+                          <Trash2 className="size-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             );
           })
         )}
       </div>
+
+      <Dialog
+        open={Boolean(renamingDialog)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenamingDialog(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Conversation</DialogTitle>
+            <DialogDescription>Update the title for this support conversation.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => void handleRenameSubmit(event)} className="space-y-4">
+            <Input
+              value={renameTitle}
+              onChange={(event) => setRenameTitle(event.target.value)}
+              aria-label="Conversation title"
+              placeholder="Enter conversation title"
+              maxLength={120}
+              autoFocus
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRenamingDialog(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isBusy || renameTitle.trim().length === 0}>
+                Save
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deletingDialog)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingDialog(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Conversation</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete &ldquo;{deletingDialog?.title}&rdquo; and
+              all of its messages? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeletingDialog(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isBusy}
+              onClick={() => void handleConfirmDelete()}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

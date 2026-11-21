@@ -220,18 +220,24 @@ describe('ChatWorkspace', () => {
 
     expect(await screen.findByText('Billing Question')).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Rename Billing Question' }));
-    const titleInput = screen.getByLabelText('Edit conversation title');
+    await user.click(screen.getByRole('button', { name: 'Actions for Billing Question' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+
+    const titleInput = await screen.findByLabelText('Conversation title');
     await user.clear(titleInput);
     await user.type(titleInput, 'Invoice Support');
-    await user.click(screen.getByRole('button', { name: 'Save conversation title' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(chatClient.updateDialog).toHaveBeenCalledWith(dialog.id, { title: 'Invoice Support' });
     });
     expect(await screen.findByText('Invoice Support')).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Invoice Support' }));
+    await user.click(screen.getByRole('button', { name: 'Actions for Invoice Support' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    expect(await screen.findByText('Delete Conversation')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
     await waitFor(() => {
       expect(chatClient.deleteDialog).toHaveBeenCalledWith(dialog.id);
     });
