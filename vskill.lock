@@ -182,8 +182,24 @@
       "sourceSkillPath": "skills/web-design-guidelines/SKILL.md",
       "sourceBranch": "main",
       "sourceCommitSha": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62"
+    },
+    "dry-refactoring": {
+      "version": "1.0.0",
+      "sha": "246f191f6af247b383eb4625f8d687ab3d4ddde4e2722d13a059caaa91074a1e",
+      "tier": "VERIFIED",
+      "installedAt": "2026-11-21T14:32:21.418Z",
+      "source": "github:kucherenko/jscpd",
+      "scope": "project",
+      "files": [
+        "SKILL.md"
+      ],
+      "sourceType": "github",
+      "sourceRepoUrl": "https://github.com/kucherenko/jscpd",
+      "sourceSkillPath": "skills/dry-refactoring/SKILL.md",
+      "sourceBranch": "master",
+      "sourceCommitSha": "a5ac161f1574565f4c632af6ff3acc089f152466"
     }
   },
   "createdAt": "2026-11-18T10:12:44.125Z",
-  "updatedAt": "2026-11-18T12:05:00.520Z"
+  "updatedAt": "2026-11-21T14:32:21.418Z"
 }
