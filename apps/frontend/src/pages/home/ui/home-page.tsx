@@ -3,7 +3,6 @@ import { ArrowRight, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import { useCurrentUserQuery } from '@/features/auth/model/use-auth';
 import { TELECOM_SUGGESTIONS } from '@/features/chat/model/telecom-suggestions';
 import { ChatWorkspace } from '@/features/chat/ui/chat-workspace';
-import { ThemeToggle } from '@/features/theme/ui/theme-toggle';
 import { Badge } from '@/shared/ui/badge';
 import { BrandLogo } from '@/shared/ui/brand-logo';
 import { Button } from '@/shared/ui/button';
@@ -47,7 +46,6 @@ export function HomePage() {
           <AppHeader.Brand subtitle="Telecom Customer Support" />
         </AppHeader.Left>
         <AppHeader.Right>
-          <ThemeToggle />
           <Button asChild variant="ghost" size="sm">
             <Link to="/sign-in">Sign in</Link>
           </Button>

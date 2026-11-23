@@ -1,6 +1,5 @@
 import { Headset, ShieldCheck, Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { ThemeToggle } from '@/features/theme/ui/theme-toggle';
 import { Card } from '@/shared/ui/card';
 import { CardContent } from '@/shared/ui/card-content';
 import { CardDescription } from '@/shared/ui/card-description';
@@ -23,9 +22,6 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
         <AppHeader.Left>
           <AppHeader.Brand subtitle="Telecom Customer Support" to="/" />
         </AppHeader.Left>
-        <AppHeader.Right>
-          <ThemeToggle />
-        </AppHeader.Right>
       </AppHeader>
 
       <main className="mx-auto my-8 flex w-full max-w-md flex-col items-center px-4 sm:px-6">

@@ -31,7 +31,6 @@ import {
 import { KnowledgeBaseDetailDialog } from '@/features/knowledge-base/ui/knowledge-base-detail-dialog';
 import { KnowledgeBaseRetrievalTester } from '@/features/knowledge-base/ui/knowledge-base-retrieval-tester';
 import { KnowledgeBaseUploadDialog } from '@/features/knowledge-base/ui/knowledge-base-upload-dialog';
-import { ThemeToggle } from '@/features/theme/ui/theme-toggle';
 import { getAuthServerError } from '@/shared/api/api-client';
 import { useFileDropZone } from '@/shared/lib/use-file-drop-zone';
 import { Badge } from '@/shared/ui/badge';
@@ -176,9 +175,6 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
             subtitle={`Signed in as ${user.email}`}
           />
         </AppHeader.Left>
-        <AppHeader.Right>
-          <ThemeToggle />
-        </AppHeader.Right>
       </AppHeader>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
