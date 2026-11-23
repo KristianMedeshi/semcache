@@ -1,30 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import type { UserResponseDto } from '@semcache/shared-dtos';
-import {
-  BookOpen,
-  ChevronDown,
-  LogOut,
-  Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings,
-  ShieldCheck,
-  Users,
-} from 'lucide-react';
+import { BookOpen, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { isAdmin } from '@/features/auth/api/auth.client';
-import { ThemeToggle } from '@/features/theme/ui/theme-toggle';
-import { Avatar, AvatarFallback } from '@/shared/ui/avatar';
 import { Badge } from '@/shared/ui/badge';
 import { BrandLogo } from '@/shared/ui/brand-logo';
 import { Button } from '@/shared/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/shared/ui/dropdown-menu';
 import { AppHeader } from '@/widgets/app-header/ui/app-header';
 
 export interface ChatHeaderProps {
@@ -32,15 +12,6 @@ export interface ChatHeaderProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onOpenMobileHistory: () => void;
-  onOpenProfileSettings: () => void;
-  onOpenAdminDirectory: () => void;
-  onSignOut: () => void;
-  isSigningOut?: boolean;
-}
-
-function getUserInitials(email: string): string {
-  const local = email.split('@')[0] ?? 'SC';
-  return local.slice(0, 2).toUpperCase();
 }
 
 export function ChatHeader({
@@ -48,10 +19,6 @@ export function ChatHeader({
   isSidebarOpen,
   onToggleSidebar,
   onOpenMobileHistory,
-  onOpenProfileSettings,
-  onOpenAdminDirectory,
-  onSignOut,
-  isSigningOut,
 }: ChatHeaderProps) {
   const adminUser = isAdmin(user);
 
@@ -108,8 +75,8 @@ export function ChatHeader({
         />
       </AppHeader.Left>
 
-      <AppHeader.Right>
-        {adminUser ? (
+      {adminUser ? (
+        <AppHeader.Right>
           <Button
             asChild
             variant="outline"
@@ -121,73 +88,8 @@ export function ChatHeader({
               <span>Knowledge Base</span>
             </Link>
           </Button>
-        ) : null}
-
-        <ThemeToggle />
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label="Customer account menu"
-              className="gap-2 rounded-full px-1.5 sm:px-2"
-            >
-              <Avatar className="size-8 border border-border">
-                <AvatarFallback className="bg-primary/10 text-primary">
-                  {getUserInitials(user.email)}
-                </AvatarFallback>
-              </Avatar>
-              <ChevronDown className="hidden size-3.5 text-muted-foreground sm:block" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-60">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col gap-1">
-                <p className="truncate text-sm font-medium text-foreground">{user.email}</p>
-                <div className="flex items-center gap-1.5">
-                  <Badge variant="teal" className="text-[10px] uppercase">
-                    {adminUser ? 'Operator' : 'Subscriber'}
-                  </Badge>
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <ShieldCheck className="size-3 text-emerald-600" />
-                    Verified
-                  </span>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onOpenProfileSettings}>
-              <Settings className="size-4 text-muted-foreground" />
-              Account settings
-            </DropdownMenuItem>
-            {adminUser ? (
-              <>
-                <DropdownMenuItem onSelect={onOpenAdminDirectory}>
-                  <Users className="size-4 text-muted-foreground" />
-                  Operator directory
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/knowledge-base">
-                    <BookOpen className="size-4 text-muted-foreground" />
-                    Knowledge Base
-                  </Link>
-                </DropdownMenuItem>
-              </>
-            ) : null}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={onSignOut}
-              disabled={isSigningOut}
-              className="text-destructive focus:text-destructive"
-            >
-              <LogOut className="size-4" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </AppHeader.Right>
+        </AppHeader.Right>
+      ) : null}
     </AppHeader>
   );
 }

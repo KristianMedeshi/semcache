@@ -8,6 +8,7 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
@@ -38,6 +39,7 @@ export interface ConversationSidebarProps {
   onNewConversation: () => void;
   onRenameDialog?: (dialogId: string, title: string) => Promise<void> | void;
   onDeleteDialog?: (dialogId: string) => Promise<void> | void;
+  footer?: ReactNode;
 }
 
 function formatRelativeTime(isoDate: string): string {
@@ -58,6 +60,7 @@ export function ConversationSidebarContent({
   onNewConversation,
   onRenameDialog,
   onDeleteDialog,
+  footer,
 }: ConversationSidebarProps) {
   const [search, setSearch] = useState('');
   const [renamingDialog, setRenamingDialog] = useState<DialogResponseDto | null>(null);
@@ -95,8 +98,8 @@ export function ConversationSidebarContent({
   };
 
   return (
-    <div className="flex h-full flex-col bg-secondary/35">
-      <div className="space-y-3 border-b p-3.5">
+    <div className="flex min-h-0 flex-1 flex-col bg-secondary/35">
+      <div className="shrink-0 space-y-3 border-b p-3.5">
         <Button
           type="button"
           onClick={onNewConversation}
@@ -122,7 +125,7 @@ export function ConversationSidebarContent({
         ) : null}
       </div>
 
-      <div className="flex-1 space-y-1 overflow-y-auto p-2.5">
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2.5">
         <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Recent Conversations
         </p>
@@ -226,6 +229,8 @@ export function ConversationSidebarContent({
           })
         )}
       </div>
+
+      {footer}
 
       <Dialog
         open={Boolean(renamingDialog)}

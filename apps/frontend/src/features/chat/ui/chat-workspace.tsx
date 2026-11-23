@@ -28,6 +28,7 @@ import {
   ConversationSidebarContent,
   MobileConversationDrawer,
 } from '@/features/chat/ui/conversation-sidebar';
+import { SidebarAccountFooter } from '@/features/chat/ui/sidebar-account-footer';
 import { getAuthServerError } from '@/shared/api/api-client';
 
 export interface ChatWorkspaceProps {
@@ -233,6 +234,16 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   const showWelcomeState =
     !activeDialogId || (!messagesQuery.isPending && activeGraphNodes.length === 0);
 
+  const sidebarFooter = (
+    <SidebarAccountFooter
+      user={user}
+      onOpenProfileSettings={() => setProfileOpen(true)}
+      onOpenAdminDirectory={() => setAdminOpen(true)}
+      onSignOut={handleSignOut}
+      isSigningOut={signOutMutation.isPending}
+    />
+  );
+
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
       <ChatHeader
@@ -240,15 +251,11 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         onOpenMobileHistory={() => setMobileHistoryOpen(true)}
-        onOpenProfileSettings={() => setProfileOpen(true)}
-        onOpenAdminDirectory={() => setAdminOpen(true)}
-        onSignOut={handleSignOut}
-        isSigningOut={signOutMutation.isPending}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {isSidebarOpen ? (
-          <aside className="hidden w-72 shrink-0 border-r md:block lg:w-80">
+          <aside className="hidden w-72 shrink-0 border-r md:flex md:flex-col lg:w-80">
             <ConversationSidebarContent
               dialogs={dialogs}
               activeDialogId={activeDialogId}
@@ -259,6 +266,7 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
               onNewConversation={handleNewConversation}
               onRenameDialog={handleRenameDialog}
               onDeleteDialog={handleDeleteDialog}
+              footer={sidebarFooter}
             />
           </aside>
         ) : null}
@@ -330,6 +338,7 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
         onNewConversation={handleNewConversation}
         onRenameDialog={handleRenameDialog}
         onDeleteDialog={handleDeleteDialog}
+        footer={sidebarFooter}
       />
 
       <ProfileSettingsDialog user={user} open={profileOpen} onOpenChange={setProfileOpen} />
