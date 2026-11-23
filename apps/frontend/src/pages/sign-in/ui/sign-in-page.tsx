@@ -1,5 +1,4 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { toast } from 'sonner';
 import { signInSchema, type SignInFormValues } from '@/features/auth/model/auth-schemas';
 import { useSignInMutation } from '@/features/auth/model/use-auth';
 import { AuthEmailField } from '@/features/auth/ui/auth-email-field';
@@ -29,7 +28,6 @@ export function SignInPage() {
   const onSubmit = async (values: SignInFormValues) => {
     try {
       await signInMutation.mutateAsync(values);
-      toast.success('Welcome back');
       const target = search.redirect && search.redirect.startsWith('/') ? search.redirect : '/';
       await navigate({ to: target as '/' });
     } catch {

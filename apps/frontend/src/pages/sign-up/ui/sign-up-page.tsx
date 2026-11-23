@@ -1,5 +1,4 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { toast } from 'sonner';
 import { signUpSchema, type SignUpFormValues } from '@/features/auth/model/auth-schemas';
 import { useSignUpMutation } from '@/features/auth/model/use-auth';
 import { AuthEmailField } from '@/features/auth/ui/auth-email-field';
@@ -36,7 +35,6 @@ export function SignUpPage() {
         email: values.email,
         password: values.password,
       });
-      toast.success('Account created successfully');
       await navigate({ to: '/' });
     } catch {
       // Error state is rendered inline via signUpMutation.error.
