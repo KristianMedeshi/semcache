@@ -12,6 +12,7 @@
       "command(head)",
       "command(tail)",
       "command(wc)",
+      "command(sort)",
       "command(git status)",
       "command(git diff)",
       "command(git log)",
