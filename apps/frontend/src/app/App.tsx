@@ -22,6 +22,15 @@ export function App() {
 
   useEffect(() => {
     applyThemeToDocument(theme);
+
+    if (theme !== 'system' || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => applyThemeToDocument('system');
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
   useEffect(() => {

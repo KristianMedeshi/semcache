@@ -2,8 +2,10 @@ import { Link } from '@tanstack/react-router';
 import type { UserResponseDto } from '@semcache/shared-dtos';
 import {
   BookOpen,
+  Check,
   ChevronsUpDown,
   LogOut,
+  Monitor,
   Moon,
   Settings,
   ShieldCheck,
@@ -11,7 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { isAdmin } from '@/features/auth/api/auth.client';
-import { resolveTheme, useTheme } from '@/features/theme/model/ui.store';
+import { type ThemeMode, useTheme } from '@/features/theme/model/ui.store';
 import { Avatar, AvatarFallback } from '@/shared/ui/avatar';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
@@ -21,6 +23,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu';
 
@@ -37,6 +42,16 @@ function getUserInitials(email: string): string {
   return local.slice(0, 2).toUpperCase();
 }
 
+const THEME_OPTIONS: ReadonlyArray<{
+  value: ThemeMode;
+  label: string;
+  icon: typeof Sun;
+}> = [
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'system', label: 'System', icon: Monitor },
+];
+
 export function SidebarAccountFooter({
   user,
   onOpenProfileSettings,
@@ -46,11 +61,6 @@ export function SidebarAccountFooter({
 }: SidebarAccountFooterProps) {
   const adminUser = isAdmin(user);
   const { theme, setTheme } = useTheme();
-  const activeTheme = resolveTheme(theme);
-
-  const handleToggleTheme = () => {
-    setTheme(activeTheme === 'dark' ? 'light' : 'dark');
-  };
 
   return (
     <div className="shrink-0 border-t bg-card/70 px-3 py-2.5">
@@ -101,14 +111,25 @@ export function SidebarAccountFooter({
             <Settings className="size-4 text-muted-foreground" />
             Account settings
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleToggleTheme}>
-            {activeTheme === 'dark' ? (
-              <Sun className="size-4 text-muted-foreground" />
-            ) : (
-              <Moon className="size-4 text-muted-foreground" />
-            )}
-            {activeTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          </DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              {(() => {
+                const ActiveThemeIcon =
+                  THEME_OPTIONS.find((option) => option.value === theme)?.icon ?? Monitor;
+                return <ActiveThemeIcon className="size-4 text-muted-foreground" />;
+              })()}
+              <span>Theme</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <DropdownMenuItem key={value} onSelect={() => setTheme(value)}>
+                  <Icon className="size-4 text-muted-foreground" />
+                  <span className="flex-1">{label}</span>
+                  {theme === value ? <Check className="size-4 text-primary" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           {adminUser ? (
             <>
               <DropdownMenuItem onSelect={onOpenAdminDirectory}>

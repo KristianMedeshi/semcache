@@ -24,7 +24,7 @@ export function applyThemeToDocument(theme: ThemeMode): void {
 }
 
 export function useTheme() {
-  const [theme, setStoredTheme] = useLocalStorage<ThemeMode>(THEME_STORAGE_KEY, 'light');
+  const [theme, setStoredTheme] = useLocalStorage<ThemeMode>(THEME_STORAGE_KEY, 'system');
 
   const setTheme = useCallback(
     (nextTheme: ThemeMode) => {
