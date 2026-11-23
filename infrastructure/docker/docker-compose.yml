@@ -1,3 +1,5 @@
+name: semcache
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -11,7 +13,7 @@ services:
       - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/01-init-pgvector.sql:ro
+      - ../postgres/init.sql:/docker-entrypoint-initdb.d/01-init-pgvector.sql:ro
     healthcheck:
       test:
         ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER:-semcache_user} -d $${POSTGRES_DB:-semcache}']

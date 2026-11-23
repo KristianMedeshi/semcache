@@ -54,7 +54,8 @@ function loadEnvFilesIntoProcess(envFilePaths: string[]): void {
   if (typeof process.loadEnvFile !== 'function') {
     return;
   }
-  for (const envPath of envFilePaths) {
+  // Load lowest-priority files first so higher-priority local `.env` overrides `.env.backend`.
+  for (const envPath of [...envFilePaths].reverse()) {
     process.loadEnvFile(envPath);
   }
 }

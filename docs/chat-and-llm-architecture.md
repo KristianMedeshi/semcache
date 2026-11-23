@@ -84,10 +84,17 @@ Stream Events (`Observable<LlmChatStreamEventDto>` for `llm.chat.stream`):
 
 ## 4. Environment Variables
 
-Add the following variables to `.env` (documented in `.env.example`):
+Configure these variables in the respective app `.env` files (`apps/dialog-service/.env` and `apps/llm-service/.env`, documented in each app's `.env.example`):
+
+In `apps/dialog-service/.env`:
 
 - `DIALOG_SERVICE_HOST=127.0.0.1`
 - `DIALOG_SERVICE_PORT=3002`
+- `LLM_SERVICE_HOST=127.0.0.1`
+- `LLM_SERVICE_PORT=3004`
+
+In `apps/llm-service/.env`:
+
 - `LLM_SERVICE_HOST=127.0.0.1`
 - `LLM_SERVICE_PORT=3004`
 - `OPENROUTER_API_KEY=<your-openrouter-api-key>`

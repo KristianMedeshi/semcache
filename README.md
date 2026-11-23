@@ -28,7 +28,7 @@ semcache/
 │   └── eslint-config/            # Shared linter configurations (Oxlint)
 │
 ├── infrastructure/
-│   ├── docker/                   # Additional Docker configurations
+│   ├── docker/                   # Docker Compose PostgreSQL 17 + pgvector environment & .env.example
 │   ├── postgres/                 # PostgreSQL + pgvector SQL initialization scripts
 │   └── monitoring/               # Monitoring and metrics configurations
 │
@@ -44,13 +44,11 @@ semcache/
 │
 ├── docs/                         # Technical and research documentation
 │
-├── docker-compose.yml            # Local PostgreSQL 17 + pgvector environment
 ├── pnpm-workspace.yaml           # pnpm Workspaces configuration
 ├── turbo.json                    # Turborepo build and verification pipelines
 ├── package.json                  # Root monorepo manifest and scripts
 ├── tsconfig.base.json            # Base TypeScript configuration
 ├── .oxlintrc.json                # Root Oxlint configuration
-├── .env.example                  # Environment variables template
 ├── .gitignore                    # Git ignore rules
 ├── AGENTS.md                     # Architectural rules and guidelines for developers/agents
 └── README.md                     # Project overview and setup instructions
@@ -93,10 +91,14 @@ semcache/
 
 ### 1. Configure Environment Variables
 
-Copy the `.env.example` template to `.env`:
+Each application in `apps/` has its own local `.env` file (see `apps/*/.env.example`) and never reads the root directory. Docker Compose PostgreSQL configuration lives in `infrastructure/docker/.env`.
+
+To keep shared microservice variables (such as `INTERNAL_SERVICE_SECRET`, `DATABASE_URL`, and TCP service hosts/ports) in sync without duplicating them across every service, put them in `packages/shared-config/.env.backend`. Each backend app loads its local `.env` first and falls back to `packages/shared-config/.env.backend`:
 
 ```bash
-cp .env.example .env
+cp infrastructure/docker/.env.example infrastructure/docker/.env
+cp packages/shared-config/.env.backend.example packages/shared-config/.env.backend
+for app in apps/*; do cp "$app/.env.example" "$app/.env"; done
 ```
 
 ### 2. Install Dependencies
@@ -116,7 +118,7 @@ pnpm db:up
 Check database status and logs:
 
 ```bash
-docker compose ps
+docker compose -f infrastructure/docker/docker-compose.yml ps
 pnpm db:logs
 ```
 
@@ -139,7 +141,7 @@ pnpm --filter @semcache/dialog-service db:migrate
 
 ### 5. Configure Free OpenRouter Models
 
-Set `OPENROUTER_API_KEY` in `.env` (copied from `.env.example`). Only free OpenRouter models (`openrouter/free` or `<provider>/<model>:free`) are permitted by default.
+Set `OPENROUTER_API_KEY` in `apps/llm-service/.env` (copied from `apps/llm-service/.env.example`). Only free OpenRouter models (`openrouter/free` or `<provider>/<model>:free`) are permitted by default.
 
 ---
 

@@ -11,29 +11,40 @@ import {
   durationToMs,
 } from './constants';
 
+function findWorkspaceRoot(startDir: string): string | null {
+  let currentDir = resolve(startDir);
+  while (true) {
+    if (existsSync(join(currentDir, 'pnpm-workspace.yaml'))) {
+      return currentDir;
+    }
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) {
+      return null;
+    }
+    currentDir = parentDir;
+  }
+}
+
 /**
- * Walks up from `startDir` to the workspace root (`pnpm-workspace.yaml`) and returns
- * existing `.env` file paths ordered nearest-first.
+ * Returns existing env file paths ordered highest-priority-first:
+ * 1. The app's local `.env` in `startDir`
+ * 2. The optional `packages/shared-config/.env.backend` for variables shared across backend microservices
+ *
+ * Root `.env` is intentionally ignored so Docker/root config never leaks into apps.
  */
 export function resolveEnvFilePaths(startDir: string = process.cwd()): string[] {
   const paths: string[] = [];
-  let currentDir = resolve(startDir);
+  const localEnvPath = join(resolve(startDir), '.env');
+  if (existsSync(localEnvPath)) {
+    paths.push(localEnvPath);
+  }
 
-  while (true) {
-    const envPath = join(currentDir, '.env');
-    if (existsSync(envPath)) {
-      paths.push(envPath);
+  const workspaceRoot = findWorkspaceRoot(startDir);
+  if (workspaceRoot) {
+    const sharedEnvPath = join(workspaceRoot, 'packages', 'shared-config', '.env.backend');
+    if (existsSync(sharedEnvPath)) {
+      paths.push(sharedEnvPath);
     }
-
-    if (existsSync(join(currentDir, 'pnpm-workspace.yaml'))) {
-      break;
-    }
-
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
   }
 
   return paths;

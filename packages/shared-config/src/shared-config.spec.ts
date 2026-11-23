@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Test } from '@nestjs/testing';
 import { ServiceName } from '@semcache/shared-types';
 import {
@@ -11,6 +14,7 @@ import {
   durationEnvSchema,
   optionalString,
   positiveInt,
+  resolveEnvFilePaths,
   resolveSecretFromConfig,
   resolveServiceTcpEndpoint,
 } from './index';
@@ -101,5 +105,29 @@ describe('SharedConfigModule & Environment Validation', () => {
 
     const secret = resolveSecretFromConfig(configService, 'INTERNAL_SERVICE_SECRET', 'test');
     expect(secret).toHaveLength(64);
+  });
+
+  it('resolves local .env first, packages/shared-config/.env.backend second, and ignores root .env', () => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'semcache-env-test-'));
+    try {
+      const appDir = join(rootDir, 'apps', 'sample-app');
+      const sharedConfigDir = join(rootDir, 'packages', 'shared-config');
+      mkdirSync(appDir, { recursive: true });
+      mkdirSync(sharedConfigDir, { recursive: true });
+      writeFileSync(join(rootDir, 'pnpm-workspace.yaml'), 'packages:\n  - apps/*\n');
+      writeFileSync(join(rootDir, '.env'), 'ROOT_VAR=should_not_load\n');
+
+      expect(resolveEnvFilePaths(appDir)).toEqual([]);
+
+      const sharedEnvPath = join(sharedConfigDir, '.env.backend');
+      writeFileSync(sharedEnvPath, 'INTERNAL_SERVICE_SECRET=shared-secret\n');
+      expect(resolveEnvFilePaths(appDir)).toEqual([sharedEnvPath]);
+
+      const localEnvPath = join(appDir, '.env');
+      writeFileSync(localEnvPath, 'LOCAL_VAR=ok\n');
+      expect(resolveEnvFilePaths(appDir)).toEqual([localEnvPath, sharedEnvPath]);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
   });
 });
