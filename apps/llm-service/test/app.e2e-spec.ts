@@ -152,7 +152,7 @@ describe('LLM Service (TCP e2e)', () => {
 
     expect(res).toEqual({
       embeddings: [expect.any(Array), expect.any(Array)],
-      model: 'local/deterministic-384',
+      model: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
       dimensions: 384,
       latencyMs: expect.any(Number),
       usage: { totalTokens: expect.any(Number) },

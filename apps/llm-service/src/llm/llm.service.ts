@@ -24,9 +24,11 @@ import { Observable } from 'rxjs';
 import { type LlmEnv, isFreeOpenRouterModel } from '../config/llm.env';
 import {
   DEFAULT_LOCAL_EMBEDDING_MODEL,
-  computeDeterministicEmbedding,
+  computeTransformersEmbeddings,
   estimateTokenCount,
+  isLocalTransformersEmbeddingModel,
   normalizeEmbeddingVector,
+  resolveLocalEmbeddingModelId,
 } from './deterministic-embedding.util';
 
 export const OPENROUTER_PROVIDER = Symbol('OPENROUTER_PROVIDER');
@@ -134,18 +136,21 @@ export class LlmService {
     const openRouterApiKey = this.config.get('OPENROUTER_API_KEY') ?? '';
     const hasApiKey = openRouterApiKey.length > 0 && openRouterApiKey !== PLACEHOLDER_API_KEY;
     const useLocalModel =
-      requestedModel === DEFAULT_LOCAL_EMBEDDING_MODEL ||
+      isLocalTransformersEmbeddingModel(requestedModel) ||
       this.config.getOrThrow('NODE_ENV') === 'test' ||
       !hasApiKey;
 
     if (useLocalModel) {
-      const embeddings = dto.texts.map((text) =>
-        computeDeterministicEmbedding(text, targetDimensions),
+      const resolvedLocalModel = resolveLocalEmbeddingModelId(requestedModel);
+      const embeddings = await computeTransformersEmbeddings(
+        dto.texts,
+        targetDimensions,
+        resolvedLocalModel,
       );
       const totalTokens = dto.texts.reduce((sum, text) => sum + estimateTokenCount(text), 0);
       return {
         embeddings,
-        model: requestedModel,
+        model: resolvedLocalModel,
         dimensions: targetDimensions,
         latencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
         usage: { totalTokens },

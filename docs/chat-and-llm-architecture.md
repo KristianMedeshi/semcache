@@ -48,7 +48,7 @@ To prevent accidental paid usage during thesis development and evaluation, SemCa
 Request (`LlmGenerateEmbeddingsRequestDto` for `llm.embeddings`):
 
 - `texts`: `string[]` (1–128 strings)
-- `model?`: embedding model identifier (defaults to `OPENROUTER_EMBEDDING_MODEL`, `local/deterministic-384`)
+- `model?`: embedding model identifier (defaults to `OPENROUTER_EMBEDDING_MODEL`, `Xenova/paraphrase-multilingual-MiniLM-L12-v2` via `@huggingface/transformers`)
 
 Response (`LlmGenerateEmbeddingsResponseDto` for `llm.embeddings`):
 

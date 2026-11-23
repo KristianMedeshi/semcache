@@ -324,5 +324,5 @@ describe('LlmService', () => {
     expect(res.embeddings[1]).toHaveLength(384);
     expect(res.usage.totalTokens).toBeGreaterThan(0);
     await moduleRef.close();
-  });
+  }, 30_000);
 });

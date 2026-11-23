@@ -17,7 +17,7 @@ const config: Config = {
   moduleNameMapper: pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
   collectCoverageFrom: ['src/**/*.(t|j)s', 'libs/**/*.(t|j)s', 'apps/**/*.(t|j)s'],
   coverageDirectory: './coverage',
-  testEnvironment: 'node',
+  testEnvironment: '<rootDir>/test/node-typed-array-env.cjs',
 };
 
 export default config;
