@@ -76,6 +76,18 @@ export class GatewayDialogsController {
     );
   }
 
+  @Delete()
+  async deleteAllDialogs(@Req() req: Request, @Res() res: Response): Promise<void> {
+    await this.dialogProxyService.forwardDialogRequest(
+      req,
+      res,
+      SERVICE_TCP_PATTERNS.DIALOGS_DELETE_ALL,
+      {
+        statusCode: HttpStatus.OK,
+      },
+    );
+  }
+
   @Delete(':id')
   async deleteDialog(
     @Param('id', ParseUUIDPipe) id: string,

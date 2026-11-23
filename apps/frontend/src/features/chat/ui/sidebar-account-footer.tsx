@@ -10,13 +10,23 @@ import {
   Settings,
   ShieldCheck,
   Sun,
+  Trash2,
   Users,
 } from 'lucide-react';
+import { useState } from 'react';
 import { isAdmin } from '@/features/auth/api/auth.client';
 import { type ThemeMode, useTheme } from '@/features/theme/model/ui.store';
 import { Avatar, AvatarFallback } from '@/shared/ui/avatar';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +45,9 @@ export interface SidebarAccountFooterProps {
   onOpenAdminDirectory: () => void;
   onSignOut: () => void;
   isSigningOut?: boolean;
+  onDeleteAllActivity?: () => Promise<void> | void;
+  hasDialogs?: boolean;
+  isDeletingAllActivity?: boolean;
 }
 
 function getUserInitials(email: string): string {
@@ -58,9 +71,21 @@ export function SidebarAccountFooter({
   onOpenAdminDirectory,
   onSignOut,
   isSigningOut,
+  onDeleteAllActivity,
+  hasDialogs = false,
+  isDeletingAllActivity = false,
 }: SidebarAccountFooterProps) {
   const adminUser = isAdmin(user);
   const { theme, setTheme } = useTheme();
+  const [confirmDeleteAllOpen, setConfirmDeleteAllOpen] = useState(false);
+
+  const handleConfirmDeleteAll = async () => {
+    if (!onDeleteAllActivity) {
+      return;
+    }
+    setConfirmDeleteAllOpen(false);
+    await onDeleteAllActivity();
+  };
 
   return (
     <div className="shrink-0 border-t bg-card/70 px-3 py-2.5">
@@ -130,6 +155,16 @@ export function SidebarAccountFooter({
               ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+          {onDeleteAllActivity ? (
+            <DropdownMenuItem
+              onSelect={() => setConfirmDeleteAllOpen(true)}
+              disabled={!hasDialogs || isDeletingAllActivity}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="size-4" />
+              Delete all activity
+            </DropdownMenuItem>
+          ) : null}
           {adminUser ? (
             <>
               <DropdownMenuItem onSelect={onOpenAdminDirectory}>
@@ -155,6 +190,31 @@ export function SidebarAccountFooter({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog open={confirmDeleteAllOpen} onOpenChange={setConfirmDeleteAllOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete All Activity</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete all conversations and their messages? This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmDeleteAllOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeletingAllActivity}
+              onClick={() => void handleConfirmDeleteAll()}
+            >
+              Delete all
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

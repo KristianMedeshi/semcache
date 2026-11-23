@@ -105,6 +105,12 @@ class MockDialogController {
     return { id: payload.dialogId, deleted: true };
   }
 
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_DELETE_ALL)
+  deleteAllDialogs(@Payload() payload: DialogTcpRequestDto<unknown>) {
+    capturedDialogRequests.push({ pattern: SERVICE_TCP_PATTERNS.DIALOGS_DELETE_ALL, payload });
+    return { deletedCount: 2, deleted: true };
+  }
+
   @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT)
   editMessage(@Payload() payload: DialogTcpRequestDto<{ content: string }>) {
     capturedDialogRequests.push({ pattern: SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT, payload });
@@ -427,10 +433,17 @@ describe('API Gateway (e2e)', () => {
       .expect(200);
     expect(deleteRes.body).toEqual({ id: dialogId, deleted: true });
 
+    const deleteAllRes = await request(app.getHttpServer())
+      .delete('/dialogs')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .expect(200);
+    expect(deleteAllRes.body).toEqual({ deletedCount: 2, deleted: true });
+
     expect(capturedDialogRequests.map((r) => r.pattern)).toEqual([
       SERVICE_TCP_PATTERNS.DIALOGS_UPDATE,
       SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT,
       SERVICE_TCP_PATTERNS.DIALOGS_DELETE,
+      SERVICE_TCP_PATTERNS.DIALOGS_DELETE_ALL,
     ]);
   });
 

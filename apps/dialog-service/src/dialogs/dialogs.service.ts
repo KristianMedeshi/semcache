@@ -3,6 +3,7 @@ import { AuthenticationContext } from '@nestjs/authentication';
 import { AuthorizationService } from '@nestjs/authorization';
 import type {
   CreateDialogRequestDto,
+  DeleteAllDialogsResponseDto,
   DeleteDialogResponseDto,
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
@@ -48,6 +49,11 @@ export class DialogsService {
     await this.requireOwnedDialog(userId, dialogId);
     await this.dialogsRepository.deleteDialog(dialogId);
     return { id: dialogId, deleted: true };
+  }
+
+  async deleteAllDialogs(userId: string): Promise<DeleteAllDialogsResponseDto> {
+    const deletedCount = await this.dialogsRepository.deleteAllDialogsByUser(userId);
+    return { deletedCount, deleted: true };
   }
 
   async getDialogMessages(userId: string, dialogId: string): Promise<DialogMessageResponseDto[]> {

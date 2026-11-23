@@ -52,6 +52,7 @@ function createInMemoryDialogHarness(options?: {
       return msg;
     }),
     findMessagesByDialog: jest.fn(async () => [...storedMessages]),
+    deleteAllDialogsByUser: jest.fn(async (owner) => (owner === TEST_USER_ID ? 1 : 0)),
     touchDialog: jest.fn(async (_id, title) => {
       dialog = {
         ...dialog,
@@ -377,5 +378,13 @@ describe('DialogsService & DialogGraphService', () => {
     const systemPrompt =
       sentPayload[1].messages.find((m) => m.role === ChatMessageRole.SYSTEM)?.content ?? '';
     expect(systemPrompt).toContain('No relevant company documents were found');
+  });
+
+  it('deletes all dialogs for the requesting user and returns deletedCount', async () => {
+    const { userId, service } = createInMemoryDialogHarness();
+
+    const result = await service.deleteAllDialogs(userId);
+
+    expect(result).toEqual({ deletedCount: 1, deleted: true });
   });
 });

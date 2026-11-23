@@ -94,6 +94,7 @@ Stream Events (`Observable<LlmChatStreamEventDto>` for `llm.chat.stream`):
 - `GET /dialogs` -> `dialogs.list` — lists dialogs owned by the authenticated user (`DialogResponseDto[]`).
 - `PATCH /dialogs/:id` -> `dialogs.update` — updates an owned dialog's title (`UpdateDialogRequestDto` -> `DialogResponseDto`).
 - `DELETE /dialogs/:id` -> `dialogs.delete` — deletes an owned dialog and cascades its messages (`DeleteDialogResponseDto`).
+- `DELETE /dialogs` -> `dialogs.deleteAll` — deletes all dialogs owned by the authenticated user and cascades their messages (`DeleteAllDialogsResponseDto`).
 - `GET /dialogs/:id/messages` -> `dialogs.messages.list` — lists ordered messages for an owned dialog (`DialogMessageResponseDto[]`, each carrying `parentMessageId` for tree/branch reconstruction).
 - `POST /dialogs/:id/messages` -> `dialogs.messages.send` — executes a LangGraph turn (`SendMessageRequestDto` -> `SendMessageResponseDto`) containing `{ dialog, userMessage, assistantMessage }`, optionally continuing from `parentMessageId`.
 - `POST /dialogs/:id/messages/stream` -> `dialogs.messages.stream` — streams a dialog turn over Server-Sent Events (`text/event-stream`) emitting `DialogMessageStreamEventDto` frames:

@@ -160,6 +160,14 @@ export class DialogsRepository {
     return rows.length > 0;
   }
 
+  async deleteAllDialogsByUser(userId: string): Promise<number> {
+    const rows = await this.db
+      .delete(dialogs)
+      .where(eq(dialogs.userId, userId))
+      .returning({ id: dialogs.id });
+    return rows.length;
+  }
+
   async touchDialog(dialogId: string, title?: string): Promise<DialogResponseDto> {
     const updates: Partial<{ updatedAt: Date; title: string }> = {
       updatedAt: new Date(),

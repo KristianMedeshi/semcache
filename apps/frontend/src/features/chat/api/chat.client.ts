@@ -1,5 +1,6 @@
 import type {
   CreateDialogRequestDto,
+  DeleteAllDialogsResponseDto,
   DeleteDialogResponseDto,
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
@@ -42,6 +43,11 @@ export async function deleteDialog(dialogId: string): Promise<DeleteDialogRespon
   const { data } = await apiClient.delete<DeleteDialogResponseDto>(
     `/dialogs/${encodeURIComponent(dialogId)}`,
   );
+  return data;
+}
+
+export async function deleteAllDialogs(): Promise<DeleteAllDialogsResponseDto> {
+  const { data } = await apiClient.delete<DeleteAllDialogsResponseDto>('/dialogs');
   return data;
 }
 

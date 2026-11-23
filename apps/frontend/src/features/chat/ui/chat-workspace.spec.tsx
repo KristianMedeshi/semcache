@@ -17,6 +17,7 @@ vi.mock('@/features/chat/api/chat.client', () => ({
   createDialog: vi.fn(),
   updateDialog: vi.fn(),
   deleteDialog: vi.fn(),
+  deleteAllDialogs: vi.fn(),
   getDialogMessages: vi.fn(),
   sendDialogMessage: vi.fn(),
   editDialogMessage: vi.fn(),
@@ -234,6 +235,49 @@ describe('ChatWorkspace', () => {
       expect(chatClient.deleteDialog).toHaveBeenCalledWith(dialog.id);
     });
     expect(screen.queryByText('Invoice Support')).not.toBeInTheDocument();
+  });
+
+  it('deletes all activity from the sidebar footer after confirmation', async () => {
+    const user = userEvent.setup();
+    const dialogs: DialogResponseDto[] = [
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        userId: testUser.id,
+        title: 'Billing Question',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: '55555555-5555-4555-8555-555555555555',
+        userId: testUser.id,
+        title: 'Roaming Help',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+
+    vi.mocked(chatClient.listDialogs).mockResolvedValueOnce(dialogs);
+    vi.mocked(chatClient.getDialogMessages).mockResolvedValue([]);
+    vi.mocked(chatClient.deleteAllDialogs).mockResolvedValueOnce({
+      deletedCount: 2,
+      deleted: true,
+    });
+
+    renderChatWorkspace();
+
+    expect(await screen.findByText('Billing Question')).toBeVisible();
+    expect(screen.getByText('Roaming Help')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Customer account menu' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete all activity' }));
+    expect(await screen.findByText('Delete All Activity')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Delete all' }));
+
+    await waitFor(() => {
+      expect(chatClient.deleteAllDialogs).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.queryByText('Billing Question')).not.toBeInTheDocument();
+    expect(screen.queryByText('Roaming Help')).not.toBeInTheDocument();
   });
 
   it('edits a user message to create a new branch and toggles between branches in the message graph', async () => {

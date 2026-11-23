@@ -6,6 +6,7 @@ import type {
 import { ChatMessageRole } from '@semcache/shared-types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  deleteAllDialogs,
   deleteDialog,
   streamDialogMessage,
   streamEditDialogMessage,
@@ -152,6 +153,13 @@ describe('streamDialogMessage', () => {
     const deleted = await deleteDialog('dialog-1');
     expect(deleteSpy).toHaveBeenCalledWith('/dialogs/dialog-1');
     expect(deleted).toEqual({ id: 'dialog-1', deleted: true });
+
+    const deleteAllSpy = vi.spyOn(apiClient, 'delete').mockResolvedValueOnce({
+      data: { deletedCount: 3, deleted: true },
+    });
+    const deletedAll = await deleteAllDialogs();
+    expect(deleteAllSpy).toHaveBeenCalledWith('/dialogs');
+    expect(deletedAll).toEqual({ deletedCount: 3, deleted: true });
   });
 
   it('streams SSE events from /dialogs/:id/messages/:messageId/edit/stream', async () => {

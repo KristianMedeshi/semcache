@@ -3,6 +3,7 @@ import { CurrentUser } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import type {
+  DeleteAllDialogsResponseDto,
   DeleteDialogResponseDto,
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
@@ -51,6 +52,14 @@ export class DialogsController {
     @Payload('dialogId', ParseUUIDPipe) id: string,
   ): Promise<DeleteDialogResponseDto> {
     return this.dialogsService.deleteDialog(user.id, id);
+  }
+
+  @Can(DialogPolicy, 'deleteAll')
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_DELETE_ALL)
+  async deleteAllDialogs(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<DeleteAllDialogsResponseDto> {
+    return this.dialogsService.deleteAllDialogs(user.id);
   }
 
   @Can(DialogPolicy, 'viewMessages')

@@ -146,6 +146,7 @@ export const SERVICE_TCP_PATTERNS = {
   DIALOGS_LIST: 'dialogs.list',
   DIALOGS_UPDATE: 'dialogs.update',
   DIALOGS_DELETE: 'dialogs.delete',
+  DIALOGS_DELETE_ALL: 'dialogs.deleteAll',
   DIALOGS_MESSAGES_LIST: 'dialogs.messages.list',
   DIALOGS_MESSAGES_SEND: 'dialogs.messages.send',
   DIALOGS_MESSAGES_STREAM: 'dialogs.messages.stream',

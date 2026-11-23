@@ -222,6 +222,14 @@ export interface DeleteDialogResponseDto {
 }
 
 /**
+ * DTO returned after deleting all dialog conversations for a user.
+ */
+export interface DeleteAllDialogsResponseDto {
+  deletedCount: number;
+  deleted: true;
+}
+
+/**
  * DTO representing a user dialog thread.
  */
 export interface DialogResponseDto {

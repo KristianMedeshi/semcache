@@ -27,6 +27,10 @@ export class DialogPolicy implements PolicyBefore<AuthenticatedUser, Ability<Dia
     return this.isAuthenticatedUser(user);
   }
 
+  deleteAll(user: AuthenticatedUser | null): boolean {
+    return this.isAuthenticatedUser(user);
+  }
+
   viewMessages(user: AuthenticatedUser | null): boolean {
     return this.isAuthenticatedUser(user);
   }

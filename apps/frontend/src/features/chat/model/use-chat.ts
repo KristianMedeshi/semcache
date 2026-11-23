@@ -12,6 +12,7 @@ import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   type StreamDialogMessageCallbacks,
   createDialog,
+  deleteAllDialogs,
   deleteDialog,
   getDialogMessages,
   listDialogs,
@@ -78,6 +79,21 @@ export function useDeleteDialogMutation() {
         prev ? prev.filter((d) => d.id !== id) : [],
       );
       client.removeQueries({ queryKey: queryKeys.dialogs.messages(id) });
+    },
+  });
+}
+
+export function useDeleteAllDialogsMutation() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => deleteAllDialogs(),
+    onSuccess: () => {
+      client.setQueryData<DialogResponseDto[]>(queryKeys.dialogs.list(), []);
+      client.removeQueries({
+        queryKey: queryKeys.dialogs.all,
+        predicate: (query) => query.queryKey[1] === 'messages',
+      });
     },
   });
 }

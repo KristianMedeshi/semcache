@@ -187,6 +187,18 @@ class InMemoryDialogsRepository {
     return this.dialogRows.delete(dialogId);
   }
 
+  async deleteAllDialogsByUser(userId: string): Promise<number> {
+    let deletedCount = 0;
+    for (const [id, dialog] of this.dialogRows.entries()) {
+      if (dialog.userId === userId) {
+        this.dialogRows.delete(id);
+        this.messageRows.delete(id);
+        deletedCount += 1;
+      }
+    }
+    return deletedCount;
+  }
+
   async touchDialog(dialogId: string, title?: string): Promise<DialogResponseDto> {
     const dialog = this.dialogRows.get(dialogId);
     if (!dialog) {
@@ -351,6 +363,36 @@ describe('Dialog Service (TCP e2e)', () => {
     }
 
     expect(extractRpcErrorPayload(caughtError)?.statusCode).toBe(400);
+  });
+
+  it('deletes all dialogs for the authenticated user over dialogs.deleteAll', async () => {
+    const internalHeaders = createCustomerHeaders();
+    await createDialog(internalHeaders, 'First');
+    await createDialog(internalHeaders, 'Second');
+
+    const before = await firstValueFrom(
+      client.send<DialogResponseDto[]>(SERVICE_TCP_PATTERNS.DIALOGS_LIST, {
+        headers: internalHeaders,
+      }),
+    );
+
+    const result = await firstValueFrom(
+      client.send<{ deletedCount: number; deleted: true }>(
+        SERVICE_TCP_PATTERNS.DIALOGS_DELETE_ALL,
+        {
+          headers: internalHeaders,
+        },
+      ),
+    );
+
+    expect(result).toEqual({ deletedCount: before.length, deleted: true });
+
+    const remaining = await firstValueFrom(
+      client.send<DialogResponseDto[]>(SERVICE_TCP_PATTERNS.DIALOGS_LIST, {
+        headers: internalHeaders,
+      }),
+    );
+    expect(remaining).toEqual([]);
   });
 
   it('streams user_message, delta chunks, and done over dialogs.messages.stream', async () => {

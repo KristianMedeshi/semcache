@@ -13,6 +13,7 @@ import {
 import {
   STREAMING_ASSISTANT_MESSAGE_ID,
   useCreateDialogMutation,
+  useDeleteAllDialogsMutation,
   useDeleteDialogMutation,
   useDialogMessagesQuery,
   useDialogsQuery,
@@ -66,6 +67,7 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   const createDialogMutation = useCreateDialogMutation();
   const updateDialogMutation = useUpdateDialogMutation();
   const deleteDialogMutation = useDeleteDialogMutation();
+  const deleteAllDialogsMutation = useDeleteAllDialogsMutation();
   const streamMessageMutation = useStreamMessageMutation();
   const streamEditMessageMutation = useStreamEditMessageMutation();
   const signOutMutation = useSignOutMutation();
@@ -75,6 +77,7 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
     createDialogMutation.isPending ||
     updateDialogMutation.isPending ||
     deleteDialogMutation.isPending ||
+    deleteAllDialogsMutation.isPending ||
     isStreaming;
 
   const activeMessages = messagesQuery.data ?? [];
@@ -147,6 +150,19 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
       toast.success('Conversation deleted');
     } catch (error) {
       toast.error(getAuthServerError(error as Error, 'Failed to delete conversation'));
+    }
+  };
+
+  const handleDeleteAllDialogs = async () => {
+    try {
+      await deleteAllDialogsMutation.mutateAsync();
+      setIsNewChatPending(false);
+      setSelectedDialogId(null);
+      setSelectedBranchesByDialog({});
+      setLastMessagesByDialog({});
+      toast.success('All conversations deleted');
+    } catch (error) {
+      toast.error(getAuthServerError(error as Error, 'Failed to delete all conversations'));
     }
   };
 
@@ -248,6 +264,9 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
       onOpenAdminDirectory={() => setAdminOpen(true)}
       onSignOut={handleSignOut}
       isSigningOut={signOutMutation.isPending}
+      onDeleteAllActivity={handleDeleteAllDialogs}
+      hasDialogs={dialogs.length > 0}
+      isDeletingAllActivity={isSending}
     />
   );
 
