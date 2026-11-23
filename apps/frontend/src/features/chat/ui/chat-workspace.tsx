@@ -20,6 +20,11 @@ import {
   useStreamMessageMutation,
   useUpdateDialogMutation,
 } from '@/features/chat/model/use-chat';
+import {
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  useResizableSidebar,
+} from '@/features/chat/model/use-resizable-sidebar';
 import { ChatComposer } from '@/features/chat/ui/chat-composer';
 import { ChatHeader } from '@/features/chat/ui/chat-header';
 import { ChatMessageItem } from '@/features/chat/ui/chat-message-item';
@@ -30,6 +35,7 @@ import {
 } from '@/features/chat/ui/conversation-sidebar';
 import { SidebarAccountFooter } from '@/features/chat/ui/sidebar-account-footer';
 import { getAuthServerError } from '@/shared/api/api-client';
+import { cn } from '@/shared/lib/utils';
 
 export interface ChatWorkspaceProps {
   user: UserResponseDto;
@@ -40,6 +46,8 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   const [isNewChatPending, setIsNewChatPending] = useState(false);
   const [draft, setDraft] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { sidebarWidth, isResizing, handleResizeStart, handleResizeKeyDown } =
+    useResizableSidebar();
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
@@ -253,8 +261,17 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {isSidebarOpen ? (
-          <aside className="hidden w-72 shrink-0 border-r md:flex md:flex-col lg:w-80">
+        <aside
+          aria-hidden={!isSidebarOpen}
+          inert={!isSidebarOpen}
+          style={{ width: isSidebarOpen ? `${sidebarWidth}px` : '0px' }}
+          className={cn(
+            'hidden shrink-0 overflow-hidden md:flex md:flex-col',
+            isResizing ? 'transition-none' : 'transition-[width,opacity] duration-200 ease-in-out',
+            isSidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
+          )}
+        >
+          <div style={{ width: `${sidebarWidth}px` }} className="flex h-full min-h-0 flex-col">
             <ConversationSidebarContent
               dialogs={dialogs}
               activeDialogId={activeDialogId}
@@ -267,7 +284,25 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
               onDeleteDialog={handleDeleteDialog}
               footer={sidebarFooter}
             />
-          </aside>
+          </div>
+        </aside>
+
+        {isSidebarOpen ? (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize conversation sidebar"
+            aria-valuemin={MIN_SIDEBAR_WIDTH}
+            aria-valuemax={MAX_SIDEBAR_WIDTH}
+            aria-valuenow={sidebarWidth}
+            tabIndex={0}
+            onPointerDown={handleResizeStart}
+            onKeyDown={handleResizeKeyDown}
+            className={cn(
+              "relative hidden w-px shrink-0 cursor-col-resize select-none bg-border transition-colors before:absolute before:inset-y-0 before:-right-1 before:-left-1 before:content-[''] hover:bg-primary/60 focus-visible:bg-primary focus-visible:outline-none md:block",
+              isResizing ? 'bg-primary' : null,
+            )}
+          />
         ) : null}
 
         <main className="flex min-h-0 flex-1 flex-col bg-background">
