@@ -1,4 +1,11 @@
 import { QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import type {
   KnowledgeDocumentDetailResponseDto,
   KnowledgeDocumentResponseDto,
@@ -83,9 +90,30 @@ const sampleDocs: KnowledgeDocumentResponseDto[] = [
 
 function renderKnowledgeBasePage() {
   const client = createAppQueryClient();
+  const rootRoute = createRootRoute();
+  const kbRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/knowledge-base',
+    component: KnowledgeBasePage,
+  });
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/',
+    component: () => <div>Home</div>,
+  });
+  const signInRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/sign-in',
+    component: () => <div>Sign In</div>,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([kbRoute, indexRoute, signInRoute]),
+    history: createMemoryHistory({ initialEntries: ['/knowledge-base'] }),
+  });
+
   return render(
     <QueryClientProvider client={client}>
-      <KnowledgeBasePage />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
@@ -95,7 +123,7 @@ describe('KnowledgeBasePage', () => {
     vi.clearAllMocks();
   });
 
-  it('denies access to non-admin customers', () => {
+  it('denies access to non-admin customers', async () => {
     vi.mocked(authHooks.useCurrentUserQuery).mockReturnValue({
       data: customerUser,
       isPending: false,
@@ -103,7 +131,7 @@ describe('KnowledgeBasePage', () => {
 
     renderKnowledgeBasePage();
 
-    expect(screen.getByText('Operator Access Required')).toBeVisible();
+    expect(await screen.findByText('Operator Access Required')).toBeVisible();
     expect(kbClient.listKnowledgeDocuments).not.toHaveBeenCalled();
   });
 

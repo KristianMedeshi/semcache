@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import type { UserResponseDto } from '@semcache/shared-dtos';
 import {
   BookOpen,
@@ -118,10 +119,10 @@ export function ChatHeader({
             size="sm"
             className="hidden rounded-lg border-border/90 text-xs font-medium md:inline-flex"
           >
-            <a href="/knowledge-base">
+            <Link to="/knowledge-base">
               <BookOpen className="size-3.5 text-primary" />
               <span>Knowledge Base</span>
-            </a>
+            </Link>
           </Button>
         ) : null}
 
@@ -183,10 +184,10 @@ export function ChatHeader({
                   Operator directory
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <a href="/knowledge-base">
+                  <Link to="/knowledge-base">
                     <BookOpen className="size-4 text-muted-foreground" />
                     Knowledge Base
-                  </a>
+                  </Link>
                 </DropdownMenuItem>
               </>
             ) : null}

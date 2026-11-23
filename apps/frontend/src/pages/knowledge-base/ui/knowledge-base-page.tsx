@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { ShieldAlert } from 'lucide-react';
 import { isAdmin } from '@/features/auth/api/auth.client';
 import { useCurrentUserQuery } from '@/features/auth/model/use-auth';
@@ -49,11 +50,13 @@ export function KnowledgeBasePage() {
           </CardHeader>
           <CardContent className="flex justify-center gap-2">
             <Button asChild variant="outline">
-              <a href="/">Return to Support Chat</a>
+              <Link to="/">Return to Support Chat</Link>
             </Button>
             {!user ? (
               <Button asChild>
-                <a href="/sign-in?redirect=%2Fknowledge-base">Sign in</a>
+                <Link to="/sign-in" search={{ redirect: '/knowledge-base' }}>
+                  Sign in
+                </Link>
               </Button>
             ) : null}
           </CardContent>

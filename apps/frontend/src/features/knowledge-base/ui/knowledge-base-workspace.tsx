@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import type { KnowledgeDocumentResponseDto, UserResponseDto } from '@semcache/shared-dtos';
 import { KnowledgeDocumentStatus, QueryCategory } from '@semcache/shared-types';
 import {
@@ -177,10 +178,10 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
 
           <div className="flex shrink-0 items-center gap-2">
             <Button asChild variant="outline" size="sm">
-              <a href="/">
+              <Link to="/">
                 <ArrowLeft className="size-4" />
                 <span className="hidden sm:inline">Support Chat</span>
-              </a>
+              </Link>
             </Button>
             <ThemeToggle />
             <Button type="button" size="sm" onClick={() => setUploadOpen(true)}>

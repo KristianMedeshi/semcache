@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { BookOpen, Loader2, ShieldAlert, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { listUsers, revokeUserSessions } from '@/features/auth/api/auth.client';
@@ -59,10 +60,10 @@ export function AdminOperatorDialog({ open, onOpenChange }: AdminOperatorDialogP
             Manage RAG documents used by the AI Support Service
           </span>
           <Button asChild variant="outline" size="sm">
-            <a href="/knowledge-base">
+            <Link to="/knowledge-base">
               <BookOpen className="size-3.5 text-primary" />
               Knowledge Base
-            </a>
+            </Link>
           </Button>
         </div>
 
