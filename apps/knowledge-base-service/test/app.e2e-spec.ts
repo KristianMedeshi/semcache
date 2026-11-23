@@ -33,7 +33,7 @@ import type { KnowledgeChunkRecord, KnowledgeDocumentRecord } from '../src/db/sc
 import { KnowledgeBaseRepository } from '../src/knowledge-base/knowledge-base.repository';
 
 function embedTextDeterministic(text: string): number[] {
-  const vector = new Array<number>(384).fill(0);
+  const vector = Array.from({ length: 384 }, () => 0);
   const tokens = text
     .toLowerCase()
     .replace(/[^a-z0-9\s]+/g, ' ')

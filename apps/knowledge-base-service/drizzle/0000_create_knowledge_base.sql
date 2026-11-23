@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
 CREATE TYPE "public"."kb_document_category" AS ENUM('billing', 'technical_support', 'account_management', 'product_inquiry', 'general');--> statement-breakpoint
-CREATE TYPE "public"."kb_document_format" AS ENUM('text', 'markdown', 'html', 'json');--> statement-breakpoint
+CREATE TYPE "public"."kb_document_format" AS ENUM('text', 'markdown', 'html', 'json', 'pdf', 'docx');--> statement-breakpoint
 CREATE TYPE "public"."kb_document_status" AS ENUM('pending', 'processing', 'ready', 'failed');--> statement-breakpoint
 CREATE TABLE "kb_documents" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

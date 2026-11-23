@@ -18,6 +18,8 @@ export const FORMAT_LABELS: Record<KnowledgeDocumentFormat, string> = {
   [KnowledgeDocumentFormat.MARKDOWN]: 'Markdown',
   [KnowledgeDocumentFormat.HTML]: 'HTML',
   [KnowledgeDocumentFormat.JSON]: 'JSON',
+  [KnowledgeDocumentFormat.PDF]: 'PDF',
+  [KnowledgeDocumentFormat.DOCX]: 'DOCX',
 };
 
 export const STATUS_LABELS: Record<KnowledgeDocumentStatus, string> = {
@@ -38,6 +40,12 @@ export function inferFormatFromFileName(fileName: string): KnowledgeDocumentForm
   if (lower.endsWith('.json')) {
     return KnowledgeDocumentFormat.JSON;
   }
+  if (lower.endsWith('.pdf')) {
+    return KnowledgeDocumentFormat.PDF;
+  }
+  if (lower.endsWith('.docx')) {
+    return KnowledgeDocumentFormat.DOCX;
+  }
   return KnowledgeDocumentFormat.TEXT;
 }
 
@@ -54,12 +62,30 @@ export interface ParsedUploadFile {
   content: string;
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i += 1) {
+    binary += String.fromCharCode(bytes[i] ?? 0);
+  }
+  return btoa(binary);
+}
+
 export async function readUploadedFile(file: File): Promise<ParsedUploadFile> {
-  const content = await file.text();
+  const format = inferFormatFromFileName(file.name);
+  let content: string;
+
+  if (format === KnowledgeDocumentFormat.PDF || format === KnowledgeDocumentFormat.DOCX) {
+    const buffer = await file.arrayBuffer();
+    content = arrayBufferToBase64(buffer);
+  } else {
+    content = await file.text();
+  }
+
   return {
     title: deriveTitleFromFileName(file.name),
     fileName: file.name,
-    format: inferFormatFromFileName(file.name),
+    format,
     content,
   };
 }

@@ -98,6 +98,8 @@ export enum KnowledgeDocumentFormat {
   MARKDOWN = 'markdown',
   HTML = 'html',
   JSON = 'json',
+  PDF = 'pdf',
+  DOCX = 'docx',
 }
 
 /**

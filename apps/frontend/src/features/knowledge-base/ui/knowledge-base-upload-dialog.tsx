@@ -192,14 +192,14 @@ export function KnowledgeBaseUploadDialog({ open, onOpenChange }: KnowledgeBaseU
                     Select one or multiple documents
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Supported formats: .txt, .md, .html, .json
+                    Supported formats: .txt, .md, .html, .json, .pdf, .docx
                   </p>
                 </Label>
                 <Input
                   id="kb-file-upload"
                   type="file"
                   multiple
-                  accept=".txt,.md,.markdown,.html,.htm,.json"
+                  accept=".txt,.md,.markdown,.html,.htm,.json,.pdf,.docx"
                   onChange={(e) => void handleFileChange(e)}
                   className="mt-3 cursor-pointer"
                 />

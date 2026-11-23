@@ -1,11 +1,19 @@
+import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
+import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
+import { HtmlToTextTransformer } from '@langchain/community/document_transformers/html_to_text';
+import { BaseDocumentLoader } from '@langchain/core/document_loaders/base';
+import { Document } from '@langchain/core/documents';
+import { MarkdownTextSplitter, RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { Injectable } from '@nestjs/common';
 import { KNOWLEDGE_BASE_VALIDATION_LIMITS } from '@semcache/shared-dtos';
 import { KnowledgeDocumentFormat } from '@semcache/shared-types';
 
-export interface ExtractedDocumentContent {
+export interface ProcessedDocumentResult {
   format: KnowledgeDocumentFormat;
   text: string;
   characterCount: number;
+  documents: Document[];
+  chunks: DocumentChunk[];
 }
 
 export interface DocumentChunk {
@@ -16,15 +24,108 @@ export interface DocumentChunk {
   metadata: Record<string, string | number | boolean>;
 }
 
-const HTML_ENTITY_MAP: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&apos;': "'",
-  '&nbsp;': ' ',
-};
+class TextDocumentLoader extends BaseDocumentLoader {
+  constructor(
+    private readonly content: string,
+    private readonly metadata: Record<string, unknown>,
+  ) {
+    super();
+  }
+
+  async load(): Promise<Document[]> {
+    const normalized = this.content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    if (normalized.length === 0) {
+      return [];
+    }
+    return [new Document({ pageContent: normalized, metadata: { ...this.metadata } })];
+  }
+}
+
+class JsonDocumentLoader extends BaseDocumentLoader {
+  constructor(
+    private readonly rawJson: string,
+    private readonly metadata: Record<string, unknown>,
+  ) {
+    super();
+  }
+
+  async load(): Promise<Document[]> {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(this.rawJson);
+    } catch {
+      throw new Error('Invalid JSON document content');
+    }
+
+    const lines: string[] = [];
+    this.flattenJsonValue(parsed, '', lines);
+    const text = lines.join('\n').trim();
+    if (text.length === 0) {
+      return [];
+    }
+    return [new Document({ pageContent: text, metadata: { ...this.metadata } })];
+  }
+
+  private flattenJsonValue(value: unknown, path: string, lines: string[]): void {
+    if (value === null || value === undefined) {
+      return;
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      const text = String(value).trim();
+      if (text.length > 0) {
+        lines.push(path ? `${path}: ${text}` : text);
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i += 1) {
+        this.flattenJsonValue(value[i], path ? `${path}[${i}]` : `[${i}]`, lines);
+      }
+      return;
+    }
+    if (typeof value === 'object') {
+      for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+        this.flattenJsonValue(entry, path ? `${path}.${key}` : key, lines);
+      }
+    }
+  }
+}
+
+function decodeContentToBlob(rawContent: string, mimeType: string): Blob {
+  const dataUrlPrefix = /^data:[^;]+;base64,/i;
+  const cleaned = rawContent.replace(dataUrlPrefix, '').trim();
+  const isBase64 = /^[A-Za-z0-9+/=\s]+$/.test(cleaned) && cleaned.length >= 4;
+  const buffer = isBase64 ? Buffer.from(cleaned, 'base64') : Buffer.from(rawContent, 'utf-8');
+  return new Blob([buffer], { type: mimeType });
+}
+
+function sanitizeMetadata(
+  metadata: Record<string, unknown>,
+): Record<string, string | number | boolean> {
+  const sanitized: Record<string, string | number | boolean> = {};
+
+  for (const [key, value] of Object.entries(metadata)) {
+    if (key === 'loc' && typeof value === 'object' && value !== null) {
+      const pageNumber = (value as { pageNumber?: unknown }).pageNumber;
+      if (typeof pageNumber === 'number' && Number.isFinite(pageNumber)) {
+        sanitized.pageNumber = pageNumber;
+      }
+      continue;
+    }
+    if (key === 'pdf' && typeof value === 'object' && value !== null) {
+      const totalPages = (value as { totalPages?: unknown }).totalPages;
+      if (typeof totalPages === 'number' && Number.isFinite(totalPages)) {
+        sanitized.totalPages = totalPages;
+      }
+      continue;
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
 
 @Injectable()
 export class DocumentProcessorService {
@@ -43,46 +144,96 @@ export class DocumentProcessorService {
     if (lower.endsWith('.json')) {
       return KnowledgeDocumentFormat.JSON;
     }
+    if (lower.endsWith('.pdf')) {
+      return KnowledgeDocumentFormat.PDF;
+    }
+    if (lower.endsWith('.docx')) {
+      return KnowledgeDocumentFormat.DOCX;
+    }
     return KnowledgeDocumentFormat.TEXT;
   }
 
-  extractContent(
-    rawContent: string,
-    format?: KnowledgeDocumentFormat,
-    fileName?: string,
-  ): ExtractedDocumentContent {
-    const resolvedFormat = this.resolveFormat(format, fileName);
+  async loadDocuments(input: {
+    rawContent: string;
+    format?: KnowledgeDocumentFormat;
+    fileName?: string;
+    documentId?: string;
+    metadata?: Record<string, string | number | boolean>;
+  }): Promise<{ format: KnowledgeDocumentFormat; documents: Document[] }> {
+    const resolvedFormat = this.resolveFormat(input.format, input.fileName);
+    const baseMetadata: Record<string, unknown> = {
+      ...input.metadata,
+      format: resolvedFormat,
+      ...(input.documentId ? { documentId: input.documentId } : {}),
+      ...(input.fileName ? { fileName: input.fileName } : {}),
+    };
 
-    let extracted: string;
+    let documents: Document[];
     switch (resolvedFormat) {
-      case KnowledgeDocumentFormat.HTML:
-        extracted = this.extractFromHtml(rawContent);
+      case KnowledgeDocumentFormat.PDF: {
+        const blob = decodeContentToBlob(input.rawContent, 'application/pdf');
+        const loader = new PDFLoader(blob, { splitPages: true });
+        documents = (await loader.load()).map(
+          (doc) =>
+            new Document({
+              pageContent: doc.pageContent.trim(),
+              metadata: { ...baseMetadata, ...doc.metadata },
+            }),
+        );
         break;
-      case KnowledgeDocumentFormat.JSON:
-        extracted = this.extractFromJson(rawContent);
+      }
+      case KnowledgeDocumentFormat.DOCX: {
+        const blob = decodeContentToBlob(
+          input.rawContent,
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        );
+        const loader = new DocxLoader(blob, { type: 'docx' });
+        documents = (await loader.load()).map(
+          (doc) =>
+            new Document({
+              pageContent: doc.pageContent.trim(),
+              metadata: { ...baseMetadata, ...doc.metadata },
+            }),
+        );
         break;
+      }
+      case KnowledgeDocumentFormat.HTML: {
+        const rawDocs = await new TextDocumentLoader(input.rawContent, baseMetadata).load();
+        const transformer = new HtmlToTextTransformer();
+        documents = (await transformer.transformDocuments(rawDocs)).map(
+          (doc) =>
+            new Document({
+              pageContent: doc.pageContent.trim(),
+              metadata: { ...baseMetadata, ...doc.metadata },
+            }),
+        );
+        break;
+      }
+      case KnowledgeDocumentFormat.JSON: {
+        documents = await new JsonDocumentLoader(input.rawContent, baseMetadata).load();
+        break;
+      }
       case KnowledgeDocumentFormat.MARKDOWN:
       case KnowledgeDocumentFormat.TEXT:
-      default:
-        extracted = this.normalizeWhitespace(rawContent);
+      default: {
+        documents = await new TextDocumentLoader(input.rawContent, baseMetadata).load();
         break;
+      }
     }
 
-    if (extracted.length === 0) {
+    const nonEmptyDocs = documents.filter((doc) => doc.pageContent.trim().length > 0);
+    if (nonEmptyDocs.length === 0) {
       throw new Error('Document contains no extractable text content after processing');
     }
 
-    return {
-      format: resolvedFormat,
-      text: extracted,
-      characterCount: extracted.length,
-    };
+    return { format: resolvedFormat, documents: nonEmptyDocs };
   }
 
-  splitIntoChunks(
-    text: string,
+  async splitDocuments(
+    documents: Document[],
+    format: KnowledgeDocumentFormat,
     options?: { chunkSize?: number; chunkOverlap?: number },
-  ): DocumentChunk[] {
+  ): Promise<DocumentChunk[]> {
     const chunkSize = options?.chunkSize ?? KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_SIZE;
     const chunkOverlap =
       options?.chunkOverlap ?? KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_OVERLAP;
@@ -95,210 +246,64 @@ export class DocumentProcessorService {
     if (chunkOverlap < 0 || chunkOverlap >= chunkSize) {
       throw new Error('chunkOverlap must be non-negative and strictly less than chunkSize');
     }
-
-    const normalized = this.normalizeWhitespace(text);
-    if (normalized.length === 0) {
+    if (documents.length === 0) {
       throw new Error('Cannot split empty document content into chunks');
     }
 
-    const segments = this.recursiveSplit(normalized, chunkSize);
-    const mergedChunks = this.mergeSegmentsWithOverlap(segments, chunkSize, chunkOverlap);
+    const splitter =
+      format === KnowledgeDocumentFormat.MARKDOWN
+        ? new MarkdownTextSplitter({ chunkSize, chunkOverlap })
+        : new RecursiveCharacterTextSplitter({ chunkSize, chunkOverlap });
 
-    let currentHeading = '';
-    return mergedChunks.map((content, chunkIndex) => {
-      const headingMatch = /^(#{1,6}\s+.+)$/m.exec(content);
-      if (headingMatch?.[1]) {
-        currentHeading = headingMatch[1].replace(/^#+\s*/, '').trim();
-      }
+    const splitDocs = await splitter.splitDocuments(documents);
 
-      const metadata: Record<string, string | number | boolean> = currentHeading
-        ? { section: currentHeading }
-        : {};
-
-      return {
-        chunkIndex,
-        content,
-        tokenCount: Math.max(1, Math.ceil(content.length / 4)),
-        characterCount: content.length,
-        metadata,
-      };
-    });
-  }
-
-  private extractFromHtml(rawHtml: string): string {
-    const withoutScriptsAndStyles = rawHtml
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ');
-
-    const withLineBreaks = withoutScriptsAndStyles
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/(p|div|section|article|li|tr|h[1-6]|blockquote)>/gi, '\n\n')
-      .replace(/<(li)\b[^>]*>/gi, '- ');
-
-    const withoutTags = withLineBreaks.replace(/<[^>]+>/g, ' ');
-    const decoded = withoutTags.replace(
-      /&(amp|lt|gt|quot|#39|apos|nbsp);/gi,
-      (entity) => HTML_ENTITY_MAP[entity.toLowerCase()] ?? entity,
-    );
-
-    return this.normalizeWhitespace(decoded);
-  }
-
-  private extractFromJson(rawJson: string): string {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(rawJson);
-    } catch {
-      throw new Error('Invalid JSON document content');
-    }
-
-    const lines: string[] = [];
-    this.flattenJsonValue(parsed, '', lines);
-    return this.normalizeWhitespace(lines.join('\n'));
-  }
-
-  private flattenJsonValue(value: unknown, path: string, lines: string[]): void {
-    if (value === null || value === undefined) {
-      return;
-    }
-
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      const text = String(value).trim();
-      if (text.length > 0) {
-        lines.push(path ? `${path}: ${text}` : text);
-      }
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      for (let i = 0; i < value.length; i += 1) {
-        this.flattenJsonValue(value[i], path ? `${path}[${i}]` : `[${i}]`, lines);
-      }
-      return;
-    }
-
-    if (typeof value === 'object') {
-      for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-        const nextPath = path ? `${path}.${key}` : key;
-        this.flattenJsonValue(entry, nextPath, lines);
-      }
-    }
-  }
-
-  private normalizeWhitespace(input: string): string {
-    return input
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-      .replace(/[ \t]+\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .replace(/[ \t]{2,}/g, ' ')
-      .trim();
-  }
-
-  private recursiveSplit(text: string, chunkSize: number): string[] {
-    if (text.length <= chunkSize) {
-      return [text];
-    }
-
-    const separators = ['\n\n', '\n', '. ', '? ', '! ', '; ', ' '];
-    for (const separator of separators) {
-      if (!text.includes(separator)) {
-        continue;
-      }
-
-      const parts = text.split(separator).filter((part) => part.trim().length > 0);
-      if (parts.length <= 1) {
-        continue;
-      }
-
-      const results: string[] = [];
-      let current = '';
-
-      for (const rawPart of parts) {
-        const part = rawPart.trim();
-        const joiner = separator.trim().length === 0 ? separator : `${separator.trim()} `;
-        const candidate = current.length === 0 ? part : `${current}${joiner}${part}`;
-
-        if (candidate.length <= chunkSize) {
-          current = candidate;
-        } else {
-          if (current.length > 0) {
-            results.push(current);
-          }
-          if (part.length > chunkSize) {
-            results.push(...this.recursiveSplit(part, chunkSize));
-            current = '';
-          } else {
-            current = part;
-          }
+    let currentSection = '';
+    return splitDocs
+      .filter((doc) => doc.pageContent.trim().length > 0)
+      .map((doc, chunkIndex) => {
+        const content = doc.pageContent.trim();
+        const headingMatch = /^(#{1,6}\s+.+)$/m.exec(content);
+        if (headingMatch?.[1]) {
+          currentSection = headingMatch[1].replace(/^#+\s*/, '').trim();
         }
-      }
 
-      if (current.length > 0) {
-        results.push(current);
-      }
-      return results;
-    }
+        const metadata = sanitizeMetadata(doc.metadata);
+        if (format === KnowledgeDocumentFormat.MARKDOWN && currentSection.length > 0) {
+          metadata.section = currentSection;
+        }
 
-    // Hard character split fallback for uninterrupted tokens
-    const hardSlices: string[] = [];
-    for (let i = 0; i < text.length; i += chunkSize) {
-      hardSlices.push(text.slice(i, i + chunkSize));
-    }
-    return hardSlices;
+        return {
+          chunkIndex,
+          content,
+          tokenCount: Math.max(1, Math.ceil(content.length / 4)),
+          characterCount: content.length,
+          metadata,
+        };
+      });
   }
 
-  private mergeSegmentsWithOverlap(
-    segments: string[],
-    chunkSize: number,
-    chunkOverlap: number,
-  ): string[] {
-    const chunks: string[] = [];
-    let current = '';
+  async processDocument(input: {
+    rawContent: string;
+    format?: KnowledgeDocumentFormat;
+    fileName?: string;
+    documentId?: string;
+    metadata?: Record<string, string | number | boolean>;
+    chunkSize?: number;
+    chunkOverlap?: number;
+  }): Promise<ProcessedDocumentResult> {
+    const { format, documents } = await this.loadDocuments(input);
+    const chunks = await this.splitDocuments(documents, format, {
+      chunkSize: input.chunkSize,
+      chunkOverlap: input.chunkOverlap,
+    });
+    const text = documents.map((doc) => doc.pageContent).join('\n\n');
 
-    for (const segment of segments) {
-      const trimmed = segment.trim();
-      if (trimmed.length === 0) {
-        continue;
-      }
-
-      const candidate = current.length === 0 ? trimmed : `${current}\n\n${trimmed}`;
-      if (candidate.length <= chunkSize) {
-        current = candidate;
-        continue;
-      }
-
-      if (current.length > 0) {
-        chunks.push(current);
-      }
-
-      if (chunkOverlap > 0 && current.length > 0) {
-        const overlapText = this.extractOverlapTail(current, chunkOverlap);
-        const withOverlap = overlapText.length > 0 ? `${overlapText}\n\n${trimmed}` : trimmed;
-        current = withOverlap.length <= chunkSize ? withOverlap : trimmed;
-      } else {
-        current = trimmed;
-      }
-    }
-
-    if (current.length > 0) {
-      chunks.push(current);
-    }
-
-    return chunks;
-  }
-
-  private extractOverlapTail(text: string, overlap: number): string {
-    if (text.length <= overlap) {
-      return text;
-    }
-
-    const tail = text.slice(text.length - overlap);
-    const firstSpace = tail.indexOf(' ');
-    if (firstSpace > 0 && firstSpace < tail.length - 1) {
-      return tail.slice(firstSpace + 1).trim();
-    }
-    return tail.trim();
+    return {
+      format,
+      text,
+      characterCount: text.length,
+      documents,
+      chunks,
+    };
   }
 }

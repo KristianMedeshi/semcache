@@ -122,7 +122,7 @@ function createKnowledgeBaseHarness(options?: { llmSendImpl?: jest.Mock }) {
     options?.llmSendImpl ??
     jest.fn((_pattern: string, payload: { texts: string[] }) =>
       of({
-        embeddings: payload.texts.map(() => new Array(384).fill(0.05)),
+        embeddings: payload.texts.map(() => Array.from({ length: 384 }, () => 0.05)),
         model: 'local/deterministic-384',
         dimensions: 384,
         latencyMs: 5,
@@ -171,7 +171,7 @@ describe('KnowledgeBaseService', () => {
       .mockReturnValueOnce(throwError(() => new Error('Embedding TCP timeout')))
       .mockReturnValueOnce(
         of({
-          embeddings: [new Array(384).fill(0.05)],
+          embeddings: [Array.from({ length: 384 }, () => 0.05)],
           model: 'local/deterministic-384',
           dimensions: 384,
           latencyMs: 4,

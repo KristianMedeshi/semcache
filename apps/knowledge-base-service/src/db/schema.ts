@@ -23,6 +23,8 @@ export const knowledgeDocumentFormatEnum = pgEnum('kb_document_format', [
   'markdown',
   'html',
   'json',
+  'pdf',
+  'docx',
 ]);
 
 export const knowledgeDocumentCategoryEnum = pgEnum('kb_document_category', [

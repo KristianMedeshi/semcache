@@ -200,26 +200,29 @@ export class KnowledgeBaseService {
     });
 
     try {
-      const extracted = this.processor.extractContent(
-        document.rawContent,
-        document.format as KnowledgeDocumentFormat,
-        document.fileName ?? undefined,
-      );
+      const processed = await this.processor.processDocument({
+        rawContent: document.rawContent,
+        format: document.format as KnowledgeDocumentFormat,
+        fileName: document.fileName ?? undefined,
+        documentId: document.id,
+        metadata: document.metadata,
+        chunkSize: options.chunkSize,
+        chunkOverlap: options.chunkOverlap,
+      });
 
-      const chunks = this.processor.splitIntoChunks(extracted.text, options);
       const embeddings = await this.generateEmbeddingsInBatches(
-        chunks.map((chunk) => chunk.content),
+        processed.chunks.map((chunk) => chunk.content),
       );
 
-      if (embeddings.length !== chunks.length) {
+      if (embeddings.length !== processed.chunks.length) {
         throw new Error(
-          `Embedding count mismatch: expected ${chunks.length}, received ${embeddings.length}`,
+          `Embedding count mismatch: expected ${processed.chunks.length}, received ${embeddings.length}`,
         );
       }
 
       const storedChunks = await this.repository.replaceDocumentChunks(
         document.id,
-        chunks.map((chunk, index) => ({
+        processed.chunks.map((chunk, index) => ({
           ...chunk,
           embedding: embeddings[index] ?? [],
         })),
@@ -227,10 +230,10 @@ export class KnowledgeBaseService {
 
       const readyRecord = await this.repository.updateDocumentStatus(document.id, {
         status: KnowledgeDocumentStatus.READY,
-        format: extracted.format,
-        extractedContent: extracted.text,
+        format: processed.format,
+        extractedContent: processed.text,
         chunkCount: storedChunks.length,
-        characterCount: extracted.characterCount,
+        characterCount: processed.characterCount,
         errorMessage: null,
       });
 
