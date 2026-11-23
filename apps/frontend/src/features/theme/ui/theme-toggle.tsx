@@ -1,5 +1,4 @@
 import { Moon, Sun } from 'lucide-react';
-import { toast } from 'sonner';
 import { resolveTheme, useUiStore } from '@/features/theme/model/ui.store';
 import { Button } from '@/shared/ui/button';
 
@@ -11,7 +10,6 @@ export function ThemeToggle() {
   const handleToggle = () => {
     const nextTheme = activeTheme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
-    toast.success(`Switched to ${nextTheme} theme`);
   };
 
   return (
