@@ -1,5 +1,6 @@
 import type { UserResponseDto } from '@semcache/shared-dtos';
 import {
+  BookOpen,
   ChevronDown,
   Headset,
   LogOut,
@@ -110,6 +111,20 @@ export function ChatHeader({
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        {adminUser ? (
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="hidden rounded-lg border-border/90 text-xs font-medium md:inline-flex"
+          >
+            <a href="/knowledge-base">
+              <BookOpen className="size-3.5 text-primary" />
+              <span>Knowledge Base</span>
+            </a>
+          </Button>
+        ) : null}
+
         <Button
           type="button"
           variant="outline"
@@ -162,10 +177,18 @@ export function ChatHeader({
               Account settings
             </DropdownMenuItem>
             {adminUser ? (
-              <DropdownMenuItem onSelect={onOpenAdminDirectory}>
-                <Users className="size-4 text-muted-foreground" />
-                Operator directory
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onSelect={onOpenAdminDirectory}>
+                  <Users className="size-4 text-muted-foreground" />
+                  Operator directory
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href="/knowledge-base">
+                    <BookOpen className="size-4 text-muted-foreground" />
+                    Knowledge Base
+                  </a>
+                </DropdownMenuItem>
+              </>
             ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem

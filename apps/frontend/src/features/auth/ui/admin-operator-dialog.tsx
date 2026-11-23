@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, ShieldAlert, Users } from 'lucide-react';
+import { BookOpen, Loader2, ShieldAlert, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { listUsers, revokeUserSessions } from '@/features/auth/api/auth.client';
 import { queryKeys } from '@/shared/api/query-client';
@@ -49,9 +49,22 @@ export function AdminOperatorDialog({ open, onOpenChange }: AdminOperatorDialogP
             Operator Subscriber Directory
           </DialogTitle>
           <DialogDescription>
-            Manage active telecom customer accounts and revoke compromised sessions.
+            Manage active telecom customer accounts, revoke compromised sessions, or open Knowledge
+            Base management.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex items-center justify-between rounded-xl border bg-accent/40 px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            Manage RAG documents used by the AI Support Service
+          </span>
+          <Button asChild variant="outline" size="sm">
+            <a href="/knowledge-base">
+              <BookOpen className="size-3.5 text-primary" />
+              Knowledge Base
+            </a>
+          </Button>
+        </div>
 
         <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
           {usersQuery.isPending ? (
