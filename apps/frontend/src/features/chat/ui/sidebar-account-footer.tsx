@@ -11,7 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import { isAdmin } from '@/features/auth/api/auth.client';
-import { resolveTheme, useUiStore } from '@/features/theme/model/ui.store';
+import { resolveTheme, useTheme } from '@/features/theme/model/ui.store';
 import { Avatar, AvatarFallback } from '@/shared/ui/avatar';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
@@ -45,8 +45,7 @@ export function SidebarAccountFooter({
   isSigningOut,
 }: SidebarAccountFooterProps) {
   const adminUser = isAdmin(user);
-  const theme = useUiStore((state) => state.theme);
-  const setTheme = useUiStore((state) => state.setTheme);
+  const { theme, setTheme } = useTheme();
   const activeTheme = resolveTheme(theme);
 
   const handleToggleTheme = () => {
@@ -82,7 +81,7 @@ export function SidebarAccountFooter({
             <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="w-60">
+        <DropdownMenuContent side="top" align="start" className="w-(--radix-dropdown-menu-trigger-width)">
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col gap-1">
               <p className="truncate text-sm font-medium text-foreground">{user.email}</p>

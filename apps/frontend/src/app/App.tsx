@@ -3,7 +3,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { createAppRouter } from '@/app/router';
 import { getCurrentUser } from '@/features/auth/api/auth.client';
-import { applyThemeToDocument, useUiStore } from '@/features/theme/model/ui.store';
+import { applyThemeToDocument, useTheme } from '@/features/theme/model/ui.store';
 import { onUnauthorizedResponse } from '@/shared/api/api-client';
 import { queryClient, queryKeys } from '@/shared/api/query-client';
 
@@ -18,7 +18,7 @@ const appRouter = createAppRouter({
 });
 
 export function App() {
-  const theme = useUiStore((state) => state.theme);
+  const { theme } = useTheme();
 
   useEffect(() => {
     applyThemeToDocument(theme);

@@ -41,10 +41,7 @@ function AppHeaderRoot({
   return (
     <header className={cn('shrink-0 border-b bg-card', className)}>
       <div
-        className={cn(
-          'flex h-16 w-full items-center justify-between gap-3',
-          containerClassName,
-        )}
+        className={cn('flex h-16 w-full items-center justify-between gap-3', containerClassName)}
       >
         {children}
       </div>
@@ -53,11 +50,15 @@ function AppHeaderRoot({
 }
 
 export function AppHeaderLeft({ children, className }: AppHeaderGroupProps) {
-  return <div className={cn('flex min-w-0 items-center gap-2.5 sm:gap-3', className)}>{children}</div>;
+  return (
+    <div className={cn('flex min-w-0 items-center gap-2.5 sm:gap-3', className)}>{children}</div>
+  );
 }
 
 export function AppHeaderRight({ children, className }: AppHeaderGroupProps) {
-  return <div className={cn('flex shrink-0 items-center gap-1.5 sm:gap-2', className)}>{children}</div>;
+  return (
+    <div className={cn('flex shrink-0 items-center gap-1.5 sm:gap-2', className)}>{children}</div>
+  );
 }
 
 export function AppHeaderBrand({

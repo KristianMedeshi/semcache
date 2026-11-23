@@ -11,12 +11,7 @@ export interface ChatComposerProps {
   isSending: boolean;
 }
 
-export function ChatComposer({
-  draft,
-  onDraftChange,
-  onSubmit,
-  isSending,
-}: ChatComposerProps) {
+export function ChatComposer({ draft, onDraftChange, onSubmit, isSending }: ChatComposerProps) {
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 

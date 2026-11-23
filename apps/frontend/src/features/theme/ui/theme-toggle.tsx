@@ -1,10 +1,9 @@
 import { Moon, Sun } from 'lucide-react';
-import { resolveTheme, useUiStore } from '@/features/theme/model/ui.store';
+import { resolveTheme, useTheme } from '@/features/theme/model/ui.store';
 import { Button } from '@/shared/ui/button';
 
 export function ThemeToggle() {
-  const theme = useUiStore((state) => state.theme);
-  const setTheme = useUiStore((state) => state.setTheme);
+  const { theme, setTheme } = useTheme();
   const activeTheme = resolveTheme(theme);
 
   const handleToggle = () => {

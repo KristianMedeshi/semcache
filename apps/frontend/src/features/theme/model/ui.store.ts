@@ -1,11 +1,9 @@
-import { create } from 'zustand';
+import { useCallback } from 'react';
+import { useLocalStorage } from '@/hookas/use-local-storage';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-interface UiState {
-  theme: ThemeMode;
-  setTheme: (theme: ThemeMode) => void;
-}
+export const THEME_STORAGE_KEY = 'semcache-theme';
 
 export function resolveTheme(theme: ThemeMode): 'light' | 'dark' {
   if (theme !== 'system') {
@@ -25,10 +23,16 @@ export function applyThemeToDocument(theme: ThemeMode): void {
   document.documentElement.classList.toggle('dark', resolved === 'dark');
 }
 
-export const useUiStore = create<UiState>((set) => ({
-  theme: 'light',
-  setTheme: (theme) => {
-    applyThemeToDocument(theme);
-    set({ theme });
-  },
-}));
+export function useTheme() {
+  const [theme, setStoredTheme] = useLocalStorage<ThemeMode>(THEME_STORAGE_KEY, 'light');
+
+  const setTheme = useCallback(
+    (nextTheme: ThemeMode) => {
+      applyThemeToDocument(nextTheme);
+      setStoredTheme(nextTheme);
+    },
+    [setStoredTheme],
+  );
+
+  return { theme, setTheme } as const;
+}
