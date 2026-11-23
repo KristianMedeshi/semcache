@@ -205,7 +205,7 @@ export function ConversationSidebarContent({
                         <MoreHorizontal className="size-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuContent side="right" align="start" className="w-44">
                       {onRenameDialog ? (
                         <DropdownMenuItem onSelect={() => openRenameDialog(dialog)}>
                           <Pencil className="size-4 text-muted-foreground" />

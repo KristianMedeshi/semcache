@@ -225,7 +225,6 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   const handleSignOut = async () => {
     try {
       await signOutMutation.mutateAsync();
-      toast.success('Signed out');
     } catch {
       toast.error('Failed to sign out');
     }

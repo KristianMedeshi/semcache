@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useLocalStorage } from '@/hookas/use-local-storage';
+import { useLocalStorage } from '@/hooks/use-local-storage';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
