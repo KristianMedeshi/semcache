@@ -3,7 +3,6 @@ import type { UserResponseDto } from '@semcache/shared-dtos';
 import {
   BookOpen,
   ChevronDown,
-  Headset,
   LogOut,
   Menu,
   PanelLeftClose,
@@ -26,14 +25,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu';
-import { Separator } from '@/shared/ui/separator';
+import { AppHeader } from '@/widgets/app-header/ui/app-header';
 
 export interface ChatHeaderProps {
   user: UserResponseDto;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onOpenMobileHistory: () => void;
-  onOpenEscalation: () => void;
   onOpenProfileSettings: () => void;
   onOpenAdminDirectory: () => void;
   onSignOut: () => void;
@@ -50,7 +48,6 @@ export function ChatHeader({
   isSidebarOpen,
   onToggleSidebar,
   onOpenMobileHistory,
-  onOpenEscalation,
   onOpenProfileSettings,
   onOpenAdminDirectory,
   onSignOut,
@@ -59,8 +56,8 @@ export function ChatHeader({
   const adminUser = isAdmin(user);
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b bg-card px-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+    <AppHeader containerClassName="px-3 sm:px-5">
+      <AppHeader.Left>
         <Button
           type="button"
           variant="ghost"
@@ -89,16 +86,16 @@ export function ChatHeader({
           )}
         </Button>
 
-        <BrandLogo compact className="sm:hidden" />
-        <BrandLogo subtitle="Customer Support" className="hidden sm:flex" />
+        <AppHeader.Brand>
+          <BrandLogo compact className="sm:hidden" />
+          <BrandLogo subtitle="Customer Support" className="hidden sm:flex" />
+        </AppHeader.Brand>
 
-        <Separator orientation="vertical" className="mx-1 hidden h-7 sm:block" />
+        <AppHeader.Divider />
 
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-sm font-semibold text-foreground sm:text-[15px]">
-              Telecom Assistant
-            </h1>
+        <AppHeader.Title
+          title="Telecom Assistant"
+          badge={
             <Badge variant="success" className="hidden px-2 py-0.5 text-[11px] sm:inline-flex">
               <span className="relative flex size-2">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
@@ -106,12 +103,12 @@ export function ChatHeader({
               </span>
               Online
             </Badge>
-          </div>
-          <p className="truncate text-xs text-muted-foreground">Your personal support assistant</p>
-        </div>
-      </div>
+          }
+          subtitle="Your personal support assistant"
+        />
+      </AppHeader.Left>
 
-      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+      <AppHeader.Right>
         {adminUser ? (
           <Button
             asChild
@@ -125,18 +122,6 @@ export function ChatHeader({
             </Link>
           </Button>
         ) : null}
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onOpenEscalation}
-          className="rounded-lg border-border/90 text-xs font-medium"
-        >
-          <Headset className="size-3.5 text-primary" />
-          <span className="hidden sm:inline">Talk to a human agent</span>
-          <span className="sm:hidden">Human agent</span>
-        </Button>
 
         <ThemeToggle />
 
@@ -202,7 +187,7 @@ export function ChatHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-    </header>
+      </AppHeader.Right>
+    </AppHeader>
   );
 }

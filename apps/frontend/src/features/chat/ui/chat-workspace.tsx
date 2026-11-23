@@ -28,7 +28,6 @@ import {
   ConversationSidebarContent,
   MobileConversationDrawer,
 } from '@/features/chat/ui/conversation-sidebar';
-import { HumanEscalationDialog } from '@/features/chat/ui/human-escalation-dialog';
 import { getAuthServerError } from '@/shared/api/api-client';
 
 export interface ChatWorkspaceProps {
@@ -41,8 +40,6 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   const [draft, setDraft] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
-  const [escalationOpen, setEscalationOpen] = useState(false);
-  const [escalationRequested, setEscalationRequested] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [lastMessagesByDialog, setLastMessagesByDialog] = useState<Record<string, string>>({});
@@ -55,7 +52,6 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
   const dialogsQuery = useDialogsQuery();
   const dialogs = dialogsQuery.data ?? [];
   const activeDialogId = isNewChatPending ? null : (selectedDialogId ?? dialogs[0]?.id ?? null);
-  const activeDialog = dialogs.find((d) => d.id === activeDialogId);
 
   const messagesQuery = useDialogMessagesQuery(activeDialogId);
   const createDialogMutation = useCreateDialogMutation();
@@ -111,7 +107,6 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
       const created = await createDialogMutation.mutateAsync({});
       setIsNewChatPending(false);
       setSelectedDialogId(created.id);
-      setEscalationRequested(false);
     } catch (error) {
       toast.error(getAuthServerError(error as Error, 'Failed to start a new conversation'));
     }
@@ -245,7 +240,6 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         onOpenMobileHistory={() => setMobileHistoryOpen(true)}
-        onOpenEscalation={() => setEscalationOpen(true)}
         onOpenProfileSettings={() => setProfileOpen(true)}
         onOpenAdminDirectory={() => setAdminOpen(true)}
         onSignOut={handleSignOut}
@@ -270,25 +264,6 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
         ) : null}
 
         <main className="flex min-h-0 flex-1 flex-col bg-background">
-          {escalationRequested ? (
-            <div className="flex items-center justify-between gap-3 border-b bg-accent/60 px-4 py-2 text-xs text-accent-foreground">
-              <div className="flex items-center gap-2">
-                <Headset className="size-4 shrink-0 text-primary" />
-                <span>
-                  A live telecom specialist has been notified and will join this conversation
-                  shortly.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEscalationRequested(false)}
-                className="font-medium underline underline-offset-4"
-              >
-                Dismiss
-              </button>
-            </div>
-          ) : null}
-
           <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
             <div className="mx-auto flex w-full max-w-3xl flex-col space-y-5">
               {activeDialogId && messagesQuery.isPending ? (
@@ -338,7 +313,6 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
             draft={draft}
             onDraftChange={setDraft}
             onSubmit={() => void submitMessage(draft)}
-            onOpenEscalation={() => setEscalationOpen(true)}
             isSending={isSending}
           />
         </main>
@@ -356,16 +330,6 @@ export function ChatWorkspace({ user }: ChatWorkspaceProps) {
         onNewConversation={handleNewConversation}
         onRenameDialog={handleRenameDialog}
         onDeleteDialog={handleDeleteDialog}
-      />
-
-      <HumanEscalationDialog
-        open={escalationOpen}
-        onOpenChange={setEscalationOpen}
-        conversationTitle={activeDialog?.title}
-        onConfirmTransfer={() => {
-          setEscalationRequested(true);
-          toast.success('Support specialist requested. Estimated wait: under 2 minutes.');
-        }}
       />
 
       <ProfileSettingsDialog user={user} open={profileOpen} onOpenChange={setProfileOpen} />

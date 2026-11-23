@@ -37,6 +37,7 @@ import { useFileDropZone } from '@/shared/lib/use-file-drop-zone';
 import { Badge } from '@/shared/ui/badge';
 import { BrandLogo } from '@/shared/ui/brand-logo';
 import { Button } from '@/shared/ui/button';
+import { AppHeader } from '@/widgets/app-header/ui/app-header';
 import { Card } from '@/shared/ui/card';
 import { CardContent } from '@/shared/ui/card-content';
 import {
@@ -157,42 +158,42 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
           </div>
         </div>
       ) : null}
-      <header className="border-b bg-card">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
+      <AppHeader containerClassName="mx-auto max-w-7xl px-4 sm:px-6">
+        <AppHeader.Left>
+          <AppHeader.Brand to="/">
             <BrandLogo compact className="sm:hidden" />
             <BrandLogo subtitle="Operator Dashboard" className="hidden sm:flex" />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="truncate text-sm font-semibold sm:text-base">
-                  Knowledge Base Management
-                </h1>
-                <Badge variant="teal" className="hidden sm:inline-flex">
-                  <BookOpen className="size-3" />
-                  RAG Corpus
-                </Badge>
-              </div>
-              <p className="truncate text-xs text-muted-foreground">Signed in as {user.email}</p>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link to="/">
-                <ArrowLeft className="size-4" />
-                <span className="hidden sm:inline">Support Chat</span>
-              </Link>
-            </Button>
-            <ThemeToggle />
-            <Button type="button" size="sm" onClick={() => setUploadOpen(true)}>
-              <Plus className="size-4" />
-              Upload Documents
-            </Button>
-          </div>
-        </div>
-      </header>
+          </AppHeader.Brand>
+          <AppHeader.Divider />
+          <AppHeader.Title
+            title="Knowledge Base Management"
+            badge={
+              <Badge variant="teal" className="hidden sm:inline-flex">
+                <BookOpen className="size-3" />
+                RAG Corpus
+              </Badge>
+            }
+            subtitle={`Signed in as ${user.email}`}
+          />
+        </AppHeader.Left>
+        <AppHeader.Right>
+          <ThemeToggle />
+        </AppHeader.Right>
+      </AppHeader>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/">
+              <ArrowLeft className="size-4" />
+              <span>Support Chat</span>
+            </Link>
+          </Button>
+          <Button type="button" size="sm" onClick={() => setUploadOpen(true)}>
+            <Plus className="size-4" />
+            Upload Documents
+          </Button>
+        </div>
         <section
           aria-label="Knowledge Base Processing Summary"
           className="grid gap-3 sm:grid-cols-4"

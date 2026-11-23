@@ -1,14 +1,13 @@
-import { Link } from '@tanstack/react-router';
 import { Headset, ShieldCheck, Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ThemeToggle } from '@/features/theme/ui/theme-toggle';
-import { BrandLogo } from '@/shared/ui/brand-logo';
 import { Card } from '@/shared/ui/card';
 import { CardContent } from '@/shared/ui/card-content';
 import { CardDescription } from '@/shared/ui/card-description';
 import { CardFooter } from '@/shared/ui/card-footer';
 import { CardHeader } from '@/shared/ui/card-header';
 import { CardTitle } from '@/shared/ui/card-title';
+import { AppHeader } from '@/widgets/app-header/ui/app-header';
 
 interface AuthShellProps {
   title: string;
@@ -19,18 +18,17 @@ interface AuthShellProps {
 
 export function AuthShell({ title, description, children, footer }: AuthShellProps) {
   return (
-    <div className="flex min-h-screen flex-col justify-between bg-background px-4 py-6 sm:px-6">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between">
-        <Link
-          to="/"
-          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
-        >
-          <BrandLogo subtitle="Telecom Customer Support" />
-        </Link>
-        <ThemeToggle />
-      </header>
+    <div className="flex min-h-screen flex-col justify-between bg-background">
+      <AppHeader containerClassName="mx-auto max-w-5xl px-4 sm:px-6">
+        <AppHeader.Left>
+          <AppHeader.Brand subtitle="Telecom Customer Support" to="/" />
+        </AppHeader.Left>
+        <AppHeader.Right>
+          <ThemeToggle />
+        </AppHeader.Right>
+      </AppHeader>
 
-      <main className="mx-auto my-8 flex w-full max-w-md flex-col items-center">
+      <main className="mx-auto my-8 flex w-full max-w-md flex-col items-center px-4 sm:px-6">
         <Card className="w-full border-border/90 shadow-md">
           <CardHeader className="space-y-1.5 text-center">
             <CardTitle className="text-2xl font-semibold tracking-tight">{title}</CardTitle>
@@ -58,7 +56,7 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
         </div>
       </main>
 
-      <footer className="mx-auto w-full max-w-5xl text-center text-xs text-muted-foreground">
+      <footer className="mx-auto w-full max-w-5xl px-4 pb-6 text-center text-xs text-muted-foreground sm:px-6">
         SemCache Telecom Support · Protected by HttpOnly session cookies
       </footer>
     </div>

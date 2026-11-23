@@ -76,7 +76,7 @@ export function ChatMessageItem({
     if (next === 'up') {
       toast.success('Thanks for your feedback!');
     } else if (next === 'down') {
-      toast('Feedback recorded. You can also talk to a human agent anytime.');
+      toast('Feedback recorded.');
     }
   };
 

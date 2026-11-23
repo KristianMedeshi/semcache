@@ -8,7 +8,6 @@ export interface ChatComposerProps {
   draft: string;
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
-  onOpenEscalation: () => void;
   isSending: boolean;
 }
 
@@ -16,7 +15,6 @@ export function ChatComposer({
   draft,
   onDraftChange,
   onSubmit,
-  onOpenEscalation,
   isSending,
 }: ChatComposerProps) {
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
@@ -118,13 +116,6 @@ export function ChatComposer({
 
       <div className="mx-auto mt-2 flex max-w-3xl items-center justify-between px-1 text-[11px] text-muted-foreground">
         <span>Enter to send · Shift + Enter for a new line</span>
-        <button
-          type="button"
-          onClick={onOpenEscalation}
-          className="font-medium text-primary underline-offset-4 hover:underline"
-        >
-          Talk to a human agent
-        </button>
       </div>
     </div>
   );

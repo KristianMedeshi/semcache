@@ -134,7 +134,7 @@ describe('ChatWorkspace', () => {
     expect(screen.queryByText('30 tokens')).not.toBeInTheDocument();
   });
 
-  it('supports Enter to send and Shift+Enter for newline in the composer, and opens human agent escalation dialog', async () => {
+  it('supports Enter to send and Shift+Enter for newline in the composer', async () => {
     const user = userEvent.setup();
     const existingDialog: DialogResponseDto = {
       id: '33333333-3333-4333-8333-333333333333',
@@ -185,14 +185,6 @@ describe('ChatWorkspace', () => {
         }),
       );
     });
-
-    const escalationButtons = screen.getAllByRole('button', { name: /talk to a human agent/i });
-    await user.click(escalationButtons[0]);
-
-    expect(await screen.findByText(/specialists available/i)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: /request live agent/i }));
-
-    expect(await screen.findByText(/a live telecom specialist has been notified/i)).toBeVisible();
   });
 
   it('renames a conversation title and deletes a conversation from the sidebar', async () => {

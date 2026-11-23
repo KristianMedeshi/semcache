@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ArrowRight, Headset, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
+import { ArrowRight, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import { useCurrentUserQuery } from '@/features/auth/model/use-auth';
 import { TELECOM_SUGGESTIONS } from '@/features/chat/model/telecom-suggestions';
 import { ChatWorkspace } from '@/features/chat/ui/chat-workspace';
@@ -12,6 +12,7 @@ import { CardContent } from '@/shared/ui/card-content';
 import { CardDescription } from '@/shared/ui/card-description';
 import { CardHeader } from '@/shared/ui/card-header';
 import { CardTitle } from '@/shared/ui/card-title';
+import { AppHeader } from '@/widgets/app-header/ui/app-header';
 
 export function HomePage() {
   const { data: user, isPending } = useCurrentUserQuery();
@@ -41,21 +42,20 @@ export function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col justify-between bg-background">
-      <header className="border-b bg-card">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-          <BrandLogo subtitle="Telecom Customer Support" />
-
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/sign-in">Sign in</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link to="/sign-up">Sign up</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AppHeader containerClassName="mx-auto max-w-6xl px-4 sm:px-6">
+        <AppHeader.Left>
+          <AppHeader.Brand subtitle="Telecom Customer Support" />
+        </AppHeader.Left>
+        <AppHeader.Right>
+          <ThemeToggle />
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/sign-in">Sign in</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link to="/sign-up">Sign up</Link>
+          </Button>
+        </AppHeader.Right>
+      </AppHeader>
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 py-10 sm:px-6 lg:py-14">
         <div className="mx-auto max-w-2xl text-center">
@@ -70,7 +70,7 @@ export function HomePage() {
 
           <p className="mt-3 text-base leading-relaxed text-muted-foreground">
             Get clear answers about mobile plans, data usage, billing, international roaming, eSIM
-            activation, and network troubleshooting — or connect with a live specialist anytime.
+            activation, and network troubleshooting anytime.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
@@ -90,10 +90,6 @@ export function HomePage() {
           </div>
 
           <div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Headset className="size-3.5 text-primary" />
-              Human specialist escalation available
-            </span>
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="size-3.5 text-cyan-600 dark:text-cyan-400" />
               Encrypted subscriber session
