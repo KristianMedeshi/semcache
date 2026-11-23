@@ -4,9 +4,10 @@ import type {
   DialogMessageResponseDto,
   DialogResponseDto,
   LlmChatCompletionResponseDto,
+  RetrieveKnowledgeContextResponseDto,
 } from '@semcache/shared-dtos';
-import { ChatMessageRole, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
-import { firstValueFrom, of, toArray } from 'rxjs';
+import { ChatMessageRole, QueryCategory, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
+import { firstValueFrom, of, throwError, toArray } from 'rxjs';
 import { DialogGraphService } from './dialog-graph.service';
 import type { DialogsRepository } from './dialogs.repository';
 import { DialogsService } from './dialogs.service';
@@ -17,6 +18,7 @@ const TEST_DIALOG_ID = '22222222-2222-4222-8222-222222222222';
 function createInMemoryDialogHarness(options?: {
   initialMessages?: DialogMessageResponseDto[];
   sendImpl?: jest.Mock;
+  kbSendImpl?: jest.Mock;
 }) {
   let dialog: DialogResponseDto = {
     id: TEST_DIALOG_ID,
@@ -62,10 +64,16 @@ function createInMemoryDialogHarness(options?: {
 
   const sendMock = options?.sendImpl ?? jest.fn();
   const mockLlmClient = { send: sendMock } as unknown as ClientProxy;
-  const graphService = new DialogGraphService(mockRepo as DialogsRepository, mockLlmClient);
+  const kbSendMock = options?.kbSendImpl;
+  const mockKbClient = kbSendMock ? ({ send: kbSendMock } as unknown as ClientProxy) : undefined;
+  const graphService = new DialogGraphService(
+    mockRepo as DialogsRepository,
+    mockLlmClient,
+    mockKbClient,
+  );
   const service = new DialogsService(mockRepo as DialogsRepository, graphService);
 
-  return { userId: TEST_USER_ID, dialogId: TEST_DIALOG_ID, service, sendMock };
+  return { userId: TEST_USER_ID, dialogId: TEST_DIALOG_ID, service, sendMock, kbSendMock };
 }
 
 describe('DialogsService & DialogGraphService', () => {
@@ -286,5 +294,88 @@ describe('DialogsService & DialogGraphService', () => {
     expect(sentPayload[1].messages.map((m) => m.content)).toContain('First question');
     expect(sentPayload[1].messages.map((m) => m.content)).toContain('First answer');
     expect(sentPayload[1].messages.map((m) => m.content)).toContain('Edited follow-up');
+  });
+
+  it('retrieves knowledge base context and injects grounding rules into the LLM system prompt', async () => {
+    const kbResponse: RetrieveKnowledgeContextResponseDto = {
+      query: 'How much EU roaming data is included?',
+      hasRelevantContext: true,
+      formattedContext:
+        '[Source 1: Roaming Guide (roaming.md) | Category: product_inquiry | Section Chunk #1]\n5G Unlimited includes 25 GB EU roaming per month.',
+      results: [],
+      sources: [
+        {
+          documentId: 'doc-1',
+          documentTitle: 'Roaming Guide',
+          fileName: 'roaming.md',
+          category: QueryCategory.PRODUCT_INQUIRY,
+          chunkId: 'chunk-1',
+          chunkIndex: 0,
+        },
+      ],
+    };
+
+    const { userId, dialogId, service, sendMock, kbSendMock } = createInMemoryDialogHarness({
+      sendImpl: jest.fn(() =>
+        of({
+          content: 'Your 5G Unlimited plan includes 25 GB of EU roaming per month.',
+          model: 'openrouter/free',
+          latencyMs: 80,
+          usage: { promptTokens: 40, completionTokens: 14, totalTokens: 54 },
+        }),
+      ),
+      kbSendImpl: jest.fn(() => of(kbResponse)),
+    });
+
+    await service.sendMessage(userId, dialogId, {
+      content: 'How much EU roaming data is included?',
+    });
+
+    expect(kbSendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.KB_CONTEXT_RETRIEVE, {
+      body: {
+        query: 'How much EU roaming data is included?',
+        topK: 4,
+        minSimilarity: 0.25,
+      },
+    });
+
+    const sentPayload = sendMock.mock.calls[0] as unknown as [
+      string,
+      { messages: Array<{ role: ChatMessageRole; content: string }> },
+    ];
+    const systemPrompt =
+      sentPayload[1].messages.find((m) => m.role === ChatMessageRole.SYSTEM)?.content ?? '';
+    expect(systemPrompt).toContain('Prioritize the retrieved Knowledge Base context');
+    expect(systemPrompt).toContain(
+      'Never invent, guess, or fabricate company-specific information',
+    );
+    expect(systemPrompt).toContain('5G Unlimited includes 25 GB EU roaming per month.');
+  });
+
+  it('falls back gracefully when knowledge-base-service is unavailable and instructs LLM not to invent details', async () => {
+    const { userId, dialogId, service, sendMock } = createInMemoryDialogHarness({
+      sendImpl: jest.fn(() =>
+        of({
+          content: 'I do not have verified information on that.',
+          model: 'openrouter/free',
+          latencyMs: 65,
+          usage: { promptTokens: 30, completionTokens: 9, totalTokens: 39 },
+        }),
+      ),
+      kbSendImpl: jest.fn(() => throwError(() => new Error('KB offline'))),
+    });
+
+    const turn = await service.sendMessage(userId, dialogId, {
+      content: 'What is the secret VIP tariff?',
+    });
+
+    expect(turn.assistantMessage.content).toBe('I do not have verified information on that.');
+    const sentPayload = sendMock.mock.calls[0] as unknown as [
+      string,
+      { messages: Array<{ role: ChatMessageRole; content: string }> },
+    ];
+    const systemPrompt =
+      sentPayload[1].messages.find((m) => m.role === ChatMessageRole.SYSTEM)?.content ?? '';
+    expect(systemPrompt).toContain('No relevant company documents were found');
   });
 });

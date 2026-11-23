@@ -12,13 +12,22 @@ import {
 import { ConfigService } from '@semcache/shared-config';
 import {
   FREE_OPENROUTER_MODEL_MESSAGE,
+  KNOWLEDGE_BASE_VALIDATION_LIMITS,
   type LlmChatCompletionRequestDto,
   type LlmChatCompletionResponseDto,
   type LlmChatStreamEventDto,
+  type LlmGenerateEmbeddingsRequestDto,
+  type LlmGenerateEmbeddingsResponseDto,
 } from '@semcache/shared-dtos';
 import { ChatMessageRole } from '@semcache/shared-types';
 import { Observable } from 'rxjs';
 import { type LlmEnv, isFreeOpenRouterModel } from '../config/llm.env';
+import {
+  DEFAULT_LOCAL_EMBEDDING_MODEL,
+  computeDeterministicEmbedding,
+  estimateTokenCount,
+  normalizeEmbeddingVector,
+} from './deterministic-embedding.util';
 
 export const OPENROUTER_PROVIDER = Symbol('OPENROUTER_PROVIDER');
 
@@ -109,6 +118,64 @@ export class LlmService {
     });
   }
 
+  async generateEmbeddings(
+    dto: LlmGenerateEmbeddingsRequestDto,
+  ): Promise<LlmGenerateEmbeddingsResponseDto> {
+    if (!Array.isArray(dto.texts) || dto.texts.length === 0) {
+      throw new BadRequestException('At least one text is required for embedding generation');
+    }
+
+    const configuredModel =
+      this.config.get('OPENROUTER_EMBEDDING_MODEL') ?? DEFAULT_LOCAL_EMBEDDING_MODEL;
+    const requestedModel = dto.model?.trim() || configuredModel;
+    const startedAt = performance.now();
+    const targetDimensions = KNOWLEDGE_BASE_VALIDATION_LIMITS.EMBEDDING_DIMENSIONS;
+
+    const openRouterApiKey = this.config.get('OPENROUTER_API_KEY') ?? '';
+    const hasApiKey = openRouterApiKey.length > 0 && openRouterApiKey !== PLACEHOLDER_API_KEY;
+    const useLocalModel =
+      requestedModel === DEFAULT_LOCAL_EMBEDDING_MODEL ||
+      this.config.getOrThrow('NODE_ENV') === 'test' ||
+      !hasApiKey;
+
+    if (useLocalModel) {
+      const embeddings = dto.texts.map((text) =>
+        computeDeterministicEmbedding(text, targetDimensions),
+      );
+      const totalTokens = dto.texts.reduce((sum, text) => sum + estimateTokenCount(text), 0);
+      return {
+        embeddings,
+        model: requestedModel,
+        dimensions: targetDimensions,
+        latencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+        usage: { totalTokens },
+      };
+    }
+
+    try {
+      const result = await this.aiService.embedMany({
+        model: this.openRouterProvider.embeddingModel(requestedModel),
+        values: dto.texts,
+      });
+      const embeddings = result.embeddings.map((embedding) =>
+        normalizeEmbeddingVector(embedding, targetDimensions),
+      );
+      return {
+        embeddings,
+        model: requestedModel,
+        dimensions: targetDimensions,
+        latencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+        usage: {
+          totalTokens:
+            result.usage.tokens ??
+            dto.texts.reduce((sum, text) => sum + estimateTokenCount(text), 0),
+        },
+      };
+    } catch (error) {
+      throw this.toProviderException(error, requestedModel);
+    }
+  }
+
   private prepareChatCall(dto: LlmChatCompletionRequestDto): PreparedChatCall {
     const defaultModel = this.config.getOrThrow('OPENROUTER_DEFAULT_MODEL');
     const targetModel = dto.model?.trim() || defaultModel;
@@ -118,8 +185,7 @@ export class LlmService {
     }
 
     const openRouterApiKey = this.config.get('OPENROUTER_API_KEY') ?? '';
-    const hasApiKey =
-      openRouterApiKey.length > 0 && openRouterApiKey !== PLACEHOLDER_API_KEY;
+    const hasApiKey = openRouterApiKey.length > 0 && openRouterApiKey !== PLACEHOLDER_API_KEY;
 
     if (this.config.getOrThrow('NODE_ENV') !== 'test' && !hasApiKey) {
       throw new ServiceUnavailableException('OPENROUTER_API_KEY is not configured');

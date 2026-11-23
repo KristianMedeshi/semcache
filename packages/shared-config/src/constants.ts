@@ -141,7 +141,9 @@ export function durationToMs(duration: DurationValue): number {
   let ms: number;
   if (typeof duration === 'number') {
     if (!Number.isFinite(duration) || duration < 0) {
-      throw new Error(`Invalid duration ${duration}: must be a non-negative number of milliseconds`);
+      throw new Error(
+        `Invalid duration ${duration}: must be a non-negative number of milliseconds`,
+      );
     }
     ms = duration;
   } else {

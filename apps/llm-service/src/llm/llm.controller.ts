@@ -2,10 +2,15 @@ import { Controller } from '@nestjs/common';
 import { Authenticate } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import type { LlmChatCompletionResponseDto, LlmChatStreamEventDto } from '@semcache/shared-dtos';
+import type {
+  LlmChatCompletionResponseDto,
+  LlmChatStreamEventDto,
+  LlmGenerateEmbeddingsResponseDto,
+} from '@semcache/shared-dtos';
 import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Observable } from 'rxjs';
 import { ChatCompletionRequestDto } from './dto/chat-completion.dto';
+import { GenerateEmbeddingsRequestDto } from './dto/embeddings.dto';
 import { LlmService } from './llm.service';
 import { LlmPolicy } from './policies/llm.policy';
 
@@ -24,5 +29,13 @@ export class LlmController {
   @MessagePattern(SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM)
   streamChat(@Payload() dto: ChatCompletionRequestDto): Observable<LlmChatStreamEventDto> {
     return this.llmService.streamChatCompletion(dto);
+  }
+
+  @Can(LlmPolicy, 'generateEmbeddings')
+  @MessagePattern(SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS)
+  async embed(
+    @Payload() dto: GenerateEmbeddingsRequestDto,
+  ): Promise<LlmGenerateEmbeddingsResponseDto> {
+    return this.llmService.generateEmbeddings(dto);
   }
 }

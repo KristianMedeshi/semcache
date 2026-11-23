@@ -311,4 +311,18 @@ describe('LlmService', () => {
 
     await moduleRef.close();
   });
+
+  it('generates 384-dimensional normalized embeddings via generateEmbeddings', async () => {
+    const { service, moduleRef } = await createLlmTestService();
+    const res = await service.generateEmbeddings({
+      texts: ['5G Unlimited Plan details', 'International roaming rates'],
+    });
+
+    expect(res.embeddings).toHaveLength(2);
+    expect(res.dimensions).toBe(384);
+    expect(res.embeddings[0]).toHaveLength(384);
+    expect(res.embeddings[1]).toHaveLength(384);
+    expect(res.usage.totalTokens).toBeGreaterThan(0);
+    await moduleRef.close();
+  });
 });

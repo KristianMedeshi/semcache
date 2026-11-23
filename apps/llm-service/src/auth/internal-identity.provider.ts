@@ -22,10 +22,7 @@ export class InternalIdentityAuth extends AuthenticationProvider<AuthenticatedUs
   private readonly logger = new Logger(InternalIdentityAuth.name);
   private readonly internalServiceSecret: string;
 
-  constructor(
-    config: ConfigService<LlmEnv, true>,
-    registry: AuthenticationRegistry,
-  ) {
+  constructor(config: ConfigService<LlmEnv, true>, registry: AuthenticationRegistry) {
     super();
     this.internalServiceSecret = resolveSecretFromConfig(
       config,

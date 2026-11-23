@@ -45,10 +45,7 @@ export class GatewayEditMessageDto implements EditMessageRequestDto {
   model?: string;
 }
 
-export class GatewaySendMessageDto
-  extends GatewayEditMessageDto
-  implements SendMessageRequestDto
-{
+export class GatewaySendMessageDto extends GatewayEditMessageDto implements SendMessageRequestDto {
   @IsOptional()
   @IsUUID()
   parentMessageId?: string | null;

@@ -37,6 +37,7 @@ export const llmEnvSchema = baseEnvSchema
       val.replace(/\/+$/, ''),
     ),
     OPENROUTER_DEFAULT_MODEL: freeOpenRouterModelEnvSchema,
+    OPENROUTER_EMBEDDING_MODEL: defaultString('local/deterministic-384'),
     OPENROUTER_TIMEOUT_MS: positiveInt('OPENROUTER_TIMEOUT_MS').default(
       DEFAULT_OPENROUTER_TIMEOUT_MS,
     ),

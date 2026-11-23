@@ -60,7 +60,10 @@ SemCache implements browser-based session authentication and policy-based author
   - `knowledge-base-service` (`KnowledgeBasePolicy`):
     - `retrieveContext` — authorizes internal RAG context retrieval.
     - `readDocument` — requires authenticated `CUSTOMER` or `ADMIN`.
-    - `manageDocuments` — restricts document management to `ADMIN`.
+    - `manageDocuments` — restricts document upload, reprocessing, and deletion to `ADMIN`.
+  - `api-gateway` (`GatewayAccessPolicy`):
+    - `readKnowledgeBase` — requires authenticated `CUSTOMER` or `ADMIN` for `GET /knowledge-base/documents`, `GET /knowledge-base/documents/:id`, and `POST /knowledge-base/search`.
+    - `manageKnowledgeBase` — restricts `POST /knowledge-base/documents`, `POST /knowledge-base/documents/:id/reprocess`, and `DELETE /knowledge-base/documents/:id` to `ADMIN`.
 - **Service-level enforcement**:
   - `UsersService` and `DialogsService` read the actor from `AuthenticationContext` and call `AuthorizationService.authorize(...)` for record-level ownership checks.
 
@@ -118,16 +121,16 @@ pnpm --filter @semcache/auth-service db:migrate
 
 ## 7. Environment Variables
 
-| Variable                        | Default (dev/test)                            | Production Requirement    | Purpose                                        |
-| :------------------------------ | :-------------------------------------------- | :------------------------ | :--------------------------------------------- |
-| `DATABASE_URL`                  | Optional in `test`                            | Required                  | PostgreSQL connection URL                      |
-| `AUTH_SERVICE_HOST`             | `127.0.0.1`                                   | Required if non-default   | TCP host of `auth-service` for `api-gateway`   |
-| `AUTH_SERVICE_PORT`             | `3001`                                        | Required if non-default   | TCP port of `auth-service` for `api-gateway`   |
-| `INTERNAL_SERVICE_SECRET`       | Ephemeral 32-byte random                      | Required (min 32 chars)   | HMAC secret for signing `x-internal-*` headers |
-| `SESSION_COOKIE_NAME`           | `semcache_sid`                                | Optional                  | Name of the HttpOnly session cookie            |
-| `SESSION_TTL`                   | `24h`                                         | Optional                  | Absolute session expiration (`Duration`: e.g. `30d`, `24h`, or ms) |
+| Variable                        | Default (dev/test)                            | Production Requirement    | Purpose                                                                        |
+| :------------------------------ | :-------------------------------------------- | :------------------------ | :----------------------------------------------------------------------------- |
+| `DATABASE_URL`                  | Optional in `test`                            | Required                  | PostgreSQL connection URL                                                      |
+| `AUTH_SERVICE_HOST`             | `127.0.0.1`                                   | Required if non-default   | TCP host of `auth-service` for `api-gateway`                                   |
+| `AUTH_SERVICE_PORT`             | `3001`                                        | Required if non-default   | TCP port of `auth-service` for `api-gateway`                                   |
+| `INTERNAL_SERVICE_SECRET`       | Ephemeral 32-byte random                      | Required (min 32 chars)   | HMAC secret for signing `x-internal-*` headers                                 |
+| `SESSION_COOKIE_NAME`           | `semcache_sid`                                | Optional                  | Name of the HttpOnly session cookie                                            |
+| `SESSION_TTL`                   | `24h`                                         | Optional                  | Absolute session expiration (`Duration`: e.g. `30d`, `24h`, or ms)             |
 | `SESSION_IDLE_TIMEOUT`          | `30m`                                         | Optional                  | Sliding idle session timeout (`Duration`: e.g. `7d`, `30m`, or `0` to disable) |
-| `LOGIN_RATE_LIMIT_WINDOW_MS`    | `900000` (15m)                                | Optional                  | Throttling window for failed logins in ms      |
-| `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` | `5`                                           | Optional                  | Max login attempts per account+IP per window   |
-| `CORS_ORIGIN`                   | `http://localhost:5173,http://127.0.0.1:5173` | Set to frontend origin(s) | Allowed CORS and CSRF trusted origins          |
-| `SECURE_COOKIES`                | `false` (`true` in prod)                      | `true`                    | Enforce `Secure` flag on session cookie        |
+| `LOGIN_RATE_LIMIT_WINDOW_MS`    | `900000` (15m)                                | Optional                  | Throttling window for failed logins in ms                                      |
+| `LOGIN_RATE_LIMIT_MAX_ATTEMPTS` | `5`                                           | Optional                  | Max login attempts per account+IP per window                                   |
+| `CORS_ORIGIN`                   | `http://localhost:5173,http://127.0.0.1:5173` | Set to frontend origin(s) | Allowed CORS and CSRF trusted origins                                          |
+| `SECURE_COOKIES`                | `false` (`true` in prod)                      | `true`                    | Enforce `Secure` flag on session cookie                                        |

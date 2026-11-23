@@ -50,6 +50,14 @@ export class GatewayAccessPolicy implements PolicyBefore<
     return this.isAllowedUser(user);
   }
 
+  readKnowledgeBase(user: UserResponseDto | null): boolean {
+    return this.isAllowedUser(user);
+  }
+
+  manageKnowledgeBase(user: UserResponseDto | null): boolean {
+    return user !== null && user.role === UserRole.ADMIN;
+  }
+
   private isAllowedUser(user: UserResponseDto | null): boolean {
     return user !== null && (user.role === UserRole.CUSTOMER || user.role === UserRole.ADMIN);
   }

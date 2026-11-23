@@ -81,6 +81,26 @@ export enum ChatMessageRole {
 }
 
 /**
+ * Processing lifecycle status for uploaded knowledge base documents.
+ */
+export enum KnowledgeDocumentStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  READY = 'ready',
+  FAILED = 'failed',
+}
+
+/**
+ * Supported document formats for knowledge base content extraction.
+ */
+export enum KnowledgeDocumentFormat {
+  TEXT = 'text',
+  MARKDOWN = 'markdown',
+  HTML = 'html',
+  JSON = 'json',
+}
+
+/**
  * Curated list of zero-cost OpenRouter models permitted in SemCache.
  */
 export const FREE_OPENROUTER_MODELS = [
@@ -131,6 +151,13 @@ export const SERVICE_TCP_PATTERNS = {
   DIALOGS_MESSAGES_EDIT_STREAM: 'dialogs.messages.edit.stream',
   LLM_CHAT: 'llm.chat',
   LLM_CHAT_STREAM: 'llm.chat.stream',
+  LLM_EMBEDDINGS: 'llm.embeddings',
+  KB_DOCUMENTS_UPLOAD: 'kb.documents.upload',
+  KB_DOCUMENTS_LIST: 'kb.documents.list',
+  KB_DOCUMENTS_GET: 'kb.documents.get',
+  KB_DOCUMENTS_DELETE: 'kb.documents.delete',
+  KB_DOCUMENTS_REPROCESS: 'kb.documents.reprocess',
+  KB_CONTEXT_RETRIEVE: 'kb.context.retrieve',
 } as const;
 
 export type ServiceTcpPattern = (typeof SERVICE_TCP_PATTERNS)[keyof typeof SERVICE_TCP_PATTERNS];

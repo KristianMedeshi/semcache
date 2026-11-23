@@ -130,13 +130,14 @@ Stop the database:
 pnpm db:down
 ```
 
-### 4. Apply Database Migrations (`auth-service` & `dialog-service`)
+### 4. Apply Database Migrations (`auth-service`, `dialog-service`, & `knowledge-base-service`)
 
-After starting PostgreSQL, apply the Drizzle ORM migrations for `auth-service` and `dialog-service`:
+After starting PostgreSQL, apply the Drizzle ORM migrations for `auth-service`, `dialog-service`, and `knowledge-base-service`:
 
 ```bash
 pnpm --filter @semcache/auth-service db:migrate
 pnpm --filter @semcache/dialog-service db:migrate
+pnpm --filter @semcache/knowledge-base-service db:migrate
 ```
 
 ### 5. Configure Free OpenRouter Models

@@ -2,6 +2,8 @@ import {
   CacheHitStatus,
   ChatMessageRole,
   HealthCheckStatus,
+  KnowledgeDocumentFormat,
+  KnowledgeDocumentStatus,
   QueryCategory,
   SemanticEvaluationMetadata,
   UserRole,
@@ -351,5 +353,178 @@ export interface DialogTcpRequestDto<TBody = undefined> {
   headers: Record<string, string>;
   dialogId?: string;
   messageId?: string;
+  body?: TBody;
+}
+
+/**
+ * Shared validation and chunking limits for Knowledge Base documents and RAG retrieval.
+ */
+export const KNOWLEDGE_BASE_VALIDATION_LIMITS = {
+  TITLE_MAX_LENGTH: 200,
+  FILENAME_MAX_LENGTH: 255,
+  CONTENT_MIN_LENGTH: 1,
+  CONTENT_MAX_LENGTH: 500_000,
+  QUERY_MIN_LENGTH: 1,
+  QUERY_MAX_LENGTH: 4_000,
+  DEFAULT_CHUNK_SIZE: 800,
+  MIN_CHUNK_SIZE: 100,
+  MAX_CHUNK_SIZE: 4_000,
+  DEFAULT_CHUNK_OVERLAP: 150,
+  MAX_CHUNK_OVERLAP: 1_000,
+  DEFAULT_TOP_K: 4,
+  MIN_TOP_K: 1,
+  MAX_TOP_K: 20,
+  DEFAULT_MIN_SIMILARITY: 0.25,
+  EMBEDDING_DIMENSIONS: 384,
+  MAX_EMBEDDING_BATCH_SIZE: 128,
+} as const;
+
+/**
+ * DTO contract for requesting embedding vectors from `llm-service` (`llm.embeddings`).
+ */
+export interface LlmGenerateEmbeddingsRequestDto {
+  texts: string[];
+  model?: string;
+}
+
+/**
+ * DTO contract for embedding vectors returned by `llm-service`.
+ */
+export interface LlmGenerateEmbeddingsResponseDto {
+  embeddings: number[][];
+  model: string;
+  dimensions: number;
+  latencyMs: number;
+  usage: {
+    totalTokens: number;
+  };
+}
+
+/**
+ * DTO contract for uploading a knowledge base document.
+ */
+export interface UploadKnowledgeDocumentRequestDto {
+  title: string;
+  content: string;
+  fileName?: string;
+  format?: KnowledgeDocumentFormat;
+  category?: QueryCategory;
+  metadata?: Record<string, string | number | boolean>;
+  chunkSize?: number;
+  chunkOverlap?: number;
+}
+
+/**
+ * DTO representing a knowledge base document summary and processing status.
+ */
+export interface KnowledgeDocumentResponseDto {
+  id: string;
+  title: string;
+  fileName: string | null;
+  format: KnowledgeDocumentFormat;
+  category: QueryCategory;
+  status: KnowledgeDocumentStatus;
+  chunkCount: number;
+  characterCount: number;
+  errorMessage: string | null;
+  metadata: Record<string, string | number | boolean>;
+  uploadedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * DTO representing a single processed chunk of a knowledge base document.
+ */
+export interface KnowledgeChunkResponseDto {
+  id: string;
+  documentId: string;
+  chunkIndex: number;
+  content: string;
+  tokenCount: number;
+  characterCount: number;
+  metadata: Record<string, string | number | boolean>;
+  createdAt: string;
+}
+
+/**
+ * Detailed knowledge base document DTO including extracted content and chunks.
+ */
+export interface KnowledgeDocumentDetailResponseDto extends KnowledgeDocumentResponseDto {
+  content: string;
+  chunks?: KnowledgeChunkResponseDto[];
+}
+
+/**
+ * DTO returned after deleting a knowledge base document and its chunks.
+ */
+export interface DeleteKnowledgeDocumentResponseDto {
+  id: string;
+  deleted: true;
+  deletedChunksCount: number;
+}
+
+/**
+ * DTO contract for querying knowledge base documents via semantic similarity search.
+ */
+export interface RetrieveKnowledgeContextRequestDto {
+  query: string;
+  topK?: number;
+  minSimilarity?: number;
+  category?: QueryCategory;
+}
+
+/**
+ * Source document reference attached to retrieved knowledge base chunks.
+ */
+export interface KnowledgeContextSourceReferenceDto {
+  documentId: string;
+  documentTitle: string;
+  fileName: string | null;
+  category: QueryCategory;
+  chunkId: string;
+  chunkIndex: number;
+}
+
+/**
+ * Single ranked knowledge chunk returned by semantic similarity search.
+ */
+export interface RetrievedKnowledgeChunkDto {
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  fileName: string | null;
+  category: QueryCategory;
+  chunkIndex: number;
+  content: string;
+  similarity: number;
+  source: KnowledgeContextSourceReferenceDto;
+}
+
+/**
+ * DTO contract returned by `kb.context.retrieve` and `POST /knowledge-base/search`.
+ */
+export interface RetrieveKnowledgeContextResponseDto {
+  query: string;
+  hasRelevantContext: boolean;
+  formattedContext: string;
+  results: RetrievedKnowledgeChunkDto[];
+  sources: KnowledgeContextSourceReferenceDto[];
+}
+
+/**
+ * Filter parameters for listing knowledge base documents.
+ */
+export interface ListKnowledgeDocumentsQueryDto {
+  category?: QueryCategory;
+  status?: KnowledgeDocumentStatus;
+}
+
+/**
+ * TCP RPC request envelope forwarded to `knowledge-base-service`.
+ */
+export interface KnowledgeBaseTcpRequestDto<TBody = undefined> {
+  headers?: Record<string, string>;
+  documentId?: string;
   body?: TBody;
 }

@@ -19,10 +19,12 @@ import type {
   LlmChatCompletionResponseDto,
   LlmChatStreamEventDto,
   LlmTokenUsageDto,
+  RetrieveKnowledgeContextResponseDto,
   SendMessageResponseDto,
 } from '@semcache/shared-dtos';
 import {
   ChatMessageRole,
+  QueryCategory,
   SERVICE_TCP_PATTERNS,
   ServiceName,
   UserRole,
@@ -66,6 +68,39 @@ class MockLlmController {
   controllers: [MockLlmController],
 })
 class MockLlmModule {}
+
+const capturedKbQueries: string[] = [];
+
+@Controller()
+class MockKbController {
+  @MessagePattern(SERVICE_TCP_PATTERNS.KB_CONTEXT_RETRIEVE)
+  retrieve(@Payload() payload: { body?: { query?: string } }): RetrieveKnowledgeContextResponseDto {
+    const query = payload.body?.query ?? '';
+    capturedKbQueries.push(query);
+    return {
+      query,
+      hasRelevantContext: true,
+      formattedContext:
+        '[Source 1: Billing Policy | Category: billing | Section Chunk #1]\nInvoices are issued on the 1st of each month.',
+      results: [],
+      sources: [
+        {
+          documentId: 'kb-doc-1',
+          documentTitle: 'Billing Policy',
+          fileName: 'billing.md',
+          category: QueryCategory.BILLING,
+          chunkId: 'kb-chunk-1',
+          chunkIndex: 0,
+        },
+      ],
+    };
+  }
+}
+
+@Module({
+  controllers: [MockKbController],
+})
+class MockKbModule {}
 
 @Injectable()
 class InMemoryDialogsRepository {
@@ -171,6 +206,7 @@ describe('Dialog Service (TCP e2e)', () => {
   let app: INestMicroservice;
   let client: ClientProxy;
   let mockLlmApp: INestMicroservice;
+  let mockKbApp: INestMicroservice;
   const originalEnv = { ...process.env };
   const secret = 'test-internal-service-secret-32-chars';
 
@@ -183,10 +219,20 @@ describe('Dialog Service (TCP e2e)', () => {
     await mockLlmApp.listen();
     const llmAddress = mockLlmApp.unwrap<Server>().address() as AddressInfo;
 
+    mockKbApp = await NestFactory.createMicroservice<MicroserviceOptions>(MockKbModule, {
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: 0 },
+      logger: false,
+    });
+    await mockKbApp.listen();
+    const kbAddress = mockKbApp.unwrap<Server>().address() as AddressInfo;
+
     process.env.NODE_ENV = 'test';
     process.env.INTERNAL_SERVICE_SECRET = secret;
     process.env.LLM_SERVICE_HOST = '127.0.0.1';
     process.env.LLM_SERVICE_PORT = String(llmAddress.port);
+    process.env.KNOWLEDGE_BASE_SERVICE_HOST = '127.0.0.1';
+    process.env.KNOWLEDGE_BASE_SERVICE_PORT = String(kbAddress.port);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -215,6 +261,7 @@ describe('Dialog Service (TCP e2e)', () => {
     await client.close();
     await app.close();
     await mockLlmApp.close();
+    await mockKbApp.close();
     process.env = { ...originalEnv };
   });
 
@@ -274,6 +321,7 @@ describe('Dialog Service (TCP e2e)', () => {
     expect(turn.dialog.title).toBe('Where is my invoice?');
     expect(turn.assistantMessage.content).toBe('Assistant answer via mocked LLM service');
     expect(turn.assistantMessage.model).toBe('openrouter/free');
+    expect(capturedKbQueries).toContain('Where is my invoice?');
 
     const messages = await firstValueFrom(
       client.send<DialogMessageResponseDto[]>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_LIST, {

@@ -13,6 +13,7 @@ import type {
   AuthTcpRequestDto,
   DialogMessageStreamEventDto,
   DialogTcpRequestDto,
+  KnowledgeBaseTcpRequestDto,
 } from '@semcache/shared-dtos';
 import {
   ChatMessageRole,
@@ -29,6 +30,10 @@ import { AppModule } from '../src/app.module';
 const capturedAuthRequests: Array<{ pattern: string; payload: AuthTcpRequestDto<unknown> }> = [];
 const capturedDialogRequests: Array<{ pattern: string; payload: DialogTcpRequestDto<unknown> }> =
   [];
+const capturedKbRequests: Array<{
+  pattern: string;
+  payload: KnowledgeBaseTcpRequestDto<unknown>;
+}> = [];
 
 @Controller()
 class MockAuthController {
@@ -202,10 +207,37 @@ class MockDialogController {
 })
 class MockDialogModule {}
 
+@Controller()
+class MockKbController {
+  @MessagePattern(SERVICE_TCP_PATTERNS.KB_DOCUMENTS_LIST)
+  listDocuments(@Payload() payload: KnowledgeBaseTcpRequestDto<unknown>) {
+    capturedKbRequests.push({ pattern: SERVICE_TCP_PATTERNS.KB_DOCUMENTS_LIST, payload });
+    return [{ id: 'doc-1', title: 'Roaming Policy', status: 'ready' }];
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.KB_CONTEXT_RETRIEVE)
+  retrieveContext(@Payload() payload: KnowledgeBaseTcpRequestDto<{ query: string }>) {
+    capturedKbRequests.push({ pattern: SERVICE_TCP_PATTERNS.KB_CONTEXT_RETRIEVE, payload });
+    return {
+      query: payload.body?.query ?? '',
+      hasRelevantContext: true,
+      formattedContext: '[Source 1: Roaming Policy]\n25 GB EU roaming included.',
+      results: [],
+      sources: [],
+    };
+  }
+}
+
+@Module({
+  controllers: [MockKbController],
+})
+class MockKbModule {}
+
 describe('API Gateway (e2e)', () => {
   let app: INestApplication<App>;
   let mockAuthMicroservice: INestMicroservice;
   let mockDialogMicroservice: INestMicroservice;
+  let mockKbMicroservice: INestMicroservice;
   const originalEnv = { ...process.env };
 
   beforeAll(async () => {
@@ -229,12 +261,22 @@ describe('API Gateway (e2e)', () => {
     );
     await mockDialogMicroservice.listen();
 
+    mockKbMicroservice = await NestFactory.createMicroservice<MicroserviceOptions>(MockKbModule, {
+      transport: Transport.TCP,
+      options: { host: '127.0.0.1', port: 0 },
+      logger: false,
+    });
+    await mockKbMicroservice.listen();
+
     const authAddress = mockAuthMicroservice.unwrap<Server>().address() as AddressInfo;
     const dialogAddress = mockDialogMicroservice.unwrap<Server>().address() as AddressInfo;
+    const kbAddress = mockKbMicroservice.unwrap<Server>().address() as AddressInfo;
     process.env.AUTH_SERVICE_HOST = '127.0.0.1';
     process.env.AUTH_SERVICE_PORT = String(authAddress.port);
     process.env.DIALOG_SERVICE_HOST = '127.0.0.1';
     process.env.DIALOG_SERVICE_PORT = String(dialogAddress.port);
+    process.env.KNOWLEDGE_BASE_SERVICE_HOST = '127.0.0.1';
+    process.env.KNOWLEDGE_BASE_SERVICE_PORT = String(kbAddress.port);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -248,12 +290,14 @@ describe('API Gateway (e2e)', () => {
   beforeEach(() => {
     capturedAuthRequests.length = 0;
     capturedDialogRequests.length = 0;
+    capturedKbRequests.length = 0;
   });
 
   afterAll(async () => {
     await app.close();
     await mockAuthMicroservice.close();
     await mockDialogMicroservice.close();
+    await mockKbMicroservice.close();
     process.env = { ...originalEnv };
   });
 
@@ -387,6 +431,33 @@ describe('API Gateway (e2e)', () => {
       SERVICE_TCP_PATTERNS.DIALOGS_UPDATE,
       SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT,
       SERVICE_TCP_PATTERNS.DIALOGS_DELETE,
+    ]);
+  });
+
+  it('enforces RBAC and forwards /knowledge-base/documents and /knowledge-base/search over TCP', async () => {
+    await request(app.getHttpServer()).get('/knowledge-base/documents').expect(401);
+
+    await request(app.getHttpServer())
+      .post('/knowledge-base/documents')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .send({ title: 'Unauthorized Customer Upload', content: 'Test' })
+      .expect(403);
+
+    const listRes = await request(app.getHttpServer())
+      .get('/knowledge-base/documents')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .expect(200);
+    expect(listRes.body).toEqual([{ id: 'doc-1', title: 'Roaming Policy', status: 'ready' }]);
+
+    const searchRes = await request(app.getHttpServer())
+      .post('/knowledge-base/search')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .send({ query: 'EU roaming allowance' })
+      .expect(200);
+    expect(searchRes.body.hasRelevantContext).toBe(true);
+    expect(capturedKbRequests.map((r) => r.pattern)).toEqual([
+      SERVICE_TCP_PATTERNS.KB_DOCUMENTS_LIST,
+      SERVICE_TCP_PATTERNS.KB_CONTEXT_RETRIEVE,
     ]);
   });
 });

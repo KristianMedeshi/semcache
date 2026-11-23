@@ -10,6 +10,7 @@ import { GatewayAuthModule } from './auth/gateway-auth.module';
 import { StripInternalHeadersMiddleware } from './auth/strip-internal-headers.middleware';
 import { gatewayEnvSchema } from './config/gateway.env';
 import { GatewayDialogsModule } from './dialogs/gateway-dialogs.module';
+import { GatewayKnowledgeBaseModule } from './knowledge-base/gateway-knowledge-base.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { GatewayDialogsModule } from './dialogs/gateway-dialogs.module';
     AuthorizationModule.forRoot(),
     GatewayAuthModule,
     GatewayDialogsModule,
+    GatewayKnowledgeBaseModule,
   ],
   controllers: [AppController],
   providers: [

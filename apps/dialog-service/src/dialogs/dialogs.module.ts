@@ -5,7 +5,11 @@ import { ServiceName } from '@semcache/shared-types';
 import { InternalIdentityAuth } from '../auth/internal-identity.provider';
 import type { DialogEnv } from '../config/dialog.env';
 import { DatabaseModule } from '../db/database.module';
-import { DialogGraphService, LLM_SERVICE_CLIENT } from './dialog-graph.service';
+import {
+  DialogGraphService,
+  KNOWLEDGE_BASE_SERVICE_CLIENT,
+  LLM_SERVICE_CLIENT,
+} from './dialog-graph.service';
 import { DialogsController } from './dialogs.controller';
 import { DialogsRepository } from './dialogs.repository';
 import { DialogsService } from './dialogs.service';
@@ -30,6 +34,25 @@ import { DialogPolicy } from './policies/dialog.policy';
         });
       },
     },
+    {
+      provide: KNOWLEDGE_BASE_SERVICE_CLIENT,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<DialogEnv, true>): ClientProxy => {
+        const { host, port } = resolveServiceTcpEndpoint(
+          config,
+          ServiceName.KNOWLEDGE_BASE_SERVICE,
+          {
+            hostKey: 'KNOWLEDGE_BASE_SERVICE_HOST',
+            portKey: 'KNOWLEDGE_BASE_SERVICE_PORT',
+            urlKey: 'KNOWLEDGE_BASE_SERVICE_URL',
+          },
+        );
+        return ClientProxyFactory.create({
+          transport: Transport.TCP,
+          options: { host, port },
+        });
+      },
+    },
     InternalIdentityAuth,
     DialogPolicy,
     DialogsRepository,
@@ -39,9 +62,12 @@ import { DialogPolicy } from './policies/dialog.policy';
   exports: [DialogsService, DialogsRepository, DialogPolicy],
 })
 export class DialogsModule implements OnModuleDestroy {
-  constructor(@Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy) {}
+  constructor(
+    @Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy,
+    @Inject(KNOWLEDGE_BASE_SERVICE_CLIENT) private readonly kbClient: ClientProxy,
+  ) {}
 
   async onModuleDestroy(): Promise<void> {
-    await this.llmClient.close();
+    await Promise.all([this.llmClient.close(), this.kbClient.close()]);
   }
 }

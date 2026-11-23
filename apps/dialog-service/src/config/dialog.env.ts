@@ -16,6 +16,11 @@ export const dialogEnvSchema = baseEnvSchema
     LLM_SERVICE_HOST: optionalString(),
     LLM_SERVICE_PORT: positiveInt('LLM_SERVICE_PORT').optional(),
     LLM_SERVICE_URL: optionalString(),
+    KNOWLEDGE_BASE_SERVICE_HOST: optionalString(),
+    KNOWLEDGE_BASE_SERVICE_PORT: positiveInt('KNOWLEDGE_BASE_SERVICE_PORT').optional(),
+    KNOWLEDGE_BASE_SERVICE_URL: optionalString(),
+    KB_RAG_TOP_K: positiveInt('KB_RAG_TOP_K').default(4),
+    KB_RAG_MIN_SIMILARITY: z.coerce.number().min(0).max(1).default(0.25),
     INTERNAL_SERVICE_SECRET: defaultString(''),
   })
   .superRefine((data, ctx) => {
