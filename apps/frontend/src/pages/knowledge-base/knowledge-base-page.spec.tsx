@@ -11,7 +11,7 @@ import {
   QueryCategory,
   UserRole,
 } from '@semcache/shared-types';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as authHooks from '@/features/auth/model/use-auth';
@@ -265,5 +265,91 @@ describe('KnowledgeBasePage', () => {
         expect.any(Function),
       );
     });
+  });
+
+  it('opens Upload Documents dialog with queued files when dropping files onto the page', async () => {
+    const user = userEvent.setup();
+    vi.mocked(authHooks.useCurrentUserQuery).mockReturnValue({
+      data: adminUser,
+      isPending: false,
+    } as ReturnType<typeof authHooks.useCurrentUserQuery>);
+    vi.mocked(kbClient.listKnowledgeDocuments).mockResolvedValue([]);
+    vi.mocked(kbClient.uploadMultipleKnowledgeDocuments).mockResolvedValueOnce([
+      {
+        ...sampleDocs[0],
+        title: 'dropped guide',
+        fileName: 'dropped-guide.md',
+        content: 'Dropped content',
+        chunks: [],
+      },
+    ]);
+
+    const { container } = renderKnowledgeBasePage();
+    await screen.findByText('No knowledge documents uploaded yet');
+
+    const droppedFile = new File(['Dropped content'], 'dropped-guide.md', {
+      type: 'text/markdown',
+    });
+    droppedFile.text = async () => 'Dropped content';
+
+    const workspaceRoot = container.firstElementChild as HTMLElement;
+    const dataTransfer = {
+      types: ['Files'],
+      files: [droppedFile],
+      dropEffect: 'none',
+    };
+
+    fireEvent.dragEnter(workspaceRoot, { dataTransfer });
+    expect(screen.getByTestId('kb-page-drop-overlay')).toBeVisible();
+
+    fireEvent.drop(workspaceRoot, { dataTransfer });
+    expect(screen.queryByTestId('kb-page-drop-overlay')).not.toBeInTheDocument();
+
+    expect(await screen.findByDisplayValue('dropped guide')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: /upload 1 document/i }));
+
+    await waitFor(() => {
+      expect(kbClient.uploadMultipleKnowledgeDocuments).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            title: 'dropped guide',
+            fileName: 'dropped-guide.md',
+            format: KnowledgeDocumentFormat.MARKDOWN,
+            content: 'Dropped content',
+          }),
+        ],
+        expect.any(Function),
+      );
+    });
+  });
+
+  it('queues files dropped onto the Upload Documents dialog dropzone', async () => {
+    const user = userEvent.setup();
+    vi.mocked(authHooks.useCurrentUserQuery).mockReturnValue({
+      data: adminUser,
+      isPending: false,
+    } as ReturnType<typeof authHooks.useCurrentUserQuery>);
+    vi.mocked(kbClient.listKnowledgeDocuments).mockResolvedValue([]);
+
+    renderKnowledgeBasePage();
+
+    await user.click(await screen.findByRole('button', { name: /upload documents/i }));
+    const dropzone = screen.getByTestId('kb-dialog-dropzone');
+
+    const droppedFile = new File(['FAQ body'], 'support-faq.txt', { type: 'text/plain' });
+    droppedFile.text = async () => 'FAQ body';
+
+    const dataTransfer = {
+      types: ['Files'],
+      files: [droppedFile],
+      dropEffect: 'none',
+    };
+
+    fireEvent.dragEnter(dropzone, { dataTransfer });
+    expect(screen.getByText('Drop documents here to add them')).toBeVisible();
+
+    fireEvent.drop(dropzone, { dataTransfer });
+    expect(await screen.findByDisplayValue('support faq')).toBeVisible();
   });
 });

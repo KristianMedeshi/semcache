@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  UploadCloud,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ import { KnowledgeBaseRetrievalTester } from '@/features/knowledge-base/ui/knowl
 import { KnowledgeBaseUploadDialog } from '@/features/knowledge-base/ui/knowledge-base-upload-dialog';
 import { ThemeToggle } from '@/features/theme/ui/theme-toggle';
 import { getAuthServerError } from '@/shared/api/api-client';
+import { useFileDropZone } from '@/shared/lib/use-file-drop-zone';
 import { Badge } from '@/shared/ui/badge';
 import { BrandLogo } from '@/shared/ui/brand-logo';
 import { Button } from '@/shared/ui/button';
@@ -55,8 +57,17 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
   const [categoryFilter, setCategoryFilter] = useState<QueryCategory | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<KnowledgeDocumentStatus | 'all'>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [pendingDroppedFiles, setPendingDroppedFiles] = useState<File[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<KnowledgeDocumentResponseDto | null>(null);
+
+  const { isDragging, dropZoneProps } = useFileDropZone({
+    disabled: uploadOpen || Boolean(selectedDocId) || Boolean(deleteTarget),
+    onDropFiles: (files) => {
+      setPendingDroppedFiles(files);
+      setUploadOpen(true);
+    },
+  });
 
   const documentsQuery = useKnowledgeDocumentsQuery();
   const reprocessMutation = useReprocessKnowledgeDocumentMutation();
@@ -128,7 +139,23 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div {...dropZoneProps} className="relative min-h-screen bg-background text-foreground">
+      {isDragging ? (
+        <div
+          data-testid="kb-page-drop-overlay"
+          className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-background/80 p-6 backdrop-blur-xs"
+        >
+          <div className="flex max-w-md flex-col items-center rounded-2xl border-2 border-dashed border-primary bg-card/95 px-8 py-10 text-center shadow-xl">
+            <div className="mb-3 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <UploadCloud className="size-7" />
+            </div>
+            <p className="text-base font-semibold text-foreground">Drop documents to upload</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Supported formats: .txt, .md, .html, .json, .pdf, .docx
+            </p>
+          </div>
+        </div>
+      ) : null}
       <header className="border-b bg-card">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
@@ -275,7 +302,7 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {documents.length === 0
-                        ? 'Upload company policies, plans, or troubleshooting guides to ground the AI Support Service.'
+                        ? 'Drag and drop files onto this page or click Upload Documents to ground the AI Support Service.'
                         : 'Try clearing the search query or changing the category/status filter.'}
                     </p>
                   </div>
@@ -379,7 +406,12 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
         </div>
       </main>
 
-      <KnowledgeBaseUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      <KnowledgeBaseUploadDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        pendingFiles={pendingDroppedFiles}
+        onPendingFilesConsumed={() => setPendingDroppedFiles([])}
+      />
 
       <KnowledgeBaseDetailDialog
         documentId={selectedDocId}

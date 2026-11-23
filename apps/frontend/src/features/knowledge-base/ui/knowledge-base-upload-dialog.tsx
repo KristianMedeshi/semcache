@@ -4,7 +4,7 @@ import {
 } from '@semcache/shared-dtos';
 import { KnowledgeDocumentFormat, QueryCategory } from '@semcache/shared-types';
 import { FileText, Loader2, Trash2, UploadCloud } from 'lucide-react';
-import { type ChangeEvent, type FormEvent, useState } from 'react';
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   CATEGORY_LABELS,
@@ -14,6 +14,8 @@ import {
 } from '@/features/knowledge-base/model/knowledge-base-helpers';
 import { useUploadKnowledgeDocumentsMutation } from '@/features/knowledge-base/model/use-knowledge-base';
 import { getAuthServerError } from '@/shared/api/api-client';
+import { useFileDropZone } from '@/shared/lib/use-file-drop-zone';
+import { cn } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import {
@@ -31,11 +33,18 @@ import { Textarea } from '@/shared/ui/textarea';
 export interface KnowledgeBaseUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  pendingFiles?: File[];
+  onPendingFilesConsumed?: () => void;
 }
 
 type UploadMode = 'files' | 'manual';
 
-export function KnowledgeBaseUploadDialog({ open, onOpenChange }: KnowledgeBaseUploadDialogProps) {
+export function KnowledgeBaseUploadDialog({
+  open,
+  onOpenChange,
+  pendingFiles,
+  onPendingFilesConsumed,
+}: KnowledgeBaseUploadDialogProps) {
   const [mode, setMode] = useState<UploadMode>('files');
   const [queuedFiles, setQueuedFiles] = useState<ParsedUploadFile[]>([]);
   const [category, setCategory] = useState<QueryCategory>(QueryCategory.GENERAL);
@@ -63,6 +72,46 @@ export function KnowledgeBaseUploadDialog({ open, onOpenChange }: KnowledgeBaseU
     setProgress(null);
   };
 
+  const enqueueFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) {
+      return;
+    }
+
+    try {
+      const parsed = await Promise.all(files.map((file) => readUploadedFile(file)));
+      const nonEmpty = parsed.filter((item) => item.content.trim().length > 0);
+      if (nonEmpty.length < parsed.length) {
+        toast.error('Some selected files were empty and skipped.');
+      }
+      if (nonEmpty.length > 0) {
+        setQueuedFiles((prev) => [...prev, ...nonEmpty]);
+      }
+    } catch {
+      toast.error('Failed to read one or more selected files.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open && pendingFiles && pendingFiles.length > 0) {
+      void enqueueFiles(pendingFiles);
+      onPendingFilesConsumed?.();
+    }
+  }, [open, pendingFiles, enqueueFiles, onPendingFilesConsumed]);
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setMode('files');
+    }
+    onOpenChange(nextOpen);
+  };
+
+  const { isDragging, dropZoneProps } = useFileDropZone({
+    disabled: mode !== 'files' || uploadMutation.isPending,
+    onDropFiles: (files) => {
+      void enqueueFiles(files);
+    },
+  });
+
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const fileList = event.target.files;
     if (!fileList || fileList.length === 0) {
@@ -70,14 +119,7 @@ export function KnowledgeBaseUploadDialog({ open, onOpenChange }: KnowledgeBaseU
     }
 
     try {
-      const parsed = await Promise.all(Array.from(fileList).map((file) => readUploadedFile(file)));
-      const nonEmpty = parsed.filter((item) => item.content.trim().length > 0);
-      if (nonEmpty.length < parsed.length) {
-        toast.error('Some selected files were empty and skipped.');
-      }
-      setQueuedFiles((prev) => [...prev, ...nonEmpty]);
-    } catch {
-      toast.error('Failed to read one or more selected files.');
+      await enqueueFiles(Array.from(fileList));
     } finally {
       event.target.value = '';
     }
@@ -148,7 +190,7 @@ export function KnowledgeBaseUploadDialog({ open, onOpenChange }: KnowledgeBaseU
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -183,13 +225,24 @@ export function KnowledgeBaseUploadDialog({ open, onOpenChange }: KnowledgeBaseU
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           {mode === 'files' ? (
             <div className="space-y-3">
-              <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-center">
+              <div
+                {...dropZoneProps}
+                data-testid="kb-dialog-dropzone"
+                className={cn(
+                  'rounded-xl border border-dashed p-4 text-center transition-colors',
+                  isDragging
+                    ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                    : 'bg-muted/30',
+                )}
+              >
                 <Label htmlFor="kb-file-upload" className="cursor-pointer space-y-1.5">
                   <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <UploadCloud className="size-5" />
                   </div>
                   <p className="text-sm font-medium text-foreground">
-                    Select one or multiple documents
+                    {isDragging
+                      ? 'Drop documents here to add them'
+                      : 'Drag & drop documents here, or choose from your computer'}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Supported formats: .txt, .md, .html, .json, .pdf, .docx
