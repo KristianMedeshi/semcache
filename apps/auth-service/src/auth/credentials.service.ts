@@ -14,6 +14,10 @@ export class CredentialsService {
   ) {}
 
   async register(email: string, password: string): Promise<UserResponseDto> {
+    return this.createAccount(email, password, UserRole.CUSTOMER);
+  }
+
+  async createAccount(email: string, password: string, role: UserRole): Promise<UserResponseDto> {
     const existing = await this.usersRepository.findByEmail(email);
     if (existing) {
       this.logger.warn(
@@ -28,7 +32,7 @@ export class CredentialsService {
     const passwordHash = await this.passwordHasher.hash(password);
     const user = await this.usersRepository.create(email, {
       passwordHash,
-      role: UserRole.CUSTOMER,
+      role,
     });
 
     this.logger.log(
