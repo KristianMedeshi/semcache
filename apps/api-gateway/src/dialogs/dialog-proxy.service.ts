@@ -19,6 +19,7 @@ import type {
 import type { Request, Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { AuthProxyService } from '../auth/auth-proxy.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 export const DIALOG_SERVICE_CLIENT = Symbol('DIALOG_SERVICE_CLIENT');
 
@@ -37,6 +38,7 @@ export class DialogProxyService {
     private readonly authProxyService: AuthProxyService,
     @Inject(DIALOG_SERVICE_CLIENT) private readonly dialogClient: ClientProxy,
     @Optional() private readonly authContext?: AuthenticationContext,
+    @Optional() private readonly metricsService?: MetricsService,
   ) {}
 
   async forwardDialogRequest<TBody = undefined>(
@@ -46,12 +48,42 @@ export class DialogProxyService {
     options?: { dialogId?: string; messageId?: string; body?: TBody; statusCode?: number },
   ): Promise<void> {
     const payload = await this.buildAuthenticatedDialogPayload(req, options);
+    const startedAt = performance.now();
 
     let result: unknown;
     try {
       result = await firstValueFrom(this.dialogClient.send<unknown>(pattern, payload));
     } catch (error) {
       throw this.mapRpcError(error, pattern);
+    }
+
+    if (result && typeof result === 'object' && 'cache' in result && result.cache) {
+      const cache = result.cache as { status?: string; mode?: string; category?: string };
+      if (cache.status && typeof res.setHeader === 'function') {
+        res.setHeader('X-Cache-Status', cache.status);
+      }
+      if (cache.mode && typeof res.setHeader === 'function') {
+        res.setHeader('X-Cache-Mode', cache.mode);
+      }
+      if (cache.status && this.metricsService) {
+        const assistant =
+          'assistantMessage' in result && result.assistantMessage
+            ? (result.assistantMessage as {
+                usage?: {
+                  promptTokens?: number;
+                  completionTokens?: number;
+                  totalTokens?: number;
+                } | null;
+              })
+            : undefined;
+        this.metricsService.recordCacheTurn({
+          status: cache.status,
+          mode: cache.mode ?? 'unknown',
+          category: cache.category ?? 'general',
+          durationSeconds: (performance.now() - startedAt) / 1000,
+          usage: assistant?.usage,
+        });
+      }
     }
 
     res.status(options?.statusCode ?? HttpStatus.OK).json(result);

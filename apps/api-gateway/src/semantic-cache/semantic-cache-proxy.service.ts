@@ -12,9 +12,11 @@ import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
 import { extractRpcErrorPayload } from '@semcache/shared-config';
 import type { SemanticCacheTcpRequestDto } from '@semcache/shared-dtos';
+import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { AuthProxyService } from '../auth/auth-proxy.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 export const SEMANTIC_CACHE_SERVICE_CLIENT = Symbol('SEMANTIC_CACHE_SERVICE_CLIENT');
 
@@ -26,6 +28,7 @@ export class SemanticCacheProxyService {
     private readonly authProxyService: AuthProxyService,
     @Inject(SEMANTIC_CACHE_SERVICE_CLIENT) private readonly semanticCacheClient: ClientProxy,
     @Optional() private readonly authContext?: AuthenticationContext,
+    @Optional() private readonly metricsService?: MetricsService,
   ) {}
 
   async forwardSemanticCacheRequest<TBody = undefined>(
@@ -55,6 +58,15 @@ export class SemanticCacheProxyService {
 
     try {
       const result = await firstValueFrom(this.semanticCacheClient.send<unknown>(pattern, payload));
+      if (this.metricsService) {
+        if (pattern === SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES) {
+          this.metricsService.recordKbInvalidation('sources');
+        } else if (pattern === SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_CATEGORY) {
+          this.metricsService.recordKbInvalidation('category');
+        } else if (pattern === SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL) {
+          this.metricsService.recordKbInvalidation('all');
+        }
+      }
       res.status(options?.statusCode ?? HttpStatus.OK).json(result);
     } catch (error) {
       throw this.mapRpcError(error, pattern);

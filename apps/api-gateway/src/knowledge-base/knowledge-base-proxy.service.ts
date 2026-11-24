@@ -12,9 +12,11 @@ import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
 import { extractRpcErrorPayload } from '@semcache/shared-config';
 import type { KnowledgeBaseTcpRequestDto } from '@semcache/shared-dtos';
+import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { AuthProxyService } from '../auth/auth-proxy.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 export const KNOWLEDGE_BASE_SERVICE_CLIENT = Symbol('KNOWLEDGE_BASE_SERVICE_CLIENT');
 
@@ -26,6 +28,7 @@ export class KnowledgeBaseProxyService {
     private readonly authProxyService: AuthProxyService,
     @Inject(KNOWLEDGE_BASE_SERVICE_CLIENT) private readonly kbClient: ClientProxy,
     @Optional() private readonly authContext?: AuthenticationContext,
+    @Optional() private readonly metricsService?: MetricsService,
   ) {}
 
   async forwardKnowledgeBaseRequest<TBody = undefined>(
@@ -59,6 +62,14 @@ export class KnowledgeBaseProxyService {
       result = await firstValueFrom(this.kbClient.send<unknown>(pattern, payload));
     } catch (error) {
       throw this.mapRpcError(error, pattern);
+    }
+
+    if (
+      this.metricsService &&
+      (pattern === SERVICE_TCP_PATTERNS.KB_DOCUMENTS_REPROCESS ||
+        pattern === SERVICE_TCP_PATTERNS.KB_DOCUMENTS_DELETE)
+    ) {
+      this.metricsService.recordKbInvalidation('sources');
     }
 
     res.status(options?.statusCode ?? HttpStatus.OK).json(result);

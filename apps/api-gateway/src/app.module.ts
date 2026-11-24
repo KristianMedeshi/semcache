@@ -11,6 +11,7 @@ import { StripInternalHeadersMiddleware } from './auth/strip-internal-headers.mi
 import { gatewayEnvSchema } from './config/gateway.env';
 import { GatewayDialogsModule } from './dialogs/gateway-dialogs.module';
 import { GatewayKnowledgeBaseModule } from './knowledge-base/gateway-knowledge-base.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { GatewaySemanticCacheModule } from './semantic-cache/gateway-semantic-cache.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { GatewaySemanticCacheModule } from './semantic-cache/gateway-semantic-ca
     SharedConfigModule.forRoot(gatewayEnvSchema),
     AuthenticationModule.forRoot({}),
     AuthorizationModule.forRoot(),
+    MetricsModule,
     GatewayAuthModule,
     GatewayDialogsModule,
     GatewayKnowledgeBaseModule,

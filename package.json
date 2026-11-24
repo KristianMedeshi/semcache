@@ -15,7 +15,11 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,yaml,yml}\"",
     "db:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d postgres",
     "db:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
-    "db:logs": "docker compose -f infrastructure/docker/docker-compose.yml logs -f postgres"
+    "db:logs": "docker compose -f infrastructure/docker/docker-compose.yml logs -f postgres",
+    "monitoring:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d prometheus grafana",
+    "monitoring:down": "docker compose -f infrastructure/docker/docker-compose.yml stop prometheus grafana",
+    "infra:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infrastructure/docker/docker-compose.yml down"
   },
   "engines": {
     "node": ">=20.0.0",
