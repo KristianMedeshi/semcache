@@ -12,6 +12,7 @@ import {
   createValidatedConfigService,
   defaultString,
   durationEnvSchema,
+  isTestSecurityBypassEnabled,
   optionalString,
   positiveInt,
   resolveEnvFilePaths,
@@ -128,6 +129,26 @@ describe('SharedConfigModule & Environment Validation', () => {
       expect(resolveEnvFilePaths(appDir)).toEqual([localEnvPath, sharedEnvPath]);
     } finally {
       rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('enables test security bypass strictly when NODE_ENV=test', () => {
+    expect(isTestSecurityBypassEnabled('production', true)).toBe(false);
+    expect(isTestSecurityBypassEnabled('development', true)).toBe(false);
+    expect(isTestSecurityBypassEnabled('test', true)).toBe(true);
+    expect(isTestSecurityBypassEnabled('test', false)).toBe(false);
+
+    // Inside Jest (`JEST_WORKER_ID` is defined), unset flag keeps security checks active
+    expect(isTestSecurityBypassEnabled('test', undefined)).toBe(false);
+
+    const prevWorkerId = process.env.JEST_WORKER_ID;
+    delete process.env.JEST_WORKER_ID;
+    try {
+      expect(isTestSecurityBypassEnabled('test', undefined)).toBe(true);
+    } finally {
+      if (prevWorkerId !== undefined) {
+        process.env.JEST_WORKER_ID = prevWorkerId;
+      }
     }
   });
 });

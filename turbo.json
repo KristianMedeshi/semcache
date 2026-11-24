@@ -1,6 +1,18 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "concurrency": "20",
+  "globalPassThroughEnv": [
+    "NODE_ENV",
+    "TEST_BYPASS_SECURITY",
+    "LLM_PROVIDER",
+    "LM_STUDIO_BASE_URL",
+    "LM_STUDIO_API_KEY",
+    "LM_STUDIO_DEFAULT_MODEL",
+    "LM_STUDIO_ALLOWED_MODELS",
+    "TRANSFORMERS_CHAT_MODEL",
+    "TRANSFORMERS_CHAT_DTYPE",
+    "TRANSFORMERS_CHAT_MAX_NEW_TOKENS"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

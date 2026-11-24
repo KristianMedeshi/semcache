@@ -55,6 +55,44 @@ export const emptyToUndefined = (val: unknown): unknown =>
 
 export const optionalString = () => z.preprocess(emptyToUndefined, z.string().trim().optional());
 
+export const optionalBooleanEnvSchema = () =>
+  z.preprocess((val) => {
+    if (typeof val === 'boolean') {
+      return val;
+    }
+    if (typeof val === 'string') {
+      const normalized = val.trim().toLowerCase();
+      if (normalized === '') {
+        return undefined;
+      }
+      if (normalized === 'true') {
+        return true;
+      }
+      if (normalized === 'false') {
+        return false;
+      }
+    }
+    return val;
+  }, z.boolean().optional());
+
+/**
+ * Returns true only when `NODE_ENV === 'test'` and security bypass is enabled.
+ * Outside Jest (`JEST_WORKER_ID` unset), `NODE_ENV=test` enables the bypass automatically
+ * unless `TEST_BYPASS_SECURITY=false`; inside Jest it requires `TEST_BYPASS_SECURITY=true`.
+ */
+export function isTestSecurityBypassEnabled(
+  nodeEnv: NodeEnvironment,
+  explicitFlag?: boolean,
+): boolean {
+  if (nodeEnv !== 'test') {
+    return false;
+  }
+  if (explicitFlag !== undefined) {
+    return explicitFlag;
+  }
+  return process.env.JEST_WORKER_ID === undefined;
+}
+
 export const defaultString = (fallback: string) =>
   z.preprocess(emptyToUndefined, z.string().trim().default(fallback));
 
@@ -148,6 +186,7 @@ export const baseEnvSchema = z.object({
   NODE_ENV: nodeEnvSchema,
   HOST: defaultString(DEFAULT_SERVICE_HOST),
   PORT: positiveInt('PORT').optional(),
+  TEST_BYPASS_SECURITY: optionalBooleanEnvSchema(),
 });
 
 export const databaseOnlyEnvSchema = z.object({

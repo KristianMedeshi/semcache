@@ -3,7 +3,12 @@ import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
 import { ThrottlerGuard, ThrottlerModule, minutes, normalizeIp } from '@nestjs/throttler';
-import { ConfigService, SharedConfigModule, durationToMs } from '@semcache/shared-config';
+import {
+  ConfigService,
+  SharedConfigModule,
+  durationToMs,
+  isTestSecurityBypassEnabled,
+} from '@semcache/shared-config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import './auth/auth-types';
@@ -42,30 +47,40 @@ class RpcThrottlerGuard extends ThrottlerGuard {
     DatabaseModule,
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<AuthEnv, true>) => [
-        {
-          name: 'default',
-          ttl: minutes(1),
-          limit: 100,
-        },
-        {
-          name: 'account',
-          ttl: config.getOrThrow('LOGIN_RATE_LIMIT_WINDOW_MS'),
-          limit: config.getOrThrow('LOGIN_RATE_LIMIT_MAX_ATTEMPTS'),
-          skipIf: (context) => {
-            const req =
-              context.getType() === 'rpc'
-                ? context.switchToRpc().getData<{ body?: { email?: unknown }; email?: unknown }>()
-                : context.switchToHttp().getRequest<{ body?: { email?: unknown } }>();
-            return !accountEmail(req);
+      useFactory: (config: ConfigService<AuthEnv, true>) => {
+        const skipInTest = isTestSecurityBypassEnabled(
+          config.getOrThrow('NODE_ENV'),
+          config.get('TEST_BYPASS_SECURITY'),
+        );
+        return [
+          {
+            name: 'default',
+            ttl: minutes(1),
+            limit: 100,
+            skipIf: () => skipInTest,
           },
-          getTracker: (req: Record<string, unknown>) => {
-            const ip =
-              typeof req.ip === 'string' && req.ip.length > 0 ? normalizeIp(req.ip) : '127.0.0.1';
-            return `${accountEmail(req as { body?: { email?: unknown }; email?: unknown })}|${ip}`;
+          {
+            name: 'account',
+            ttl: config.getOrThrow('LOGIN_RATE_LIMIT_WINDOW_MS'),
+            limit: config.getOrThrow('LOGIN_RATE_LIMIT_MAX_ATTEMPTS'),
+            skipIf: (context) => {
+              if (skipInTest) {
+                return true;
+              }
+              const req =
+                context.getType() === 'rpc'
+                  ? context.switchToRpc().getData<{ body?: { email?: unknown }; email?: unknown }>()
+                  : context.switchToHttp().getRequest<{ body?: { email?: unknown } }>();
+              return !accountEmail(req);
+            },
+            getTracker: (req: Record<string, unknown>) => {
+              const ip =
+                typeof req.ip === 'string' && req.ip.length > 0 ? normalizeIp(req.ip) : '127.0.0.1';
+              return `${accountEmail(req as { body?: { email?: unknown }; email?: unknown })}|${ip}`;
+            },
           },
-        },
-      ],
+        ];
+      },
     }),
     AuthenticationModule.forRootAsync({
       inject: [ConfigService],
