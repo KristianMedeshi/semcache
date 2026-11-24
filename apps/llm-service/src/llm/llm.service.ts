@@ -32,15 +32,8 @@ import {
   DEFAULT_LOCAL_EMBEDDING_MODEL,
   computeTransformersEmbeddings,
   estimateTokenCount,
-  isLocalTransformersEmbeddingModel,
-  normalizeEmbeddingVector,
   resolveLocalEmbeddingModelId,
 } from './deterministic-embedding.util';
-import {
-  DEFAULT_TRANSFORMERS_CHAT_DTYPE,
-  DEFAULT_TRANSFORMERS_CHAT_MODEL,
-  generateTransformersChatCompletion,
-} from './transformers-chat.util';
 
 export const OPENROUTER_PROVIDER = Symbol('OPENROUTER_PROVIDER');
 export const LM_STUDIO_PROVIDER = Symbol('LM_STUDIO_PROVIDER');
@@ -68,18 +61,6 @@ export class LlmService {
   async generateChatCompletion(
     dto: LlmChatCompletionRequestDto,
   ): Promise<LlmChatCompletionResponseDto> {
-    const transformersModel = this.resolveTransformersChatModel(dto.model);
-    if (transformersModel) {
-      this.assertHasNonSystemMessage(dto);
-      return generateTransformersChatCompletion({
-        modelId: transformersModel,
-        dtype: this.config.get('TRANSFORMERS_CHAT_DTYPE') ?? DEFAULT_TRANSFORMERS_CHAT_DTYPE,
-        messages: dto.messages,
-        maxNewTokens: dto.maxTokens ?? this.config.get('TRANSFORMERS_CHAT_MAX_NEW_TOKENS') ?? 256,
-        temperature: dto.temperature,
-      });
-    }
-
     const { targetModel, callOptions } = this.prepareChatCall(dto);
     const startedAt = performance.now();
 
@@ -97,26 +78,6 @@ export class LlmService {
       let abortStream: (() => void) | undefined;
 
       const run = async () => {
-        const transformersModel = this.resolveTransformersChatModel(dto.model);
-        if (transformersModel) {
-          this.assertHasNonSystemMessage(dto);
-          const completion = await generateTransformersChatCompletion({
-            modelId: transformersModel,
-            dtype: this.config.get('TRANSFORMERS_CHAT_DTYPE') ?? DEFAULT_TRANSFORMERS_CHAT_DTYPE,
-            messages: dto.messages,
-            maxNewTokens:
-              dto.maxTokens ?? this.config.get('TRANSFORMERS_CHAT_MAX_NEW_TOKENS') ?? 256,
-            temperature: dto.temperature,
-          });
-          if (aborted) return;
-          if (completion.content.length > 0) {
-            subscriber.next({ type: 'delta', delta: completion.content });
-          }
-          subscriber.next({ type: 'done', completion });
-          subscriber.complete();
-          return;
-        }
-
         const { targetModel, callOptions } = this.prepareChatCall(dto);
         const startedAt = performance.now();
         const stream = this.aiService.streamText(callOptions);
@@ -180,52 +141,20 @@ export class LlmService {
     const startedAt = performance.now();
     const targetDimensions = KNOWLEDGE_BASE_VALIDATION_LIMITS.EMBEDDING_DIMENSIONS;
 
-    const openRouterApiKey = this.config.get('OPENROUTER_API_KEY') ?? '';
-    const hasApiKey = openRouterApiKey.length > 0 && openRouterApiKey !== PLACEHOLDER_API_KEY;
-    const useLocalModel =
-      isLocalTransformersEmbeddingModel(requestedModel) ||
-      this.config.getOrThrow('NODE_ENV') === 'test' ||
-      !hasApiKey;
-
-    if (useLocalModel) {
-      const resolvedLocalModel = resolveLocalEmbeddingModelId(requestedModel);
-      const embeddings = await computeTransformersEmbeddings(
-        dto.texts,
-        targetDimensions,
-        resolvedLocalModel,
-      );
-      const totalTokens = dto.texts.reduce((sum, text) => sum + estimateTokenCount(text), 0);
-      return {
-        embeddings,
-        model: resolvedLocalModel,
-        dimensions: targetDimensions,
-        latencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
-        usage: { totalTokens },
-      };
-    }
-
-    try {
-      const result = await this.aiService.embedMany({
-        model: this.openRouterProvider.embeddingModel(requestedModel),
-        values: dto.texts,
-      });
-      const embeddings = result.embeddings.map((embedding) =>
-        normalizeEmbeddingVector(embedding, targetDimensions),
-      );
-      return {
-        embeddings,
-        model: requestedModel,
-        dimensions: targetDimensions,
-        latencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
-        usage: {
-          totalTokens:
-            result.usage.tokens ??
-            dto.texts.reduce((sum, text) => sum + estimateTokenCount(text), 0),
-        },
-      };
-    } catch (error) {
-      throw this.toProviderException(error, requestedModel);
-    }
+    const resolvedLocalModel = resolveLocalEmbeddingModelId(requestedModel);
+    const embeddings = await computeTransformersEmbeddings(
+      dto.texts,
+      targetDimensions,
+      resolvedLocalModel,
+    );
+    const totalTokens = dto.texts.reduce((sum, text) => sum + estimateTokenCount(text), 0);
+    return {
+      embeddings,
+      model: resolvedLocalModel,
+      dimensions: targetDimensions,
+      latencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+      usage: { totalTokens },
+    };
   }
 
   private prepareChatCall(dto: LlmChatCompletionRequestDto): PreparedChatCall {
@@ -302,26 +231,6 @@ export class LlmService {
     };
 
     return { targetModel, callOptions };
-  }
-
-  private resolveTransformersChatModel(requestedModel?: string): string | null {
-    const trimmed = requestedModel?.trim();
-    if (trimmed && (trimmed.startsWith('onnx-community/') || trimmed.startsWith('Xenova/'))) {
-      return trimmed;
-    }
-    if (this.config.get('LLM_PROVIDER') === 'transformers') {
-      return (
-        trimmed || this.config.get('TRANSFORMERS_CHAT_MODEL') || DEFAULT_TRANSFORMERS_CHAT_MODEL
-      );
-    }
-    return null;
-  }
-
-  private assertHasNonSystemMessage(dto: LlmChatCompletionRequestDto): void {
-    const hasNonSystem = dto.messages.some((message) => message.role !== ChatMessageRole.SYSTEM);
-    if (!hasNonSystem) {
-      throw new BadRequestException('At least one non-system message is required');
-    }
   }
 
   private buildCompletionResponse(

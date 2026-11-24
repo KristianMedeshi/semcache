@@ -338,13 +338,13 @@ export const FREE_OPENROUTER_MODEL_MESSAGE =
  * plus explicit local/LM Studio models (`support-llm`, `qwen/qwen3-1.7b`, `local/*`, `*:local`).
  */
 export const ALLOWED_LLM_MODEL_REGEX =
-  /^(openrouter\/free|[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+:free|support-llm|qwen\/qwen3-1\.7b|local\/[a-zA-Z0-9._/-]+|[a-zA-Z0-9._/-]+:local|onnx-community\/[a-zA-Z0-9._/-]+|Xenova\/[a-zA-Z0-9._/-]+)$/;
+  /^(openrouter\/free|[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+:free|support-llm|qwen\/qwen3-1\.7b|local\/[a-zA-Z0-9._/-]+|[a-zA-Z0-9._/-]+:local)$/;
 
 /**
  * Validation message returned when an unsupported model identifier is requested.
  */
 export const ALLOWED_LLM_MODEL_MESSAGE =
-  'Only free OpenRouter models (openrouter/free or <provider>/<model>:free) or permitted local models (support-llm, qwen/qwen3-1.7b, onnx-community/*, Xenova/*, local/*, *:local) are allowed';
+  'Only free OpenRouter models (openrouter/free or <provider>/<model>:free) or permitted local models (support-llm, qwen/qwen3-1.7b, local/*, *:local) are allowed';
 
 /**
  * Single message passed to `llm-service` for chat completion.

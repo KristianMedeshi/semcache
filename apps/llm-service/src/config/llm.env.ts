@@ -63,7 +63,7 @@ export const llmEnvSchema = baseEnvSchema
     LLM_SERVICE_PORT: positiveInt('LLM_SERVICE_PORT').optional(),
     LLM_PROVIDER: z.preprocess(
       emptyToUndefined,
-      z.enum(['openrouter', 'lmstudio', 'transformers']).default('openrouter'),
+      z.enum(['openrouter', 'lmstudio']).default('openrouter'),
     ),
     LM_STUDIO_BASE_URL: defaultString('').transform((val) => val.replace(/\/+$/, '')),
     LM_STUDIO_API_KEY: defaultString('lm-studio'),
@@ -74,9 +74,6 @@ export const llmEnvSchema = baseEnvSchema
         .map((s) => s.trim())
         .filter(Boolean),
     ),
-    TRANSFORMERS_CHAT_MODEL: defaultString('onnx-community/Qwen2.5-0.5B-Instruct'),
-    TRANSFORMERS_CHAT_DTYPE: defaultString('q4'),
-    TRANSFORMERS_CHAT_MAX_NEW_TOKENS: positiveInt('TRANSFORMERS_CHAT_MAX_NEW_TOKENS').default(256),
     OPENROUTER_API_KEY: defaultString(''),
     OPENROUTER_BASE_URL: defaultString(DEFAULT_OPENROUTER_BASE_URL).transform((val) =>
       val.replace(/\/+$/, ''),

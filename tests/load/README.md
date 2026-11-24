@@ -51,13 +51,9 @@ Total repeats/paraphrases: 66.6%; new/edge/trap: 33.4%. 1,000 `uk` + 1,000 `en`;
 
 3. **Start backend microservices in test + local LLM mode:**
 
-   Setting `NODE_ENV=test` (outside Jest) relaxes CSRF, cookie sessions, auth guards, and rate limits strictly for automated load testing, while `LLM_PROVIDER=lmstudio` routes LLM requests to LM Studio without requiring `OPENROUTER_API_KEY`:
+   Setting `NODE_ENV=test` (outside Jest) relaxes CSRF, cookie sessions, auth guards, and rate limits strictly for automated load testing, while `LLM_PROVIDER=lmstudio` routes chat completions to LM Studio (embeddings always use `@huggingface/transformers` locally):
 
    ```bash
-   # Option A: In-process @huggingface/transformers chat + embeddings (no external LLM server needed)
-   NODE_ENV=test LLM_PROVIDER=transformers pnpm dev
-
-   # Option B: Local LM Studio server
    NODE_ENV=test LLM_PROVIDER=lmstudio LM_STUDIO_BASE_URL=http://localhost:1234/v1 pnpm dev
    ```
 
