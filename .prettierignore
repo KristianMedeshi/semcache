@@ -8,3 +8,4 @@ report/
 pnpm-lock.yaml
 *.min.js
 *.min.css
+datasets/labeled/

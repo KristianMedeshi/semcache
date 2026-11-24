@@ -1,0 +1,534 @@
+{
+  "metadata": {
+    "schema_version": 1,
+    "generator": "tests/load/generate-dataset.ts",
+    "seed": 42,
+    "dataset_file": "dataset_2000.jsonl",
+    "total_dataset_records": 2000,
+    "total_kb_sources": 21,
+    "total_invalidation_scenarios": 5
+  },
+  "kb_sources": [
+    {
+      "kb_source_id": "kb-billing-autopay-01",
+      "title": "Autopay setup and card management",
+      "category": "billing",
+      "version": "v1",
+      "summary": "How to enable autopay, change the card, and the autopay discount.",
+      "content_en": "Autopay is enabled in the app under Payments > Autopay. Customers with autopay receive a 3% monthly discount on the plan fee. The card can be replaced in the same menu.",
+      "content_uk": "Автоплатіж вмикається в застосунку: Платежі > Автоплатіж. Клієнти з автоплатежем отримують знижку 3% на абонплату щомісяця. Картку можна замінити в тому самому меню."
+    },
+    {
+      "kb_source_id": "kb-billing-disputes-01",
+      "title": "Billing disputes, double charges and refunds",
+      "category": "billing",
+      "version": "v1",
+      "summary": "How to dispute an unknown or duplicate charge and get a refund.",
+      "content_en": "Duplicate or unrecognized charges can be disputed in the app (Payments > Dispute) within 60 days. Confirmed duplicate charges are refunded to the original card within 5 business days.",
+      "content_uk": "Дубльовані або невідомі списання можна оскаржити в застосунку (Платежі > Оскарження) протягом 60 днів. Підтверджені подвійні списання повертаються на ту ж картку протягом 5 робочих днів."
+    },
+    {
+      "kb_source_id": "kb-billing-statements-01",
+      "title": "Invoices, itemized bills and due dates",
+      "category": "billing",
+      "version": "v1",
+      "summary": "Where to find invoices and when payment is due.",
+      "content_en": "Invoices and itemized call lists are available as PDF in the personal account for the last 12 months. Postpaid invoices are due on the 20th day of the month.",
+      "content_uk": "Рахунки та деталізація дзвінків доступні у PDF в особистому кабінеті за останні 12 місяців. Постоплатні рахунки потрібно сплатити до 20 числа місяця."
+    },
+    {
+      "kb_source_id": "kb-roaming-eu-01",
+      "title": "EU/EEA roaming and call rates",
+      "category": "roaming",
+      "version": "v1",
+      "summary": "Roaming conditions in the EU/EEA and call prices abroad.",
+      "content_en": "Within the EU/EEA the plan can be used like at home with a fair-use limit of 15 GB of roaming data per month; calls are charged as domestic. Outside the EU/EEA, standard roaming rates apply.",
+      "content_uk": "У країнах ЄС/ЄЕЗ тариф працює як вдома з лімітом чесного використання 15 ГБ роумінгового інтернету на місяць; дзвінки тарифікуються як у межах країни. Поза ЄС/ЄЕЗ діють стандартні роумінгові тарифи."
+    },
+    {
+      "kb_source_id": "kb-roaming-charges-01",
+      "title": "Non-EU roaming, spending caps and coverage issues",
+      "category": "roaming",
+      "version": "v1",
+      "summary": "Roaming outside the EU, cost control and connection troubleshooting.",
+      "content_en": "Outside the EU/EEA data costs 5 EUR per 1 GB. A spending cap can be set in the app (Roaming > Limit). If no network is found after landing, enable automatic network selection and restart the phone.",
+      "content_uk": "Поза ЄС/ЄЕЗ інтернет коштує 5 EUR за 1 ГБ. Ліміт витрат встановлюється в застосунку (Роумінг > Ліміт). Якщо після прильоту мережі немає, увімкніть автоматичний вибір мережі та перезавантажте телефон."
+    },
+    {
+      "kb_source_id": "kb-roaming-packs-01",
+      "title": "Roaming data packs",
+      "category": "roaming",
+      "version": "v1",
+      "summary": "Buying, activating and tracking travel data packs.",
+      "content_en": "Travel packs of 7 or 30 days are activated in the app (Roaming > Packs) or via USSD *111#. Remaining roaming traffic is shown in the same section.",
+      "content_uk": "Travel-пакети на 7 або 30 днів активуються в застосунку (Роумінг > Пакети) або через USSD *111#. Залишок роумінгового трафіку показано в тому ж розділі."
+    },
+    {
+      "kb_source_id": "kb-tariff-catalog-01",
+      "title": "Plan catalog, prices and fair use",
+      "category": "tariff_plan",
+      "version": "v1",
+      "summary": "Current plans, monthly fees and the unlimited fair-use policy.",
+      "content_en": "Start 15GB costs 250 UAH per month; Unlimited 5G costs 650 UAH per month. On Unlimited 5G speed is reduced to 3 Mbps after 500 GB per month; hotspot is limited to 100 GB.",
+      "content_uk": "Start 15GB коштує 250 грн на місяць; Unlimited 5G коштує 650 грн на місяць. На Unlimited 5G швидкість знижується до 3 Мбіт/с після 500 ГБ на місяць; роздача (хотспот) обмежена 100 ГБ."
+    },
+    {
+      "kb_source_id": "kb-tariff-switch-01",
+      "title": "Changing plans",
+      "category": "tariff_plan",
+      "version": "v1",
+      "summary": "How and when a plan change takes effect and what it costs.",
+      "content_en": "Plan change is processed in 15 minutes and costs 0 UAH once per 30 days; the new plan applies immediately. Upgrades and downgrades use the same flow in the app.",
+      "content_uk": "Зміна тарифу виконується за 15 хвилин і коштує 0 грн один раз на 30 днів; новий тариф діє одразу. Підвищення та зниження тарифу виконуються в застосунку однаково."
+    },
+    {
+      "kb_source_id": "kb-tariff-bundles-01",
+      "title": "Extra data bundles and family plans",
+      "category": "tariff_plan",
+      "version": "v1",
+      "summary": "Extra gigabytes and family plan sharing rules.",
+      "content_en": "Extra data bundles of 1 GB (25 UAH) and 10 GB (150 UAH) can be added anytime. A family plan shares one data pool between up to 5 numbers of the same household.",
+      "content_uk": "Додаткові пакети інтернету 1 ГБ (25 грн) і 10 ГБ (150 грн) можна підключити будь-коли. Сімейний тариф ділить один пакет інтернету між п’ятьма номерами однієї домогосподарки."
+    },
+    {
+      "kb_source_id": "kb-sim-replacement-01",
+      "title": "SIM replacement and activation",
+      "category": "sim_esim",
+      "version": "v1",
+      "summary": "Replacing a damaged SIM, activating a new SIM and its price.",
+      "content_en": "A replacement SIM with the same number costs 100 UAH and is issued at a store with a passport or Diia ID, or delivered by courier within 3 business days. New SIM cards are activated after registration with a passport.",
+      "content_uk": "Заміна SIM із збереженням номера коштує 100 грн і виконується в магазині за паспортом або Дія.ID чи кур’єром протягом 3 робочих днів. Нові SIM-картки активуються після реєстрації за паспортом."
+    },
+    {
+      "kb_source_id": "kb-esim-activation-01",
+      "title": "eSIM activation and transfer",
+      "category": "sim_esim",
+      "version": "v1",
+      "summary": "Installing an eSIM profile and moving it between devices.",
+      "content_en": "An eSIM is installed by scanning the QR code from the app on a compatible phone. To move an eSIM to another device, request a new QR code in the app; the old profile is deactivated.",
+      "content_uk": "eSIM встановлюється скануванням QR-коду із застосунку на сумісному телефоні. Щоб перенести eSIM на інший пристрій, запросіть новий QR-код у застосунку; старий профіль деактивується."
+    },
+    {
+      "kb_source_id": "kb-sim-security-01",
+      "title": "SIM blocking, PIN and PUK",
+      "category": "sim_esim",
+      "version": "v1",
+      "summary": "Blocking a lost SIM and unlocking with PUK.",
+      "content_en": "A lost SIM can be blocked 24/7 via the app or the hotline; the number is kept for 6 months. The PUK code is printed on the SIM carrier card and is available in the personal account.",
+      "content_uk": "Загублену SIM можна заблокувати цілодобово через застосунок або гарячу лінію; номер зберігається 6 місяців. PUK-код надруковано на картці SIM і доступний в особистому кабінеті."
+    },
+    {
+      "kb_source_id": "kb-tech-apn-01",
+      "title": "Mobile data, APN and SMS settings",
+      "category": "technical_support",
+      "version": "v1",
+      "summary": "APN parameters and SMS troubleshooting.",
+      "content_en": "Internet APN: internet.telco.example, no username or password. MMS APN: mms.telco.example. If SMS are not received, check the SMS center number +380000000000 and free phone memory.",
+      "content_uk": "APN для інтернету: internet.telco.example, без логіна та пароля. APN для MMS: mms.telco.example. Якщо SMS не надходять, перевірте номер SMS-центру +380000000000 і вільну пам’ять телефону."
+    },
+    {
+      "kb_source_id": "kb-tech-router-01",
+      "title": "Home router configuration",
+      "category": "technical_support",
+      "version": "v1",
+      "summary": "Reset, Wi-Fi password, PPPoE and bridge mode.",
+      "content_en": "Hold the reset button for 10 seconds to restore factory settings. Wi-Fi name and password are changed at 192.168.1.1 > Wireless. Fiber routers use PPPoE credentials from the contract.",
+      "content_uk": "Утримуйте кнопку reset 10 секунд для скидання до заводських налаштувань. Назву та пароль Wi-Fi змінюють на 192.168.1.1 > Wireless. Оптичні роутери використовують PPPoE-дані з договору."
+    },
+    {
+      "kb_source_id": "kb-tech-quality-01",
+      "title": "Network quality, speed and voice",
+      "category": "technical_support",
+      "version": "v1",
+      "summary": "Troubleshooting slow data, dropped calls and VoLTE.",
+      "content_en": "For slow data, switch airplane mode on and off and select 5G/4G automatic mode. VoLTE and Wi-Fi calling are enabled in phone settings under Mobile network > VoLTE.",
+      "content_uk": "За повільного інтернету увімкніть і вимкніть режим польоту та оберіть автоматичний режим 5G/4G. VoLTE і Wi-Fi calling вмикаються в налаштуваннях телефону: Мобільна мережа > VoLTE."
+    },
+    {
+      "kb_source_id": "kb-outage-status-01",
+      "title": "Outage status and restoration times",
+      "category": "outage_incident",
+      "version": "v1",
+      "summary": "Where to check outages and typical restoration times.",
+      "content_en": "Current incidents are listed on the status page and in the app. Typical restoration time is 4 to 24 hours depending on cause; planned maintenance is announced 48 hours in advance.",
+      "content_uk": "Поточні інциденти відображаються на сторінці статусу та в застосунку. Типовий час відновлення — від 4 до 24 годин залежно від причини; планові роботи анонсуються за 48 годин."
+    },
+    {
+      "kb_source_id": "kb-outage-compensation-01",
+      "title": "Outage compensation and notifications",
+      "category": "outage_incident",
+      "version": "v1",
+      "summary": "When compensation is due and how to subscribe to alerts.",
+      "content_en": "Compensation is provided for outages longer than 24 hours as a proportional fee recalculation. Outage alerts can be enabled in the app under Notifications.",
+      "content_uk": "Компенсація надається за збої довші за 24 години у вигляді пропорційного перерахунку абонплати. Сповіщення про збої вмикаються в застосунку: Сповіщення."
+    },
+    {
+      "kb_source_id": "kb-outage-reporting-01",
+      "title": "Reporting incidents and ticket tracking",
+      "category": "outage_incident",
+      "version": "v1",
+      "summary": "How to open and track outage tickets.",
+      "content_en": "Outages are reported in the app (Help > Report a problem) or by hotline 0 800 000 000. Ticket status is visible in Help > My requests; unresolved tickets are escalated after 72 hours.",
+      "content_uk": "Про збої повідомляють у застосунку (Допомога > Повідомити про проблему) або за гарячою лінією 0 800 000 000. Статус заявки видно в розділі Допомога > Мої звернення; невирішені заявки ескалюються через 72 години."
+    },
+    {
+      "kb_source_id": "kb-contract-cancel-01",
+      "title": "Contract cancellation procedure",
+      "category": "contract_termination",
+      "version": "v1",
+      "summary": "Notice period, documents and channels for cancelling a contract.",
+      "content_en": "To cancel a contract, submit a written notice 30 days in advance via the app, a store, or registered mail; outstanding balances must be settled. A passport is required for in-store cancellation.",
+      "content_uk": "Щоб розірвати контракт, подайте письмове повідомлення за 30 днів через застосунок, магазин або рекомендований лист; заборгованість потрібно погасити. Для розірвання в магазині потрібен паспорт."
+    },
+    {
+      "kb_source_id": "kb-contract-portout-01",
+      "title": "Number portability and early termination fees",
+      "category": "contract_termination",
+      "version": "v1",
+      "summary": "Porting a number to another operator and early termination charges.",
+      "content_en": "Number porting takes up to 3 business days and requires no outstanding debt. Early termination during the minimum term is charged at 50% of the remaining monthly fees.",
+      "content_uk": "Перенесення номера триває до 3 робочих днів і вимагає відсутності заборгованості. Дострокове розірвання протягом мінімального терміну оплачується у розмірі 50% залишкових абонплат."
+    },
+    {
+      "kb_source_id": "kb-contract-suspension-01",
+      "title": "Number suspension and final billing",
+      "category": "contract_termination",
+      "version": "v1",
+      "summary": "Temporary suspension and how the last invoice is calculated.",
+      "content_en": "A number can be suspended for up to 6 months for 20 UAH per month. The final invoice is prorated by day and unused prepaid balance is refunded within 30 days.",
+      "content_uk": "Номер можна призупинити до 6 місяців за 20 грн на місяць. Останній рахунок розраховується пропорційно дням, а невикористаний передоплачений залишок повертається протягом 30 днів."
+    }
+  ],
+  "invalidation_scenarios": [
+    {
+      "scenario_id": "kbu-roaming-eu-fair-use",
+      "kb_source_id": "kb-roaming-eu-01",
+      "title": "EU roaming fair-use limit reduced",
+      "category": "roaming",
+      "intent_id": "roam_eu_usage",
+      "previous_fact": "EU/EEA roaming fair-use limit is 15 GB per month.",
+      "updated_fact": "EU/EEA roaming fair-use limit is 10 GB per month; extra data costs 3 EUR per GB.",
+      "stale_markers": [
+        "15 GB",
+        "15 ГБ"
+      ],
+      "fresh_markers": [
+        "10 GB",
+        "10 ГБ"
+      ],
+      "update_payload": {
+        "title": "EU/EEA roaming and call rates",
+        "category": "roaming",
+        "version": "v2",
+        "content": "Within the EU/EEA the plan can be used like at home with a fair-use limit of 10 GB of roaming data per month; after that data costs 3 EUR per GB. Calls are charged as domestic. Outside the EU/EEA, standard roaming rates apply.\n\nУ країнах ЄС/ЄЕЗ тариф працює як вдома з лімітом чесного використання 10 ГБ роумінгового інтернету на місяць; після цього інтернет коштує 3 EUR за 1 ГБ. Дзвінки тарифікуються як у межах країни. Поза ЄС/ЄЕЗ діють стандартні роумінгові тарифи.",
+        "summary": "EU/EEA roaming fair-use limit lowered to 10 GB per month.",
+        "invalidateCache": true,
+        "changeReason": "Regulatory/commercial change: EU fair-use roaming data cap lowered."
+      },
+      "verification_queries": [
+        {
+          "record_id": "req-0066",
+          "intent_id": "roam_eu_usage",
+          "language": "en",
+          "query_type": "canonical_seed",
+          "prompt": "Can I use my mobile data in EU countries at no extra charge?"
+        },
+        {
+          "record_id": "req-0086",
+          "intent_id": "roam_eu_usage",
+          "language": "en",
+          "query_type": "paraphrase",
+          "prompt": "hey, what are the conditions for uisng my plan in the EU? I'm a long-time customer. Thanks"
+        },
+        {
+          "record_id": "req-0092",
+          "intent_id": "roam_eu_usage",
+          "language": "uk",
+          "query_type": "canonical_seed",
+          "prompt": "Чи можна користуватись мобільним інтернетом у країнах ЄС без додаткової плати?"
+        },
+        {
+          "record_id": "req-0113",
+          "intent_id": "roam_eu_usage",
+          "language": "uk",
+          "query_type": "paraphrase",
+          "prompt": "Чи можна користуватись мбоільним інтернетом у країнах ЄС без додаткової плати? Чекаю на відповідь"
+        }
+      ],
+      "fact_probe_queries": [
+        {
+          "language": "en",
+          "prompt": "What is the monthly fair-use limit for roaming data in the EU?"
+        },
+        {
+          "language": "uk",
+          "prompt": "Який місячний ліміт роумінгового інтернету в ЄС?"
+        }
+      ]
+    },
+    {
+      "scenario_id": "kbu-tariff-switch-fee",
+      "kb_source_id": "kb-tariff-switch-01",
+      "title": "Plan change becomes paid and delayed",
+      "category": "tariff_plan",
+      "intent_id": "plan_upgrade_bigger",
+      "previous_fact": "Plan change takes 15 minutes, costs 0 UAH and applies immediately.",
+      "updated_fact": "Plan change costs 50 UAH and applies from the next billing day.",
+      "stale_markers": [
+        "15 minutes",
+        "15 хвилин",
+        "0 UAH",
+        "0 грн"
+      ],
+      "fresh_markers": [
+        "50 UAH",
+        "50 грн"
+      ],
+      "update_payload": {
+        "title": "Changing plans",
+        "category": "tariff_plan",
+        "version": "v2",
+        "content": "Plan change costs 50 UAH and is applied from the next billing day. Upgrades and downgrades use the same flow in the app.\n\nЗміна тарифу коштує 50 грн і застосовується з наступного розрахункового дня. Підвищення та зниження тарифу виконуються в застосунку однаково.",
+        "summary": "Plan change now costs 50 UAH and applies from the next billing day.",
+        "invalidateCache": true,
+        "changeReason": "Plan change policy: fee introduced and changes apply from the next billing day."
+      },
+      "verification_queries": [
+        {
+          "record_id": "req-0200",
+          "intent_id": "plan_upgrade_bigger",
+          "language": "en",
+          "query_type": "canonical_seed",
+          "prompt": "How can I upgrade my plan to one with more data?"
+        },
+        {
+          "record_id": "req-0220",
+          "intent_id": "plan_upgrade_bigger",
+          "language": "en",
+          "query_type": "paraphrase",
+          "prompt": "Hello! How do I change my current plan to a higher one? I'm writing from my phone."
+        },
+        {
+          "record_id": "req-0015",
+          "intent_id": "plan_upgrade_bigger",
+          "language": "uk",
+          "query_type": "canonical_seed",
+          "prompt": "Як перейти на тариф з більшим обсягом інтернету?"
+        },
+        {
+          "record_id": "req-0046",
+          "intent_id": "plan_upgrade_bigger",
+          "language": "uk",
+          "query_type": "paraphrase",
+          "prompt": "Хочу змінити тарф на більший, які кроки? Я з Харкова. Дякую!"
+        }
+      ],
+      "fact_probe_queries": [
+        {
+          "language": "en",
+          "prompt": "How much does a plan change cost and when does it apply?"
+        },
+        {
+          "language": "uk",
+          "prompt": "Скільки коштує зміна тарифу і коли вона починає діяти?"
+        }
+      ]
+    },
+    {
+      "scenario_id": "kbu-sim-replacement-price",
+      "kb_source_id": "kb-sim-replacement-01",
+      "title": "SIM replacement price increased",
+      "category": "sim_esim",
+      "intent_id": "sim_replace_physical",
+      "previous_fact": "SIM replacement costs 100 UAH.",
+      "updated_fact": "SIM replacement costs 150 UAH.",
+      "stale_markers": [
+        "100 UAH",
+        "100 грн"
+      ],
+      "fresh_markers": [
+        "150 UAH",
+        "150 грн"
+      ],
+      "update_payload": {
+        "title": "SIM replacement and activation",
+        "category": "sim_esim",
+        "version": "v2",
+        "content": "A replacement SIM with the same number costs 150 UAH and is issued at a store with a passport or Diia ID, or delivered by courier within 3 business days. New SIM cards are activated after registration with a passport.\n\nЗаміна SIM із збереженням номера коштує 150 грн і виконується в магазині за паспортом або Дія.ID чи кур’єром протягом 3 робочих днів. Нові SIM-картки активуються після реєстрації за паспортом.",
+        "summary": "SIM replacement fee is now 150 UAH.",
+        "invalidateCache": true,
+        "changeReason": "Price change: SIM replacement fee raised from 100 to 150 UAH."
+      },
+      "verification_queries": [
+        {
+          "record_id": "req-0188",
+          "intent_id": "sim_replace_physical",
+          "language": "en",
+          "query_type": "canonical_seed",
+          "prompt": "How do I replace my damaged SIM card?"
+        },
+        {
+          "record_id": "req-0208",
+          "intent_id": "sim_replace_physical",
+          "language": "en",
+          "query_type": "paraphrase",
+          "prompt": "Hello! How do I replace my damaed SIM card? Thank you in advance."
+        },
+        {
+          "record_id": "req-0023",
+          "intent_id": "sim_replace_physical",
+          "language": "uk",
+          "query_type": "canonical_seed",
+          "prompt": "Як замінити пошкоджену SIM-картку?"
+        },
+        {
+          "record_id": "req-0044",
+          "intent_id": "sim_replace_physical",
+          "language": "uk",
+          "query_type": "paraphrase",
+          "prompt": "Перепрошую, Скільки котшує нова SIM-картка, якщо залишити номер? Я давній клієнт. Дякую!"
+        }
+      ],
+      "fact_probe_queries": [
+        {
+          "language": "en",
+          "prompt": "How much does a replacement SIM card cost?"
+        },
+        {
+          "language": "uk",
+          "prompt": "Скільки коштує заміна SIM-картки?"
+        }
+      ]
+    },
+    {
+      "scenario_id": "kbu-billing-autopay-discount",
+      "kb_source_id": "kb-billing-autopay-01",
+      "title": "Autopay discount increased",
+      "category": "billing",
+      "intent_id": "bill_autopay_enable",
+      "previous_fact": "Autopay gives a 3% monthly discount.",
+      "updated_fact": "Autopay gives a 5% monthly discount.",
+      "stale_markers": [
+        "3%"
+      ],
+      "fresh_markers": [
+        "5%"
+      ],
+      "update_payload": {
+        "title": "Autopay setup and card management",
+        "category": "billing",
+        "version": "v2",
+        "content": "Autopay is enabled in the app under Payments > Autopay. Customers with autopay receive a 5% monthly discount on the plan fee. The card can be replaced in the same menu.\n\nАвтоплатіж вмикається в застосунку: Платежі > Автоплатіж. Клієнти з автоплатежем отримують знижку 5% на абонплату щомісяця. Картку можна замінити в тому самому меню.",
+        "summary": "Autopay discount raised to 5%.",
+        "invalidateCache": true,
+        "changeReason": "Promotion policy: autopay discount raised from 3% to 5%."
+      },
+      "verification_queries": [
+        {
+          "record_id": "req-0012",
+          "intent_id": "bill_autopay_enable",
+          "language": "en",
+          "query_type": "canonical_seed",
+          "prompt": "How do I turn on autopay for my mobile plan?"
+        },
+        {
+          "record_id": "req-0055",
+          "intent_id": "bill_autopay_enable",
+          "language": "en",
+          "query_type": "paraphrase",
+          "prompt": "How do I turn on autopay for my mboile plan? I'm a long-time customer. Please advise."
+        },
+        {
+          "record_id": "req-0291",
+          "intent_id": "bill_autopay_enable",
+          "language": "uk",
+          "query_type": "canonical_seed",
+          "prompt": "Як підключити автоплатіж за мій тариф?"
+        },
+        {
+          "record_id": "req-0311",
+          "intent_id": "bill_autopay_enable",
+          "language": "uk",
+          "query_type": "paraphrase",
+          "prompt": "Хочу, щоб абонплата списувалась з картки автоматично, як це налаштувати? Пишу з телефону. Це терміново"
+        }
+      ],
+      "fact_probe_queries": [
+        {
+          "language": "en",
+          "prompt": "What discount do I get for enabling autopay?"
+        },
+        {
+          "language": "uk",
+          "prompt": "Яку знижку я отримаю за підключення автоплатежу?"
+        }
+      ]
+    },
+    {
+      "scenario_id": "kbu-contract-notice-period",
+      "kb_source_id": "kb-contract-cancel-01",
+      "title": "Contract cancellation notice period shortened",
+      "category": "contract_termination",
+      "intent_id": "contract_cancel",
+      "previous_fact": "Cancellation requires a 30-day written notice.",
+      "updated_fact": "Cancellation requires a 14-day written notice.",
+      "stale_markers": [
+        "30 days",
+        "30 днів"
+      ],
+      "fresh_markers": [
+        "14 days",
+        "14 днів"
+      ],
+      "update_payload": {
+        "title": "Contract cancellation procedure",
+        "category": "contract_termination",
+        "version": "v2",
+        "content": "To cancel a contract, submit a written notice 14 days in advance via the app, a store, or registered mail; outstanding balances must be settled. A passport is required for in-store cancellation.\n\nЩоб розірвати контракт, подайте письмове повідомлення за 14 днів через застосунок, магазин або рекомендований лист; заборгованість потрібно погасити. Для розірвання в магазині потрібен паспорт.",
+        "summary": "Contract cancellation notice period is now 14 days.",
+        "invalidateCache": true,
+        "changeReason": "Consumer-protection update: notice period reduced from 30 to 14 days."
+      },
+      "verification_queries": [
+        {
+          "record_id": "req-0007",
+          "intent_id": "contract_cancel",
+          "language": "en",
+          "query_type": "canonical_seed",
+          "prompt": "How do I cancel my mobile contract?"
+        },
+        {
+          "record_id": "req-0028",
+          "intent_id": "contract_cancel",
+          "language": "en",
+          "query_type": "paraphrase",
+          "prompt": "Good afternoon, can I close my account and stop paying for the plan? Thank you in advance."
+        },
+        {
+          "record_id": "req-0240",
+          "intent_id": "contract_cancel",
+          "language": "uk",
+          "query_type": "canonical_seed",
+          "prompt": "Як розірвати мій мобільний контракт?"
+        },
+        {
+          "record_id": "req-0262",
+          "intent_id": "contract_cancel",
+          "language": "uk",
+          "query_type": "paraphrase",
+          "prompt": "Є питання: Хочу відмовитися від послуг, яка процедура? Я зі Львова."
+        }
+      ],
+      "fact_probe_queries": [
+        {
+          "language": "en",
+          "prompt": "How many days in advance must I notify you to cancel my contract?"
+        },
+        {
+          "language": "uk",
+          "prompt": "За скільки днів потрібно повідомити про розірвання контракту?"
+        }
+      ]
+    }
+  ]
+}

@@ -153,6 +153,7 @@ Set `OPENROUTER_API_KEY` in `apps/llm-service/.env` (copied from `apps/llm-servi
 - Authentication, CSRF protection, rate limiting, RBAC policies, API Gateway identity headers, and React integration: [docs/authentication-and-authorization.md](./docs/authentication-and-authorization.md)
 - OpenRouter chat integration (`@nestjs/ai`), LangGraph dialog orchestration (`@langchain/langgraph`), and free-model enforcement: [docs/chat-and-llm-architecture.md](./docs/chat-and-llm-architecture.md)
 - Semantic cache (`pgvector`, HNSW, caching regimes, adaptive threshold, operator API, & KB invalidation): [docs/semantic-cache-architecture.md](./docs/semantic-cache-architecture.md)
+- Benchmark dataset (2,000 labeled UK/EN telecom requests, KB invalidation scenarios) and the k6 load test comparing `no-cache` / `fixed` / `adaptive`: [tests/load/README.md](./tests/load/README.md)
 
 ---
 

@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "k6 load-test assets and deterministic dataset generator (not a workspace package)"
+}
