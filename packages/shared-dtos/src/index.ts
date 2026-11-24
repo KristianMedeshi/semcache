@@ -82,11 +82,27 @@ export interface CacheKnowledgeSourceReferenceDto {
  */
 export interface SemanticCacheLookupRequestDto {
   query: string;
-  embedding: number[];
+  embedding?: number[];
   category?: QueryCategory;
   sessionId?: string;
   mode?: CacheMode;
   fixedThresholdOverride?: number;
+}
+
+/**
+ * Compact semantic cache telemetry attached to dialog turn responses.
+ */
+export interface SemanticCacheTurnMetadataDto {
+  status: CacheHitStatus;
+  mode: CacheMode;
+  entryId?: string;
+  matchedQuery?: string;
+  cosineSimilarity: number;
+  adaptiveThreshold: number;
+  localClusterDensity?: number;
+  neighborCount?: number;
+  category: QueryCategory;
+  knowledgeSourceIds?: string[];
 }
 
 /**
@@ -318,6 +334,19 @@ export const FREE_OPENROUTER_MODEL_MESSAGE =
   'Only free OpenRouter models (openrouter/free or <provider>/<model>:free) are allowed';
 
 /**
+ * Regex matching permitted LLM models: zero-cost OpenRouter models (`openrouter/free`, `*:free`)
+ * plus explicit local/LM Studio models (`support-llm`, `qwen/qwen3-1.7b`, `local/*`, `*:local`).
+ */
+export const ALLOWED_LLM_MODEL_REGEX =
+  /^(openrouter\/free|[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+:free|support-llm|qwen\/qwen3-1\.7b|local\/[a-zA-Z0-9._/-]+|[a-zA-Z0-9._/-]+:local|onnx-community\/[a-zA-Z0-9._/-]+|Xenova\/[a-zA-Z0-9._/-]+)$/;
+
+/**
+ * Validation message returned when an unsupported model identifier is requested.
+ */
+export const ALLOWED_LLM_MODEL_MESSAGE =
+  'Only free OpenRouter models (openrouter/free or <provider>/<model>:free) or permitted local models (support-llm, qwen/qwen3-1.7b, onnx-community/*, Xenova/*, local/*, *:local) are allowed';
+
+/**
  * Single message passed to `llm-service` for chat completion.
  */
 export interface LlmChatMessageDto {
@@ -438,6 +467,9 @@ export interface SendMessageRequestDto {
   content: string;
   model?: string;
   parentMessageId?: string | null;
+  category?: QueryCategory;
+  cacheMode?: CacheMode;
+  fixedThresholdOverride?: number;
 }
 
 /**
@@ -455,6 +487,7 @@ export interface SendMessageResponseDto {
   dialog: DialogResponseDto;
   userMessage: DialogMessageResponseDto;
   assistantMessage: DialogMessageResponseDto;
+  cache?: SemanticCacheTurnMetadataDto;
 }
 
 /**
@@ -481,6 +514,7 @@ export interface DialogMessageStreamDoneEventDto {
   dialog: DialogResponseDto;
   userMessage: DialogMessageResponseDto;
   assistantMessage: DialogMessageResponseDto;
+  cache?: SemanticCacheTurnMetadataDto;
 }
 
 /**
@@ -596,6 +630,18 @@ export interface UploadKnowledgeDocumentRequestDto {
   metadata?: Record<string, string | number | boolean>;
   chunkSize?: number;
   chunkOverlap?: number;
+}
+
+/**
+ * DTO contract for reprocessing (and optionally updating) an existing knowledge base document.
+ */
+export interface ReprocessKnowledgeDocumentRequestDto {
+  content?: string;
+  title?: string;
+  metadata?: Record<string, string | number | boolean>;
+  chunkSize?: number;
+  chunkOverlap?: number;
+  includeChunks?: boolean;
 }
 
 /**

@@ -59,11 +59,12 @@ export class SemanticCacheLookupDto implements SemanticCacheLookupRequestDto {
   @MaxLength(SEMANTIC_CACHE_VALIDATION_LIMITS.QUERY_MAX_LENGTH)
   query!: string;
 
+  @ValidateIf((dto: SemanticCacheLookupDto) => dto.mode !== CacheMode.DISABLED)
   @IsArray()
   @ArrayMinSize(SEMANTIC_CACHE_VALIDATION_LIMITS.EMBEDDING_DIMENSIONS)
   @ArrayMaxSize(SEMANTIC_CACHE_VALIDATION_LIMITS.EMBEDDING_DIMENSIONS)
   @IsNumber({ allowNaN: false, allowInfinity: false }, { each: true })
-  embedding!: number[];
+  embedding?: number[];
 
   @ValidateIf(isDefined)
   @IsEnum(QueryCategory)

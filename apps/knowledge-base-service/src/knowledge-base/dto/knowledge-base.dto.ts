@@ -1,6 +1,7 @@
 import {
   KNOWLEDGE_BASE_VALIDATION_LIMITS,
   type ListKnowledgeDocumentsQueryDto,
+  type ReprocessKnowledgeDocumentRequestDto,
   type RetrieveKnowledgeContextRequestDto,
   type UploadKnowledgeDocumentRequestDto,
 } from '@semcache/shared-dtos';
@@ -104,7 +105,24 @@ export class RetrieveKnowledgeContextDto implements RetrieveKnowledgeContextRequ
   category?: QueryCategory;
 }
 
-export class ReprocessKnowledgeDocumentDto {
+export class ReprocessKnowledgeDocumentDto implements ReprocessKnowledgeDocumentRequestDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.CONTENT_MIN_LENGTH)
+  @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.CONTENT_MAX_LENGTH)
+  content?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.TITLE_MAX_LENGTH)
+  title?: string;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, string | number | boolean>;
+
   @IsOptional()
   @IsInt()
   @Min(KNOWLEDGE_BASE_VALIDATION_LIMITS.MIN_CHUNK_SIZE)

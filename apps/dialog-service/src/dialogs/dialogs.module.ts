@@ -9,6 +9,7 @@ import {
   DialogGraphService,
   KNOWLEDGE_BASE_SERVICE_CLIENT,
   LLM_SERVICE_CLIENT,
+  SEMANTIC_CACHE_SERVICE_CLIENT,
 } from './dialog-graph.service';
 import { DialogsController } from './dialogs.controller';
 import { DialogsRepository } from './dialogs.repository';
@@ -53,6 +54,25 @@ import { DialogPolicy } from './policies/dialog.policy';
         });
       },
     },
+    {
+      provide: SEMANTIC_CACHE_SERVICE_CLIENT,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<DialogEnv, true>): ClientProxy => {
+        const { host, port } = resolveServiceTcpEndpoint(
+          config,
+          ServiceName.SEMANTIC_CACHE_SERVICE,
+          {
+            hostKey: 'SEMANTIC_CACHE_SERVICE_HOST',
+            portKey: 'SEMANTIC_CACHE_SERVICE_PORT',
+            urlKey: 'SEMANTIC_CACHE_SERVICE_URL',
+          },
+        );
+        return ClientProxyFactory.create({
+          transport: Transport.TCP,
+          options: { host, port },
+        });
+      },
+    },
     InternalIdentityAuth,
     DialogPolicy,
     DialogsRepository,
@@ -65,9 +85,14 @@ export class DialogsModule implements OnModuleDestroy {
   constructor(
     @Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy,
     @Inject(KNOWLEDGE_BASE_SERVICE_CLIENT) private readonly kbClient: ClientProxy,
+    @Inject(SEMANTIC_CACHE_SERVICE_CLIENT) private readonly semanticCacheClient: ClientProxy,
   ) {}
 
   async onModuleDestroy(): Promise<void> {
-    await Promise.all([this.llmClient.close(), this.kbClient.close()]);
+    await Promise.all([
+      this.llmClient.close(),
+      this.kbClient.close(),
+      this.semanticCacheClient.close(),
+    ]);
   }
 }

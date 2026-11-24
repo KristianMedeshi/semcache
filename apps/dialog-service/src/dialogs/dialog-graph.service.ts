@@ -24,19 +24,37 @@ import type {
   LlmChatCompletionResponseDto,
   LlmChatMessageDto,
   LlmChatStreamEventDto,
+  LlmGenerateEmbeddingsRequestDto,
+  LlmGenerateEmbeddingsResponseDto,
   RetrieveKnowledgeContextRequestDto,
   RetrieveKnowledgeContextResponseDto,
+  SemanticCacheEntryResponseDto,
+  SemanticCacheLookupRequestDto,
+  SemanticCacheLookupResponseDto,
+  SemanticCacheStoreRequestDto,
+  SemanticCacheTcpRequestDto,
+  SemanticCacheTurnMetadataDto,
   SendMessageResponseDto,
 } from '@semcache/shared-dtos';
-import { ChatMessageRole, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
+import {
+  CacheHitStatus,
+  CacheMode,
+  ChatMessageRole,
+  QueryCategory,
+  SERVICE_TCP_PATTERNS,
+} from '@semcache/shared-types';
 import { Observable, type Subscription, firstValueFrom, timeout } from 'rxjs';
 import type { DialogEnv } from '../config/dialog.env';
 import { DEFAULT_DIALOG_TITLE, DialogsRepository } from './dialogs.repository';
 
 export const LLM_SERVICE_CLIENT = Symbol('LLM_SERVICE_CLIENT');
 export const KNOWLEDGE_BASE_SERVICE_CLIENT = Symbol('KNOWLEDGE_BASE_SERVICE_CLIENT');
+export const SEMANTIC_CACHE_SERVICE_CLIENT = Symbol('SEMANTIC_CACHE_SERVICE_CLIENT');
 
 const KB_RETRIEVAL_TIMEOUT_MS = 5_000;
+const CACHE_EMBEDDING_TIMEOUT_MS = 10_000;
+const CACHE_LOOKUP_TIMEOUT_MS = 5_000;
+const CACHE_STORE_TIMEOUT_MS = 5_000;
 
 const CUSTOMER_SUPPORT_SYSTEM_PROMPT = [
   'You are the official Telecom Assistant for SemCache Telecom. Help customers clearly, politely, and accurately with mobile plans and subscriptions, mobile internet and data usage, account balance and bill payments, international roaming, SIM and eSIM activation, network connectivity troubleshooting, and account management.',
@@ -72,6 +90,12 @@ const DialogTurnState = Annotation.Root({
   userContent: Annotation<string>,
   requestedModel: Annotation<string | undefined>,
   parentMessageId: Annotation<string | null | undefined>,
+  queryCategory: Annotation<QueryCategory | undefined>,
+  cacheMode: Annotation<CacheMode | undefined>,
+  fixedThresholdOverride: Annotation<number | undefined>,
+  queryEmbedding: Annotation<number[] | null>,
+  cacheLookup: Annotation<SemanticCacheLookupResponseDto | null>,
+  cacheHit: Annotation<boolean>,
   knowledgeContext: Annotation<RetrieveKnowledgeContextResponseDto | null>,
   history: Annotation<LlmChatMessageDto[]>,
   userMessage: Annotation<DialogMessageResponseDto | null>,
@@ -81,6 +105,100 @@ const DialogTurnState = Annotation.Root({
 });
 
 type DialogTurnStateType = typeof DialogTurnState.State;
+
+const BILLING_KEYWORDS = [
+  'bill',
+  'invoice',
+  'charge',
+  'refund',
+  'autopay',
+  'payment',
+  'due date',
+  'рахунок',
+  'списан',
+  'повернен',
+  'автоплат',
+  'оплат',
+];
+const TECHNICAL_KEYWORDS = [
+  'apn',
+  'router',
+  'wi-fi',
+  'wifi',
+  'volte',
+  'vowifi',
+  'slow',
+  'outage',
+  'signal',
+  'sms',
+  'pppoe',
+  'роутер',
+  'швидк',
+  'збій',
+  'сигнал',
+  'інтернет',
+];
+const ACCOUNT_KEYWORDS = [
+  'sim',
+  'esim',
+  'puk',
+  'pin',
+  'contract',
+  'cancel',
+  'terminat',
+  'port',
+  'suspend',
+  'контракт',
+  'розірв',
+  'призупин',
+  'перенес',
+];
+const PRODUCT_KEYWORDS = [
+  'roam',
+  'plan',
+  'tariff',
+  'unlimited',
+  '5g',
+  'bundle',
+  'family',
+  'роумінг',
+  'тариф',
+  'безліміт',
+  'пакет',
+];
+
+export function classifyQueryCategory(query: string): QueryCategory {
+  const text = query.toLowerCase();
+  if (BILLING_KEYWORDS.some((kw) => text.includes(kw))) return QueryCategory.BILLING;
+  if (TECHNICAL_KEYWORDS.some((kw) => text.includes(kw))) return QueryCategory.TECHNICAL_SUPPORT;
+  if (ACCOUNT_KEYWORDS.some((kw) => text.includes(kw))) return QueryCategory.ACCOUNT_MANAGEMENT;
+  if (PRODUCT_KEYWORDS.some((kw) => text.includes(kw))) return QueryCategory.PRODUCT_INQUIRY;
+  return QueryCategory.GENERAL;
+}
+
+function toSemanticCacheTurnMetadata(
+  lookup: SemanticCacheLookupResponseDto | null,
+): SemanticCacheTurnMetadataDto | undefined {
+  if (!lookup) {
+    return undefined;
+  }
+  return {
+    status: lookup.status,
+    mode: lookup.mode,
+    ...(lookup.entryId ? { entryId: lookup.entryId } : {}),
+    ...(lookup.matchedQuery ? { matchedQuery: lookup.matchedQuery } : {}),
+    cosineSimilarity: lookup.evaluation.cosineSimilarity,
+    adaptiveThreshold: lookup.evaluation.adaptiveThreshold,
+    ...(lookup.evaluation.localClusterDensity !== undefined
+      ? { localClusterDensity: lookup.evaluation.localClusterDensity }
+      : {}),
+    ...(lookup.evaluation.neighborCount !== undefined
+      ? { neighborCount: lookup.evaluation.neighborCount }
+      : {}),
+    category: lookup.evaluation.category,
+    ...(lookup.knowledgeSourceIds ? { knowledgeSourceIds: lookup.knowledgeSourceIds } : {}),
+  };
+}
 
 function deriveTitleFromMessage(content: string): string {
   const collapsed = content.replace(/\s+/g, ' ').trim();
@@ -117,16 +235,25 @@ export class DialogGraphService {
     @Inject(KNOWLEDGE_BASE_SERVICE_CLIENT)
     private readonly knowledgeBaseClient?: ClientProxy,
     @Optional() private readonly config?: ConfigService<DialogEnv, true>,
+    @Optional()
+    @Inject(SEMANTIC_CACHE_SERVICE_CLIENT)
+    private readonly semanticCacheClient?: ClientProxy,
   ) {
     this.compiledGraph = new StateGraph(DialogTurnState)
       .addNode('record_user_message', (state) => this.recordUserMessage(state))
+      .addNode('lookup_semantic_cache', (state) => this.lookupSemanticCache(state))
       .addNode('retrieve_knowledge_context', (state) => this.retrieveKnowledgeContext(state))
       .addNode('call_llm_service', (state) => this.callLlmService(state))
+      .addNode('store_semantic_cache', (state) => this.storeSemanticCache(state))
       .addNode('record_assistant_message', (state) => this.recordAssistantMessage(state))
       .addEdge(START, 'record_user_message')
-      .addEdge('record_user_message', 'retrieve_knowledge_context')
+      .addEdge('record_user_message', 'lookup_semantic_cache')
+      .addConditionalEdges('lookup_semantic_cache', (state) =>
+        state.cacheHit ? 'record_assistant_message' : 'retrieve_knowledge_context',
+      )
       .addEdge('retrieve_knowledge_context', 'call_llm_service')
-      .addEdge('call_llm_service', 'record_assistant_message')
+      .addEdge('call_llm_service', 'store_semantic_cache')
+      .addEdge('store_semantic_cache', 'record_assistant_message')
       .addEdge('record_assistant_message', END)
       .compile();
   }
@@ -136,12 +263,21 @@ export class DialogGraphService {
     content: string;
     model?: string;
     parentMessageId?: string | null;
+    category?: QueryCategory;
+    cacheMode?: CacheMode;
+    fixedThresholdOverride?: number;
   }): DialogTurnStateType {
     return {
       dialog: input.dialog,
       userContent: input.content,
       requestedModel: input.model,
       parentMessageId: input.parentMessageId,
+      queryCategory: input.category,
+      cacheMode: input.cacheMode,
+      fixedThresholdOverride: input.fixedThresholdOverride,
+      queryEmbedding: null,
+      cacheLookup: null,
+      cacheHit: false,
       knowledgeContext: null,
       history: [],
       userMessage: null,
@@ -156,6 +292,9 @@ export class DialogGraphService {
     content: string;
     model?: string;
     parentMessageId?: string | null;
+    category?: QueryCategory;
+    cacheMode?: CacheMode;
+    fixedThresholdOverride?: number;
   }): Promise<SendMessageResponseDto> {
     const finalState = await this.compiledGraph.invoke(this.createInitialState(input));
 
@@ -163,10 +302,12 @@ export class DialogGraphService {
       throw new BadGatewayException('Dialog orchestration failed to produce a complete turn');
     }
 
+    const cache = toSemanticCacheTurnMetadata(finalState.cacheLookup);
     return {
       dialog: finalState.updatedDialog,
       userMessage: finalState.userMessage,
       assistantMessage: finalState.assistantMessage,
+      ...(cache ? { cache } : {}),
     };
   }
 
@@ -175,6 +316,9 @@ export class DialogGraphService {
     content: string;
     model?: string;
     parentMessageId?: string | null;
+    category?: QueryCategory;
+    cacheMode?: CacheMode;
+    fixedThresholdOverride?: number;
   }): Observable<DialogMessageStreamEventDto> {
     return new Observable<DialogMessageStreamEventDto>((subscriber) => {
       let unsubscribed = false;
@@ -190,7 +334,7 @@ export class DialogGraphService {
 
         subscriber.next({ type: 'user_message', userMessage });
 
-        const { history: groundedHistory } = await this.retrieveKnowledgeContext({
+        const lookupState = await this.lookupSemanticCache({
           ...initialState,
           userMessage,
           history,
@@ -199,7 +343,48 @@ export class DialogGraphService {
           return;
         }
 
-        const messagesForLlm = groundedHistory ?? history;
+        const cacheMeta = toSemanticCacheTurnMetadata(lookupState.cacheLookup ?? null);
+        if (lookupState.cacheHit && lookupState.llmCompletion) {
+          if (lookupState.llmCompletion.content.length > 0) {
+            subscriber.next({ type: 'delta', delta: lookupState.llmCompletion.content });
+          }
+          const { assistantMessage, updatedDialog } = await this.recordAssistantMessage({
+            ...initialState,
+            ...lookupState,
+            userMessage,
+            history,
+          });
+          if (unsubscribed) {
+            return;
+          }
+          if (!assistantMessage || !updatedDialog) {
+            subscriber.error(
+              new BadGatewayException('Dialog orchestration failed to persist reply'),
+            );
+            return;
+          }
+          subscriber.next({
+            type: 'done',
+            dialog: updatedDialog,
+            userMessage,
+            assistantMessage,
+            ...(cacheMeta ? { cache: cacheMeta } : {}),
+          });
+          subscriber.complete();
+          return;
+        }
+
+        const kbState = await this.retrieveKnowledgeContext({
+          ...initialState,
+          ...lookupState,
+          userMessage,
+          history,
+        });
+        if (unsubscribed) {
+          return;
+        }
+
+        const messagesForLlm = kbState.history ?? history;
         let accumulatedContent = '';
         let finalCompletion: LlmChatCompletionResponseDto | null = null;
 
@@ -241,43 +426,43 @@ export class DialogGraphService {
                 ...finalCompletion,
                 content: finalCompletion.content || accumulatedContent,
               };
-
-              void this.recordAssistantMessage({
-                dialog: input.dialog,
-                userContent: input.content,
-                requestedModel: input.model,
-                parentMessageId: input.parentMessageId,
-                knowledgeContext: null,
+              const fullState: DialogTurnStateType = {
+                ...initialState,
+                ...lookupState,
+                ...kbState,
                 history: messagesForLlm,
                 userMessage,
                 llmCompletion: completionPayload,
-                assistantMessage: null,
-                updatedDialog: null,
-              }).then(
-                ({ assistantMessage, updatedDialog }) => {
-                  if (unsubscribed) {
-                    return;
-                  }
-                  if (!assistantMessage || !updatedDialog) {
-                    subscriber.error(
-                      new BadGatewayException('Dialog orchestration failed to persist reply'),
-                    );
-                    return;
-                  }
-                  subscriber.next({
-                    type: 'done',
-                    dialog: updatedDialog,
-                    userMessage,
-                    assistantMessage,
-                  });
-                  subscriber.complete();
-                },
-                (err: unknown) => {
-                  if (!unsubscribed) {
-                    subscriber.error(err);
-                  }
-                },
-              );
+              };
+
+              void this.storeSemanticCache(fullState)
+                .then(() => this.recordAssistantMessage(fullState))
+                .then(
+                  ({ assistantMessage, updatedDialog }) => {
+                    if (unsubscribed) {
+                      return;
+                    }
+                    if (!assistantMessage || !updatedDialog) {
+                      subscriber.error(
+                        new BadGatewayException('Dialog orchestration failed to persist reply'),
+                      );
+                      return;
+                    }
+                    subscriber.next({
+                      type: 'done',
+                      dialog: updatedDialog,
+                      userMessage,
+                      assistantMessage,
+                      ...(cacheMeta ? { cache: cacheMeta } : {}),
+                    });
+                    subscriber.complete();
+                  },
+                  (err: unknown) => {
+                    if (!unsubscribed) {
+                      subscriber.error(err);
+                    }
+                  },
+                );
             },
           });
       };
@@ -298,7 +483,10 @@ export class DialogGraphService {
   private async recordUserMessage(
     state: DialogTurnStateType,
   ): Promise<Partial<DialogTurnStateType>> {
-    const existingMessages = await this.dialogsRepository.findMessagesByDialog(state.dialog.id);
+    const existingMessages =
+      state.parentMessageId === null
+        ? []
+        : await this.dialogsRepository.findMessagesByDialog(state.dialog.id);
     const resolvedParentId =
       state.parentMessageId !== undefined
         ? state.parentMessageId
@@ -311,7 +499,10 @@ export class DialogGraphService {
       content: state.userContent,
     });
 
-    const branchMessages = buildBranchHistory([...existingMessages, userMessage], userMessage.id);
+    const branchMessages =
+      state.parentMessageId === null
+        ? [userMessage]
+        : buildBranchHistory([...existingMessages, userMessage], userMessage.id);
     const history: LlmChatMessageDto[] = [
       { role: ChatMessageRole.SYSTEM, content: CUSTOMER_SUPPORT_SYSTEM_PROMPT },
       ...branchMessages.map((message) => ({
@@ -324,6 +515,152 @@ export class DialogGraphService {
       userMessage,
       history,
     };
+  }
+
+  private async lookupSemanticCache(
+    state: DialogTurnStateType,
+  ): Promise<Partial<DialogTurnStateType>> {
+    if (!this.semanticCacheClient) {
+      return { cacheLookup: null, cacheHit: false, queryEmbedding: null };
+    }
+
+    const category = state.queryCategory ?? classifyQueryCategory(state.userContent);
+    if (state.cacheMode === CacheMode.DISABLED) {
+      return {
+        queryEmbedding: null,
+        cacheHit: false,
+        cacheLookup: {
+          status: CacheHitStatus.BYPASS,
+          mode: CacheMode.DISABLED,
+          evaluation: {
+            category,
+            cosineSimilarity: 0,
+            adaptiveThreshold: 0,
+            cacheStatus: CacheHitStatus.BYPASS,
+            mode: CacheMode.DISABLED,
+          },
+        },
+      };
+    }
+
+    const startedAt = performance.now();
+    try {
+      const embeddingResponse = await firstValueFrom(
+        this.llmClient
+          .send<LlmGenerateEmbeddingsResponseDto, LlmGenerateEmbeddingsRequestDto>(
+            SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS,
+            { texts: [state.userContent] },
+          )
+          .pipe(timeout(CACHE_EMBEDDING_TIMEOUT_MS)),
+      );
+      const embedding = embeddingResponse.embeddings[0];
+      if (!embedding) {
+        return { cacheLookup: null, cacheHit: false, queryEmbedding: null };
+      }
+
+      const lookup = await firstValueFrom(
+        this.semanticCacheClient
+          .send<
+            SemanticCacheLookupResponseDto,
+            SemanticCacheTcpRequestDto<SemanticCacheLookupRequestDto>
+          >(SERVICE_TCP_PATTERNS.CACHE_LOOKUP, {
+            body: {
+              query: state.userContent,
+              embedding,
+              category,
+              sessionId: state.dialog.id,
+              ...(state.cacheMode !== undefined ? { mode: state.cacheMode } : {}),
+              ...(state.fixedThresholdOverride !== undefined
+                ? { fixedThresholdOverride: state.fixedThresholdOverride }
+                : {}),
+            },
+          })
+          .pipe(timeout(CACHE_LOOKUP_TIMEOUT_MS)),
+      );
+
+      if (lookup.status === CacheHitStatus.HIT && lookup.cachedResponse) {
+        return {
+          queryEmbedding: embedding,
+          cacheLookup: lookup,
+          cacheHit: true,
+          llmCompletion: {
+            content: lookup.cachedResponse,
+            model: 'semantic-cache',
+            latencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
+            usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+          },
+        };
+      }
+
+      return { queryEmbedding: embedding, cacheLookup: lookup, cacheHit: false };
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'dialog.semantic_cache.lookup_fallback',
+          dialogId: state.dialog.id,
+          error: error instanceof Error ? error.message : 'Unknown semantic cache error',
+        }),
+      );
+      return { cacheLookup: null, cacheHit: false, queryEmbedding: null };
+    }
+  }
+
+  private async storeSemanticCache(
+    state: DialogTurnStateType,
+  ): Promise<Partial<DialogTurnStateType>> {
+    if (
+      !this.semanticCacheClient ||
+      state.cacheHit ||
+      state.cacheLookup?.status !== CacheHitStatus.MISS ||
+      !state.queryEmbedding ||
+      !state.llmCompletion?.content
+    ) {
+      return {};
+    }
+
+    const category =
+      state.cacheLookup.evaluation.category ??
+      state.queryCategory ??
+      classifyQueryCategory(state.userContent);
+    const sources = state.knowledgeContext?.sources ?? [];
+    const knowledgeSourceIds = [...new Set(sources.map((s) => s.documentId))];
+    const knowledgeSources = sources.map((s) => ({
+      documentId: s.documentId,
+      documentTitle: s.documentTitle,
+      chunkId: s.chunkId,
+      chunkIndex: s.chunkIndex,
+    }));
+
+    try {
+      await firstValueFrom(
+        this.semanticCacheClient
+          .send<
+            SemanticCacheEntryResponseDto,
+            SemanticCacheTcpRequestDto<SemanticCacheStoreRequestDto>
+          >(SERVICE_TCP_PATTERNS.CACHE_STORE, {
+            body: {
+              query: state.userContent,
+              response: state.llmCompletion.content,
+              embedding: state.queryEmbedding,
+              category,
+              ...(knowledgeSourceIds.length > 0 ? { knowledgeSourceIds } : {}),
+              ...(knowledgeSources.length > 0 ? { knowledgeSources } : {}),
+              model: state.llmCompletion.model,
+            },
+          })
+          .pipe(timeout(CACHE_STORE_TIMEOUT_MS)),
+      );
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'dialog.semantic_cache.store_fallback',
+          dialogId: state.dialog.id,
+          error: error instanceof Error ? error.message : 'Unknown semantic cache error',
+        }),
+      );
+    }
+
+    return {};
   }
 
   private async retrieveKnowledgeContext(

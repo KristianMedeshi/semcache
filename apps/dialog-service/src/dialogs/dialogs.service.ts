@@ -72,6 +72,9 @@ export class DialogsService {
       content: dto.content,
       model: dto.model,
       parentMessageId: dto.parentMessageId,
+      category: dto.category,
+      cacheMode: dto.cacheMode,
+      fixedThresholdOverride: dto.fixedThresholdOverride,
     });
   }
 
@@ -87,6 +90,9 @@ export class DialogsService {
           content: dto.content,
           model: dto.model,
           parentMessageId: dto.parentMessageId,
+          category: dto.category,
+          cacheMode: dto.cacheMode,
+          fixedThresholdOverride: dto.fixedThresholdOverride,
         }),
       ),
     );

@@ -1,6 +1,7 @@
 import {
   KNOWLEDGE_BASE_VALIDATION_LIMITS,
   type ListKnowledgeDocumentsQueryDto,
+  type ReprocessKnowledgeDocumentRequestDto,
   type RetrieveKnowledgeContextRequestDto,
   type UploadKnowledgeDocumentRequestDto,
 } from '@semcache/shared-dtos';
@@ -11,6 +12,7 @@ import {
 } from '@semcache/shared-types';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNumber,
@@ -101,4 +103,39 @@ export class GatewayRetrieveKnowledgeContextDto implements RetrieveKnowledgeCont
   @IsOptional()
   @IsEnum(QueryCategory)
   category?: QueryCategory;
+}
+
+export class GatewayReprocessKnowledgeDocumentDto implements ReprocessKnowledgeDocumentRequestDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.CONTENT_MIN_LENGTH)
+  @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.CONTENT_MAX_LENGTH)
+  content?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.TITLE_MAX_LENGTH)
+  title?: string;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, string | number | boolean>;
+
+  @IsOptional()
+  @IsInt()
+  @Min(KNOWLEDGE_BASE_VALIDATION_LIMITS.MIN_CHUNK_SIZE)
+  @Max(KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_CHUNK_SIZE)
+  chunkSize?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_CHUNK_OVERLAP)
+  chunkOverlap?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  includeChunks?: boolean;
 }

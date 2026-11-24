@@ -97,10 +97,16 @@ export class KnowledgeBaseService {
 
   async reprocessDocument(
     documentId: string,
-    options?: { chunkSize?: number; chunkOverlap?: number },
+    options?: {
+      content?: string;
+      title?: string;
+      metadata?: Record<string, string | number | boolean>;
+      chunkSize?: number;
+      chunkOverlap?: number;
+    },
     headers?: Record<string, string>,
   ): Promise<KnowledgeDocumentDetailResponseDto> {
-    const existing = await this.repository.findDocumentById(documentId);
+    let existing = await this.repository.findDocumentById(documentId);
     if (!existing) {
       throw new NotFoundException(`Knowledge document ${documentId} not found`);
     }
@@ -115,6 +121,18 @@ export class KnowledgeBaseService {
 
     if (chunkOverlap >= chunkSize) {
       throw new BadRequestException('chunkOverlap must be strictly less than chunkSize');
+    }
+
+    if (
+      options?.content !== undefined ||
+      options?.title !== undefined ||
+      options?.metadata !== undefined
+    ) {
+      existing = await this.repository.updateDocumentContent(documentId, {
+        ...(options.content !== undefined ? { rawContent: options.content } : {}),
+        ...(options.title !== undefined ? { title: options.title.trim() } : {}),
+        ...(options.metadata !== undefined ? { metadata: options.metadata } : {}),
+      });
     }
 
     const result = await this.processAndStoreDocument(existing, { chunkSize, chunkOverlap });

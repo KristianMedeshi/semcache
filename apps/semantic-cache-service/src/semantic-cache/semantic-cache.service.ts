@@ -48,6 +48,9 @@ export class SemanticCacheService {
       });
     }
 
+    if (!dto.embedding) {
+      throw new BadRequestException('Embedding vector is required when cache is enabled');
+    }
     this.thresholdCalculator.validateEmbeddingVector(dto.embedding);
 
     const limit = effectiveMode === CacheMode.ADAPTIVE ? settings.densityKNeighbors : 1;

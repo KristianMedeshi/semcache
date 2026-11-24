@@ -124,6 +124,32 @@ export class KnowledgeBaseRepository {
     return updated;
   }
 
+  async updateDocumentContent(
+    documentId: string,
+    updates: {
+      rawContent?: string;
+      title?: string;
+      metadata?: Record<string, string | number | boolean>;
+    },
+  ): Promise<KnowledgeDocumentRecord> {
+    const rows = await this.db
+      .update(knowledgeDocuments)
+      .set({
+        ...(updates.rawContent !== undefined ? { rawContent: updates.rawContent } : {}),
+        ...(updates.title !== undefined ? { title: updates.title } : {}),
+        ...(updates.metadata !== undefined ? { metadata: updates.metadata } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(knowledgeDocuments.id, documentId))
+      .returning();
+
+    const updated = rows[0];
+    if (!updated) {
+      throw new Error(`Knowledge base document ${documentId} not found`);
+    }
+    return updated;
+  }
+
   async replaceDocumentChunks(
     documentId: string,
     chunks: Array<{

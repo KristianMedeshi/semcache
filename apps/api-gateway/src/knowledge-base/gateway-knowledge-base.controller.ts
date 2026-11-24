@@ -17,6 +17,7 @@ import type { Request, Response } from 'express';
 import { GatewayAccessPolicy } from '../auth/policies/gateway-access.policy';
 import {
   GatewayListKnowledgeDocumentsQueryDto,
+  GatewayReprocessKnowledgeDocumentDto,
   GatewayRetrieveKnowledgeContextDto,
   GatewayUploadKnowledgeDocumentDto,
 } from './dto/gateway-knowledge-base.dto';
@@ -84,6 +85,7 @@ export class GatewayKnowledgeBaseController {
   @Post('documents/:id/reprocess')
   async reprocessDocument(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: GatewayReprocessKnowledgeDocumentDto,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
@@ -93,7 +95,7 @@ export class GatewayKnowledgeBaseController {
       SERVICE_TCP_PATTERNS.KB_DOCUMENTS_REPROCESS,
       {
         documentId: id,
-        body: {},
+        body,
         statusCode: HttpStatus.OK,
       },
     );

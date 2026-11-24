@@ -6,7 +6,13 @@ import type {
   LlmChatCompletionResponseDto,
   RetrieveKnowledgeContextResponseDto,
 } from '@semcache/shared-dtos';
-import { ChatMessageRole, QueryCategory, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
+import {
+  CacheHitStatus,
+  CacheMode,
+  ChatMessageRole,
+  QueryCategory,
+  SERVICE_TCP_PATTERNS,
+} from '@semcache/shared-types';
 import { firstValueFrom, of, throwError, toArray } from 'rxjs';
 import { DialogGraphService } from './dialog-graph.service';
 import type { DialogsRepository } from './dialogs.repository';
@@ -19,6 +25,7 @@ function createInMemoryDialogHarness(options?: {
   initialMessages?: DialogMessageResponseDto[];
   sendImpl?: jest.Mock;
   kbSendImpl?: jest.Mock;
+  cacheSendImpl?: jest.Mock;
 }) {
   let dialog: DialogResponseDto = {
     id: TEST_DIALOG_ID,
@@ -67,14 +74,27 @@ function createInMemoryDialogHarness(options?: {
   const mockLlmClient = { send: sendMock } as unknown as ClientProxy;
   const kbSendMock = options?.kbSendImpl;
   const mockKbClient = kbSendMock ? ({ send: kbSendMock } as unknown as ClientProxy) : undefined;
+  const cacheSendMock = options?.cacheSendImpl;
+  const mockCacheClient = cacheSendMock
+    ? ({ send: cacheSendMock } as unknown as ClientProxy)
+    : undefined;
   const graphService = new DialogGraphService(
     mockRepo as DialogsRepository,
     mockLlmClient,
     mockKbClient,
+    undefined,
+    mockCacheClient,
   );
   const service = new DialogsService(mockRepo as DialogsRepository, graphService);
 
-  return { userId: TEST_USER_ID, dialogId: TEST_DIALOG_ID, service, sendMock, kbSendMock };
+  return {
+    userId: TEST_USER_ID,
+    dialogId: TEST_DIALOG_ID,
+    service,
+    sendMock,
+    kbSendMock,
+    cacheSendMock,
+  };
 }
 
 describe('DialogsService & DialogGraphService', () => {
@@ -386,5 +406,149 @@ describe('DialogsService & DialogGraphService', () => {
     const result = await service.deleteAllDialogs(userId);
 
     expect(result).toEqual({ deletedCount: 1, deleted: true });
+  });
+
+  it('short-circuits KB and LLM on semantic cache HIT with zero tokens', async () => {
+    const sendMock = jest.fn((pattern: string) => {
+      if (pattern === SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS) {
+        return of({
+          embeddings: [Array(384).fill(0.05)],
+          model: 'local',
+          dimensions: 384,
+          latencyMs: 5,
+          usage: { totalTokens: 4 },
+        });
+      }
+      throw new Error(`Unexpected LLM call: ${pattern}`);
+    });
+    const kbSendMock = jest.fn();
+    const cacheSendMock = jest.fn((pattern: string) => {
+      if (pattern === SERVICE_TCP_PATTERNS.CACHE_LOOKUP) {
+        return of({
+          status: CacheHitStatus.HIT,
+          mode: CacheMode.ADAPTIVE,
+          entryId: 'entry-1',
+          cachedResponse: 'EU roaming includes 15 GB per month.',
+          matchedQuery: 'What is EU roaming?',
+          knowledgeSourceIds: ['doc-eu-1'],
+          evaluation: {
+            category: QueryCategory.PRODUCT_INQUIRY,
+            cosineSimilarity: 0.94,
+            adaptiveThreshold: 0.87,
+            cacheStatus: CacheHitStatus.HIT,
+            mode: CacheMode.ADAPTIVE,
+          },
+        });
+      }
+      throw new Error(`Unexpected cache call: ${pattern}`);
+    });
+
+    const { userId, dialogId, service } = createInMemoryDialogHarness({
+      sendImpl: sendMock,
+      kbSendImpl: kbSendMock,
+      cacheSendImpl: cacheSendMock,
+    });
+
+    const turn = await service.sendMessage(userId, dialogId, {
+      content: 'Can I use data in the EU?',
+      category: QueryCategory.PRODUCT_INQUIRY,
+      cacheMode: CacheMode.ADAPTIVE,
+    });
+
+    expect(turn.assistantMessage.content).toBe('EU roaming includes 15 GB per month.');
+    expect(turn.assistantMessage.usage).toEqual({
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    });
+    expect(turn.cache?.status).toBe(CacheHitStatus.HIT);
+    expect(kbSendMock).not.toHaveBeenCalled();
+    expect(sendMock).toHaveBeenCalledTimes(1); // embeddings only, no llm.chat
+  });
+
+  it('stores response with KB source IDs on semantic cache MISS and skips store on DISABLED', async () => {
+    const embedding = Array(384).fill(0.05);
+    const sendMock = jest.fn((pattern: string) => {
+      if (pattern === SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS) {
+        return of({
+          embeddings: [embedding],
+          model: 'local',
+          dimensions: 384,
+          latencyMs: 5,
+          usage: { totalTokens: 4 },
+        });
+      }
+      return of({
+        content: 'Autopay gives a 3% discount.',
+        model: 'support-llm',
+        latencyMs: 120,
+        usage: { promptTokens: 20, completionTokens: 10, totalTokens: 30 },
+      });
+    });
+    const kbSendMock = jest.fn(() =>
+      of({
+        query: 'How do I enable autopay?',
+        hasRelevantContext: true,
+        formattedContext: 'Autopay context',
+        results: [],
+        sources: [
+          {
+            documentId: '11111111-1111-4111-8111-111111111111',
+            documentTitle: 'Autopay',
+            fileName: null,
+            category: QueryCategory.BILLING,
+            chunkId: '22222222-2222-4222-8222-222222222222',
+            chunkIndex: 0,
+          },
+        ],
+      }),
+    );
+    const cacheSendMock = jest.fn((pattern: string) => {
+      if (pattern === SERVICE_TCP_PATTERNS.CACHE_LOOKUP) {
+        return of({
+          status: CacheHitStatus.MISS,
+          mode: CacheMode.FIXED,
+          evaluation: {
+            category: QueryCategory.BILLING,
+            cosineSimilarity: 0.2,
+            adaptiveThreshold: 0.9,
+            cacheStatus: CacheHitStatus.MISS,
+            mode: CacheMode.FIXED,
+          },
+        });
+      }
+      return of({ id: 'stored-1' });
+    });
+
+    const { userId, dialogId, service } = createInMemoryDialogHarness({
+      sendImpl: sendMock,
+      kbSendImpl: kbSendMock,
+      cacheSendImpl: cacheSendMock,
+    });
+
+    const missTurn = await service.sendMessage(userId, dialogId, {
+      content: 'How do I enable autopay?',
+      category: QueryCategory.BILLING,
+      cacheMode: CacheMode.FIXED,
+      fixedThresholdOverride: 0.9,
+    });
+    expect(missTurn.cache?.status).toBe(CacheHitStatus.MISS);
+    expect(cacheSendMock).toHaveBeenCalledWith(
+      SERVICE_TCP_PATTERNS.CACHE_STORE,
+      expect.objectContaining({
+        body: expect.objectContaining({
+          knowledgeSourceIds: ['11111111-1111-4111-8111-111111111111'],
+          category: QueryCategory.BILLING,
+        }),
+      }),
+    );
+
+    cacheSendMock.mockClear();
+    const bypassTurn = await service.sendMessage(userId, dialogId, {
+      content: 'What is my due date?',
+      cacheMode: CacheMode.DISABLED,
+    });
+    expect(bypassTurn.cache?.status).toBe(CacheHitStatus.BYPASS);
+    expect(cacheSendMock).not.toHaveBeenCalled();
   });
 });
