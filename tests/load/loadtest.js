@@ -1,23 +1,24 @@
 /**
  * k6 load test for the SemCache telecom support benchmark.
  *
+ * Uses existing SemCache API Gateway endpoints directly:
+ *   GET    /health
+ *   DELETE /admin/semantic-cache/entries
+ *   PATCH  /admin/semantic-cache/settings
+ *   GET    /knowledge-base/documents
+ *   POST   /knowledge-base/documents
+ *   POST   /knowledge-base/documents/:id/reprocess
+ *   POST   /dialogs
+ *   POST   /dialogs/:id/messages
+ *
  * Compares three caching modes under identical load:
- *   no-cache  every request goes to the LLM (expected cache status: BYPASS)
+ *   no-cache  every request bypasses semantic cache (cache.status = BYPASS)
  *   fixed     pgvector semantic cache with a fixed cosine threshold (THRESHOLD, default 0.90)
  *   adaptive  adaptive threshold (category + local cluster density)
  *
- * Phase 1 (default function): replays dataset_2000.jsonl once, in dataset order, through a
- *          shared-iterations scenario (every row is sent exactly once, by exactly one VU).
- * Phase 2 (teardown):         updates KB sources, re-sends affected queries and verifies that
- *          stale cached answers were invalidated.
- *
- * Run (from the repo root):
+ * Run (from the repo root, with services started under NODE_ENV=test and LLM_PROVIDER=lmstudio):
  *   CACHE_MODE=adaptive k6 run tests/load/loadtest.js
  *   CACHE_MODE=fixed THRESHOLD=0.90 TOTAL_REQUESTS=50 k6 run tests/load/loadtest.js   # smoke test
- *
- * Expected HTTP contract (see tests/load/README.md):
- *   POST {API_BASE_URL}/api/v1/support/chat      -> answer, cacheStatus (HIT|MISS|BYPASS), usage, ...
- *   PATCH {API_BASE_URL}/api/v1/kb/sources/:id   -> updates a KB source and invalidates linked cache entries
  */
 import http from 'k6/http';
 import exec from 'k6/execution';
@@ -31,11 +32,15 @@ import { Counter, Rate, Trend } from 'k6/metrics';
 const CACHE_MODE = (__ENV.CACHE_MODE || 'adaptive').toLowerCase();
 const API_BASE_URL = (__ENV.API_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
 const THRESHOLD = Number.parseFloat(__ENV.THRESHOLD || '0.90');
-const CHAT_ENDPOINT = __ENV.CHAT_ENDPOINT || '/api/v1/support/chat';
-const KB_SOURCE_ENDPOINT = __ENV.KB_SOURCE_ENDPOINT || '/api/v1/kb/sources';
-const KB_UPDATE_METHOD = (__ENV.KB_UPDATE_METHOD || 'PATCH').toUpperCase();
+const MODEL = (__ENV.MODEL || '').trim();
 const DATASET_PATH = __ENV.DATASET_PATH || '../../datasets/labeled/dataset_2000.jsonl';
 const KB_UPDATES_PATH = __ENV.KB_UPDATES_PATH || '../../datasets/labeled/kb_updates.json';
+
+// Existing gateway routes (overridable if needed)
+const DIALOGS_ENDPOINT = __ENV.DIALOGS_ENDPOINT || '/dialogs';
+const KB_DOCUMENTS_ENDPOINT = __ENV.KB_DOCUMENTS_ENDPOINT || '/knowledge-base/documents';
+const CACHE_SETTINGS_ENDPOINT = __ENV.CACHE_SETTINGS_ENDPOINT || '/admin/semantic-cache/settings';
+const CACHE_CLEAR_ENDPOINT = __ENV.CACHE_CLEAR_ENDPOINT || '/admin/semantic-cache/entries';
 
 // Concurrency tuned for LENOVO LOQ 15IAX9I + LM Studio `parallel: 4`: 4 VUs keep every LM Studio
 // slot busy without queueing requests inside LM Studio (which would inflate latency numbers).
@@ -45,10 +50,14 @@ const MAX_DURATION = __ENV.MAX_DURATION || '90m';
 const REQUEST_TIMEOUT = __ENV.REQUEST_TIMEOUT || '90s';
 const KB_INVALIDATION_TIMEOUT = __ENV.KB_INVALIDATION_TIMEOUT || '5m';
 const RUN_KB_INVALIDATION = (__ENV.RUN_KB_INVALIDATION || 'true').toLowerCase() === 'true';
+const CLEAR_CACHE_ON_START = (__ENV.CLEAR_CACHE_ON_START || 'true').toLowerCase() === 'true';
+const SEED_KB_ON_START = (__ENV.SEED_KB_ON_START || 'false').toLowerCase() === 'true';
+const RESTORE_KB_AFTER_TEST = (__ENV.RESTORE_KB_AFTER_TEST || 'true').toLowerCase() === 'true';
 const KB_PROPAGATION_MS = Number.parseInt(__ENV.KB_PROPAGATION_MS || '250', 10);
 const THINK_TIME_MS = Number.parseInt(__ENV.THINK_TIME_MS || '50', 10);
 
-// Optional auth: cookie session, bearer token or API key. KB updates need an admin identity.
+// Optional auth: when gateway runs with NODE_ENV=test, synthetic admin auth is automatic.
+// For development/production runs, provide SESSION_COOKIE (or AUTH_TOKEN / ADMIN_TOKEN).
 const AUTH_TOKEN = __ENV.AUTH_TOKEN || '';
 const ADMIN_TOKEN = __ENV.ADMIN_TOKEN || AUTH_TOKEN;
 const SESSION_COOKIE = __ENV.SESSION_COOKIE || '';
@@ -58,7 +67,7 @@ const API_KEY = __ENV.API_KEY || '';
 const BASELINE_TOKENS_PER_REQ = Number.parseInt(__ENV.BASELINE_TOKENS_PER_REQ || '450', 10);
 const COST_PER_1M_PROMPT = Number.parseFloat(__ENV.COST_PER_1M_PROMPT_TOKENS || '0.15');
 const COST_PER_1M_COMPLETION = Number.parseFloat(__ENV.COST_PER_1M_COMPLETION_TOKENS || '0.60');
-const PROMPT_TOKEN_SHARE = 0.6; // used only to blend prices when only total tokens are known
+const PROMPT_TOKEN_SHARE = 0.6;
 const SUMMARY_OUT = __ENV.SUMMARY_OUT || '';
 
 if (!['no-cache', 'fixed', 'adaptive'].includes(CACHE_MODE)) {
@@ -66,9 +75,6 @@ if (!['no-cache', 'fixed', 'adaptive'].includes(CACHE_MODE)) {
 }
 if (!(THRESHOLD > 0 && THRESHOLD <= 1)) {
   throw new Error(`THRESHOLD must be in (0, 1], got "${__ENV.THRESHOLD}"`);
-}
-if (!['PATCH', 'PUT'].includes(KB_UPDATE_METHOD)) {
-  throw new Error(`KB_UPDATE_METHOD must be PATCH or PUT, got "${KB_UPDATE_METHOD}"`);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,36 +87,32 @@ const dataset = new SharedArray('telecom_dataset_2000', () =>
     .map((line) => JSON.parse(line)),
 );
 
-const scenarios = new SharedArray(
-  'kb_invalidation_scenarios',
-  () => JSON.parse(open(KB_UPDATES_PATH)).invalidation_scenarios,
-);
+const kbData = new SharedArray('kb_updates_data', () => [JSON.parse(open(KB_UPDATES_PATH))]);
+const kbSources = kbData[0].kb_sources;
+const scenarios = kbData[0].invalidation_scenarios;
 
 const TOTAL_REQUESTS = Math.min(REQUESTED_TOTAL, dataset.length);
 
 // ---------------------------------------------------------------------------
 // Custom metrics
 // ---------------------------------------------------------------------------
-// Latency (ms), overall and split by cache status
 const reqDuration = new Trend('support_req_duration_ms', true);
 const hitLatency = new Trend('support_latency_hit_ms', true);
 const missLatency = new Trend('support_latency_miss_ms', true);
 const bypassLatency = new Trend('support_latency_bypass_ms', true);
 
-// Cache behaviour
 const chatRequests = new Counter('support_chat_requests_total');
 const cacheHits = new Counter('cache_hits_total');
 const cacheMisses = new Counter('cache_misses_total');
 const cacheBypass = new Counter('cache_bypass_total');
 const cacheErrors = new Counter('cache_errors_total');
-const hitRate = new Rate('cache_hit_rate'); // HIT / all successful responses
-const paraphraseRecall = new Rate('cache_paraphrase_recall_rate'); // HIT on cache_hit_ok rows
+const hitRate = new Rate('cache_hit_rate');
+const paraphraseRecall = new Rate('cache_paraphrase_recall_rate');
 const falseHits = new Counter('cache_false_hits_total');
 const trapFalseHits = new Counter('cache_trap_false_hits_total');
-const falseHitRate = new Rate('cache_false_hit_rate'); // false hits / hits (precision = 1 - this)
-const missRequiredFalsePositive = new Rate('cache_miss_required_false_positive_rate'); // over cache_miss_required rows
+const falseHitRate = new Rate('cache_false_hit_rate');
+const missRequiredFalsePositive = new Rate('cache_miss_required_false_positive_rate');
 
-// Tokens and money
 const promptTokens = new Counter('llm_prompt_tokens_total');
 const completionTokens = new Counter('llm_completion_tokens_total');
 const totalTokens = new Counter('llm_total_tokens_total');
@@ -119,16 +121,15 @@ const tokensSaved = new Counter('cache_tokens_saved_total');
 const llmCost = new Counter('llm_estimated_cost_usd');
 const costSaved = new Counter('cache_estimated_cost_saved_usd');
 
-// KB invalidation phase
 const loadPhaseDuration = new Trend('load_phase_duration_s');
 const kbInvalidationLatency = new Trend('kb_invalidation_latency_ms', true);
 const kbUpdates = new Counter('kb_update_requests_total');
 const kbUpdateSuccess = new Rate('kb_update_success_rate');
 const kbChecks = new Counter('kb_invalidation_checks_total');
-const kbInvalidationMiss = new Rate('kb_invalidation_miss_rate'); // first post-update query is NOT a HIT
-const kbStalePrevented = new Rate('kb_stale_answer_prevented_rate'); // not a HIT and no stale facts in the answer
-const kbReverifyHit = new Rate('kb_reverify_hit_rate'); // fresh answer gets re-cached
-const kbFreshFact = new Rate('kb_fresh_fact_rate'); // fact probes mention the updated fact
+const kbInvalidationMiss = new Rate('kb_invalidation_miss_rate');
+const kbStalePrevented = new Rate('kb_stale_answer_prevented_rate');
+const kbReverifyHit = new Rate('kb_reverify_hit_rate');
+const kbFreshFact = new Rate('kb_fresh_fact_rate');
 
 // ---------------------------------------------------------------------------
 // k6 options
@@ -153,6 +154,7 @@ export const options = {
     },
   },
   thresholds,
+  setupTimeout: '5m',
   teardownTimeout: KB_INVALIDATION_TIMEOUT,
   summaryTrendStats: ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
 };
@@ -160,31 +162,55 @@ export const options = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-let observedTokenSum = 0; // per-VU rolling average of tokens consumed by uncached calls
+let observedTokenSum = 0;
 let observedTokenCount = 0;
+
+function mapMode(mode) {
+  return mode === 'no-cache' ? 'disabled' : mode;
+}
+
+function mapCategory(category) {
+  switch (category) {
+    case 'billing':
+      return 'billing';
+    case 'technical_support':
+    case 'outage_incident':
+      return 'technical_support';
+    case 'sim_esim':
+    case 'contract_termination':
+      return 'account_management';
+    case 'roaming':
+    case 'tariff_plan':
+      return 'product_inquiry';
+    default:
+      return 'general';
+  }
+}
 
 function buildHeaders(token) {
   const headers = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    'X-Cache-Mode': CACHE_MODE,
   };
-  if (CACHE_MODE === 'fixed') headers['X-Cache-Threshold'] = String(THRESHOLD);
   if (token) headers.Authorization = `Bearer ${token}`;
   if (SESSION_COOKIE) headers.Cookie = SESSION_COOKIE;
   if (API_KEY) headers['X-API-Key'] = API_KEY;
   return headers;
 }
 
-function buildChatPayload(item) {
+function buildMessagePayload(prompt, category) {
   const payload = {
-    requestId: item.id,
-    prompt: item.prompt,
-    language: item.language,
-    category: item.category,
-    cacheMode: CACHE_MODE,
+    content: prompt,
+    parentMessageId: null,
+    category: mapCategory(category),
+    cacheMode: mapMode(CACHE_MODE),
   };
-  if (CACHE_MODE === 'fixed') payload.similarityThreshold = THRESHOLD;
+  if (CACHE_MODE === 'fixed') {
+    payload.fixedThresholdOverride = THRESHOLD;
+  }
+  if (MODEL.length > 0) {
+    payload.model = MODEL;
+  }
   return payload;
 }
 
@@ -192,52 +218,57 @@ function firstDefined(...values) {
   return values.find((v) => v !== undefined && v !== null);
 }
 
-/** Normalizes raw NestJS JSON and the `{ success, data }` envelope into one flat shape. */
-function parseChatResponse(res) {
-  let body = null;
+function parseJsonBody(res) {
   try {
-    body = res.json();
+    return res.json();
   } catch {
-    body = null;
+    return null;
   }
+}
+
+function parseChatResponse(res) {
+  const body = parseJsonBody(res);
   const root =
     body && typeof body === 'object' && body.data && typeof body.data === 'object'
       ? body.data
       : body || {};
-  const evaluation = root.evaluation || root.cache || {};
-  const usage = root.usage || root.tokenUsage || {};
+  const assistant = root.assistantMessage || {};
+  const cache = root.cache || {};
+  const usage = assistant.usage || root.usage || {};
 
   const rawStatus = firstDefined(
     res.headers['X-Cache-Status'],
     res.headers['x-cache-status'],
+    cache.status,
     root.cacheStatus,
-    root.cache_status,
-    evaluation.cacheStatus,
-    evaluation.status,
   );
   const prompt = firstDefined(usage.promptTokens, usage.prompt_tokens);
   const completion = firstDefined(usage.completionTokens, usage.completion_tokens);
   let total = firstDefined(usage.totalTokens, usage.total_tokens);
-  if (total === undefined && prompt !== undefined && completion !== undefined)
+  if (total === undefined && prompt !== undefined && completion !== undefined) {
     total = prompt + completion;
+  }
 
   return {
     ok: body !== null,
     cacheStatus: rawStatus ? String(rawStatus).toUpperCase() : null,
-    answer: String(firstDefined(root.answer, root.content, root.message, '') || ''),
-    similarity: firstDefined(root.similarity, evaluation.cosineSimilarity),
-    matchedIntentId: firstDefined(root.matchedIntentId, root.matched_intent_id),
+    answer: String(firstDefined(assistant.content, root.answer, root.content, '') || ''),
+    similarity: firstDefined(cache.cosineSimilarity, root.similarity),
+    matchedQuery: cache.matchedQuery,
     usage: { prompt, completion, total },
-    savedTokens: firstDefined(root.savedTokens, root.saved_tokens),
   };
 }
 
-function postChat(item, extraTags) {
-  const res = http.post(`${API_BASE_URL}${CHAT_ENDPOINT}`, JSON.stringify(buildChatPayload(item)), {
-    headers: buildHeaders(AUTH_TOKEN),
-    timeout: REQUEST_TIMEOUT,
-    tags: Object.assign({ name: 'support_chat', cache_mode: CACHE_MODE }, extraTags),
-  });
+function sendMessage(dialogId, prompt, category, extraTags) {
+  const res = http.post(
+    `${API_BASE_URL}${DIALOGS_ENDPOINT}/${dialogId}/messages`,
+    JSON.stringify(buildMessagePayload(prompt, category)),
+    {
+      headers: buildHeaders(AUTH_TOKEN),
+      timeout: REQUEST_TIMEOUT,
+      tags: Object.assign({ name: 'dialogs_send_message', cache_mode: CACHE_MODE }, extraTags),
+    },
+  );
   return { res, parsed: parseChatResponse(res) };
 }
 
@@ -250,7 +281,6 @@ function tokenCost(prompt, completion, total) {
   return ((total || 0) * blended) / 1e6;
 }
 
-/** Substring match that ignores digit-adjacent hits ("0 UAH" must not match inside "50 UAH"). */
 function containsMarker(text, marker) {
   const haystack = text.toLowerCase();
   const needle = marker.toLowerCase();
@@ -269,6 +299,69 @@ function containsMarker(text, marker) {
 
 const anyMarker = (text, markers) => markers.some((m) => containsMarker(text, m));
 
+function formatKbV1Content(src) {
+  return `${src.content_en}\n\n${src.content_uk}`;
+}
+
+function seedKnowledgeBase(headers) {
+  const listRes = http.get(`${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}`, {
+    headers,
+    timeout: REQUEST_TIMEOUT,
+    tags: { name: 'kb_list' },
+  });
+  const existingDocs = listRes.status >= 200 && listRes.status < 300 ? parseJsonBody(listRes) : [];
+  const bySourceId = {};
+  if (Array.isArray(existingDocs)) {
+    for (let i = 0; i < existingDocs.length; i += 1) {
+      const doc = existingDocs[i];
+      const sid = doc && doc.metadata && doc.metadata.kb_source_id;
+      if (sid) bySourceId[sid] = doc;
+    }
+  }
+
+  const kbSourceIdToUuid = {};
+  for (let i = 0; i < kbSources.length; i += 1) {
+    const src = kbSources[i];
+    const existing = bySourceId[src.kb_source_id];
+    if (existing) {
+      kbSourceIdToUuid[src.kb_source_id] = existing.id;
+      if (existing.metadata && existing.metadata.version !== src.version) {
+        http.post(
+          `${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}/${existing.id}/reprocess`,
+          JSON.stringify({
+            title: src.title,
+            content: formatKbV1Content(src),
+            metadata: { kb_source_id: src.kb_source_id, version: src.version },
+          }),
+          { headers, timeout: REQUEST_TIMEOUT, tags: { name: 'kb_restore_v1' } },
+        );
+      }
+      continue;
+    }
+
+    const uploadRes = http.post(
+      `${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}`,
+      JSON.stringify({
+        title: src.title,
+        content: formatKbV1Content(src),
+        format: 'text',
+        category: mapCategory(src.category),
+        metadata: { kb_source_id: src.kb_source_id, version: src.version },
+      }),
+      { headers, timeout: REQUEST_TIMEOUT, tags: { name: 'kb_seed_upload' } },
+    );
+    const uploaded = parseJsonBody(uploadRes);
+    if (uploadRes.status >= 200 && uploadRes.status < 300 && uploaded && uploaded.id) {
+      kbSourceIdToUuid[src.kb_source_id] = uploaded.id;
+    } else {
+      console.warn(
+        `[semcache] failed to seed KB source ${src.kb_source_id}: HTTP ${uploadRes.status}`,
+      );
+    }
+  }
+  return kbSourceIdToUuid;
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
@@ -279,15 +372,64 @@ export function setup() {
   );
   const health = http.get(`${API_BASE_URL}/health`, { timeout: '5s', tags: { name: 'health' } });
   if (health.status !== 200) {
-    console.warn(`[semcache] ${API_BASE_URL}/health returned ${health.status}; continuing anyway`);
+    throw new Error(`[semcache] ${API_BASE_URL}/health returned ${health.status}`);
   }
-  return { startedAt: Date.now() };
+
+  const adminHeaders = buildHeaders(ADMIN_TOKEN);
+
+  if (CLEAR_CACHE_ON_START) {
+    const clearRes = http.del(`${API_BASE_URL}${CACHE_CLEAR_ENDPOINT}`, null, {
+      headers: adminHeaders,
+      timeout: REQUEST_TIMEOUT,
+      tags: { name: 'cache_clear_start' },
+    });
+    if (clearRes.status < 200 || clearRes.status >= 300) {
+      console.warn(`[semcache] cache clear returned HTTP ${clearRes.status}`);
+    }
+  }
+
+  const settingsPayload = { mode: mapMode(CACHE_MODE) };
+  if (CACHE_MODE === 'fixed') {
+    settingsPayload.fixedThreshold = THRESHOLD;
+  }
+  const settingsRes = http.patch(
+    `${API_BASE_URL}${CACHE_SETTINGS_ENDPOINT}`,
+    JSON.stringify(settingsPayload),
+    { headers: adminHeaders, timeout: REQUEST_TIMEOUT, tags: { name: 'cache_settings_update' } },
+  );
+  if (settingsRes.status < 200 || settingsRes.status >= 300) {
+    console.warn(`[semcache] cache settings update returned HTTP ${settingsRes.status}`);
+  }
+
+  const kbSourceIdToUuid = SEED_KB_ON_START ? seedKnowledgeBase(adminHeaders) : {};
+
+  const dialogIds = [];
+  const userHeaders = buildHeaders(AUTH_TOKEN);
+  for (let i = 0; i < VUS; i += 1) {
+    const res = http.post(
+      `${API_BASE_URL}${DIALOGS_ENDPOINT}`,
+      JSON.stringify({ title: `k6 Benchmark VU ${i + 1}` }),
+      { headers: userHeaders, timeout: REQUEST_TIMEOUT, tags: { name: 'dialogs_create' } },
+    );
+    const created = parseJsonBody(res);
+    if (res.status < 200 || res.status >= 300 || !created || !created.id) {
+      throw new Error(`[semcache] failed to create benchmark dialog: HTTP ${res.status}`);
+    }
+    dialogIds.push(created.id);
+  }
+
+  return {
+    startedAt: Date.now(),
+    dialogIds,
+    kbSourceIdToUuid,
+  };
 }
 
-export default function () {
-  // `iterationInTest` is unique across all VUs, so every dataset row is sent exactly once.
+export default function (data) {
   const item = dataset[exec.scenario.iterationInTest];
-  const { res, parsed } = postChat(item, {
+  const dialogId = data.dialogIds[(exec.vu.idInTest - 1) % data.dialogIds.length];
+
+  const { res, parsed } = sendMessage(dialogId, item.prompt, item.category, {
     category: item.category,
     language: item.language,
     cluster_density: item.cluster_density,
@@ -309,14 +451,11 @@ export default function () {
     return;
   }
 
-  // Latency, overall and per cache status
   reqDuration.add(res.timings.duration);
   if (status === 'HIT') hitLatency.add(res.timings.duration);
   else if (status === 'MISS') missLatency.add(res.timings.duration);
   else bypassLatency.add(res.timings.duration);
 
-  // Hit rate and false hits. A HIT is false when the row requires a miss (first occurrence, trap,
-  // edge case) or when the backend reports a different matched intent than the labeled one.
   const isHit = status === 'HIT';
   const mustMiss = item.expected_behavior === 'cache_miss_required';
   hitRate.add(isHit);
@@ -327,23 +466,18 @@ export default function () {
   if (!mustMiss) paraphraseRecall.add(isHit);
   else missRequiredFalsePositive.add(isHit);
   if (isHit) {
-    const wrongIntent =
-      parsed.matchedIntentId !== undefined && parsed.matchedIntentId !== item.intent_id;
-    const isFalse = mustMiss || wrongIntent;
-    falseHitRate.add(isFalse);
-    if (isFalse) {
+    falseHitRate.add(mustMiss);
+    if (mustMiss) {
       falseHits.add(1);
       if (item.query_type === 'near_duplicate_trap') trapFalseHits.add(1);
     }
   }
 
-  // Tokens and cost
   if (isHit) {
-    const saved = firstDefined(
-      parsed.savedTokens,
-      observedTokenCount > 0 ? Math.round(observedTokenSum / observedTokenCount) : undefined,
-      BASELINE_TOKENS_PER_REQ,
-    );
+    const saved =
+      observedTokenCount > 0
+        ? Math.round(observedTokenSum / observedTokenCount)
+        : BASELINE_TOKENS_PER_REQ;
     tokensSaved.add(saved);
     costSaved.add(tokenCost(undefined, undefined, saved));
   } else if (parsed.usage.total !== undefined) {
@@ -362,8 +496,9 @@ export default function () {
 }
 
 /**
- * Post-load KB invalidation check: for each scenario, update a KB source, re-send queries that were
- * cached during the load phase and verify none is served from a stale cache entry.
+ * Post-load KB invalidation check: for each scenario, reprocess the KB document with updated v2
+ * content (which triggers automatic cache.invalidate.bySources), re-send affected queries, and
+ * verify none is served from a stale cache entry.
  */
 export function teardown(data) {
   loadPhaseDuration.add((Date.now() - data.startedAt) / 1000);
@@ -372,14 +507,126 @@ export function teardown(data) {
     return;
   }
 
+  const adminHeaders = buildHeaders(ADMIN_TOKEN);
+  const dialogId = data.dialogIds[0];
+  const updatedSourceIds = [];
+
+  const hasPerSourceSeeds = Object.keys(data.kbSourceIdToUuid || {}).length > 0;
+  if (!hasPerSourceSeeds) {
+    // User uploaded their own KB (e.g. docs/telecom-knowledge-base.md); pick the first ready
+    // document, reprocess it with an updated policy fact, verify cache invalidation, and restore.
+    const listRes = http.get(`${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}`, {
+      headers: adminHeaders,
+      timeout: REQUEST_TIMEOUT,
+      tags: { name: 'kb_list_teardown' },
+    });
+    const docs = listRes.status >= 200 && listRes.status < 300 ? parseJsonBody(listRes) : [];
+    const targetDoc = Array.isArray(docs)
+      ? docs.find((d) => d.status === 'ready') || docs[0]
+      : null;
+    if (!targetDoc || !targetDoc.id) {
+      console.warn('[semcache] skipping KB invalidation: no uploaded KB document found');
+      return;
+    }
+
+    const detailRes = http.get(`${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}/${targetDoc.id}`, {
+      headers: adminHeaders,
+      timeout: REQUEST_TIMEOUT,
+      tags: { name: 'kb_get_teardown' },
+    });
+    const detail =
+      detailRes.status >= 200 && detailRes.status < 300 ? parseJsonBody(detailRes) : null;
+    const originalContent = detail && detail.content ? String(detail.content) : null;
+    if (!originalContent) {
+      console.warn('[semcache] skipping KB invalidation: unable to read document content');
+      return;
+    }
+
+    const updatedContent = originalContent
+      .replace(/€2 monthly discount/gi, '€4 monthly discount')
+      .replace(/save €2 per month/gi, 'save €4 per month');
+    const updateRes = http.post(
+      `${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}/${targetDoc.id}/reprocess`,
+      JSON.stringify({ content: updatedContent }),
+      {
+        headers: adminHeaders,
+        timeout: REQUEST_TIMEOUT,
+        tags: { name: 'kb_source_update', scenario: 'user-kb-autopay-update' },
+      },
+    );
+    const updated = updateRes.status >= 200 && updateRes.status < 300;
+    kbUpdates.add(1);
+    kbUpdateSuccess.add(updated);
+    check(updateRes, { 'KB source reprocess is 2xx': () => updated });
+    if (updated) {
+      if (KB_PROPAGATION_MS > 0) sleep(KB_PROPAGATION_MS / 1000);
+      const autopayQueries = [
+        'How do I turn on autopay for my mobile plan?',
+        'Як підключити автоплатіж за мій тариф?',
+      ];
+      autopayQueries.forEach((prompt, i) => {
+        const { res, parsed } = sendMessage(dialogId, prompt, 'billing', {
+          phase: 'kb_invalidation',
+          scenario: 'user-kb-autopay-update',
+        });
+        kbChecks.add(1);
+        kbInvalidationLatency.add(res.timings.duration);
+        const notHit = parsed.cacheStatus !== 'HIT';
+        const stale = containsMarker(parsed.answer, '€2') && !containsMarker(parsed.answer, '€4');
+        kbInvalidationMiss.add(notHit);
+        kbStalePrevented.add(notHit && !stale);
+        if (i === 0 && CACHE_MODE !== 'no-cache') {
+          const again = sendMessage(dialogId, prompt, 'billing', {
+            phase: 'kb_reverify',
+            scenario: 'user-kb-autopay-update',
+          });
+          kbReverifyHit.add(again.parsed.cacheStatus === 'HIT');
+        }
+      });
+
+      const probe = sendMessage(
+        dialogId,
+        'What is the monthly AutoPay discount on postpaid plans?',
+        'billing',
+        { phase: 'kb_probe', scenario: 'user-kb-autopay-update' },
+      );
+      kbFreshFact.add(containsMarker(probe.parsed.answer, '€4'));
+
+      if (RESTORE_KB_AFTER_TEST) {
+        http.post(
+          `${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}/${targetDoc.id}/reprocess`,
+          JSON.stringify({ content: originalContent }),
+          {
+            headers: adminHeaders,
+            timeout: REQUEST_TIMEOUT,
+            tags: { name: 'kb_restore_original' },
+          },
+        );
+      }
+    }
+    return;
+  }
+
   for (let s = 0; s < scenarios.length; s += 1) {
     const scenario = scenarios[s];
-    const update = http.request(
-      KB_UPDATE_METHOD,
-      `${API_BASE_URL}${KB_SOURCE_ENDPOINT}/${scenario.kb_source_id}`,
-      JSON.stringify(scenario.update_payload),
+    const docId = data.kbSourceIdToUuid[scenario.kb_source_id];
+    if (!docId) {
+      console.warn(`[semcache] skipping ${scenario.scenario_id}: KB document UUID not found`);
+      continue;
+    }
+
+    const update = http.post(
+      `${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}/${docId}/reprocess`,
+      JSON.stringify({
+        title: scenario.update_payload.title,
+        content: scenario.update_payload.content,
+        metadata: {
+          kb_source_id: scenario.kb_source_id,
+          version: scenario.update_payload.version,
+        },
+      }),
       {
-        headers: buildHeaders(ADMIN_TOKEN),
+        headers: adminHeaders,
         timeout: REQUEST_TIMEOUT,
         tags: { name: 'kb_source_update', scenario: scenario.scenario_id },
       },
@@ -387,21 +634,18 @@ export function teardown(data) {
     const updated = update.status >= 200 && update.status < 300;
     kbUpdates.add(1);
     kbUpdateSuccess.add(updated);
-    check(update, { 'KB source update is 2xx': () => updated });
+    check(update, { 'KB source reprocess is 2xx': () => updated });
     if (!updated) {
-      console.error(`[semcache] KB update ${scenario.kb_source_id} failed: HTTP ${update.status}`);
-      continue; // nothing to verify if the source was not updated
+      console.error(
+        `[semcache] KB reprocess ${scenario.kb_source_id} failed: HTTP ${update.status}`,
+      );
+      continue;
     }
+    updatedSourceIds.push(scenario.kb_source_id);
     if (KB_PROPAGATION_MS > 0) sleep(KB_PROPAGATION_MS / 1000);
 
     scenario.verification_queries.forEach((query, i) => {
-      const item = {
-        id: `${query.record_id}-kbu`,
-        prompt: query.prompt,
-        language: query.language,
-        category: scenario.category,
-      };
-      const { res, parsed } = postChat(item, {
+      const { res, parsed } = sendMessage(dialogId, query.prompt, scenario.category, {
         phase: 'kb_invalidation',
         scenario: scenario.scenario_id,
       });
@@ -420,24 +664,40 @@ export function teardown(data) {
         );
       }
 
-      // The first query was just re-answered from the updated KB; asking again should hit the new entry.
       if (i === 0 && CACHE_MODE !== 'no-cache') {
-        const again = postChat(item, { phase: 'kb_reverify', scenario: scenario.scenario_id });
+        const again = sendMessage(dialogId, query.prompt, scenario.category, {
+          phase: 'kb_reverify',
+          scenario: scenario.scenario_id,
+        });
         kbReverifyHit.add(again.parsed.cacheStatus === 'HIT');
       }
     });
 
-    // Fact probes: not cached before, so they only test that retrieval uses the updated KB content.
-    scenario.fact_probe_queries.forEach((probe, i) => {
-      const item = {
-        id: `${scenario.scenario_id}-probe-${i}`,
-        prompt: probe.prompt,
-        language: probe.language,
-        category: scenario.category,
-      };
-      const { parsed } = postChat(item, { phase: 'kb_probe', scenario: scenario.scenario_id });
+    scenario.fact_probe_queries.forEach((probe) => {
+      const { parsed } = sendMessage(dialogId, probe.prompt, scenario.category, {
+        phase: 'kb_probe',
+        scenario: scenario.scenario_id,
+      });
       kbFreshFact.add(anyMarker(parsed.answer, scenario.fresh_markers));
     });
+  }
+
+  if (RESTORE_KB_AFTER_TEST && updatedSourceIds.length > 0) {
+    for (let i = 0; i < updatedSourceIds.length; i += 1) {
+      const sid = updatedSourceIds[i];
+      const src = kbSources.find((k) => k.kb_source_id === sid);
+      const docId = data.kbSourceIdToUuid[sid];
+      if (!src || !docId) continue;
+      http.post(
+        `${API_BASE_URL}${KB_DOCUMENTS_ENDPOINT}/${docId}/reprocess`,
+        JSON.stringify({
+          title: src.title,
+          content: formatKbV1Content(src),
+          metadata: { kb_source_id: src.kb_source_id, version: src.version },
+        }),
+        { headers: adminHeaders, timeout: REQUEST_TIMEOUT, tags: { name: 'kb_restore_v1' } },
+      );
+    }
   }
 }
 
