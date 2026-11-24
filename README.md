@@ -130,13 +130,14 @@ Stop the database:
 pnpm db:down
 ```
 
-### 4. Apply Database Migrations (`auth-service`, `dialog-service`, & `knowledge-base-service`)
+### 4. Apply Database Migrations (`auth-service`, `dialog-service`, `semantic-cache-service`, & `knowledge-base-service`)
 
-After starting PostgreSQL, apply the Drizzle ORM migrations for `auth-service`, `dialog-service`, and `knowledge-base-service`:
+After starting PostgreSQL, apply the Drizzle ORM migrations for `auth-service`, `dialog-service`, `semantic-cache-service`, and `knowledge-base-service`:
 
 ```bash
 pnpm --filter @semcache/auth-service db:migrate
 pnpm --filter @semcache/dialog-service db:migrate
+pnpm --filter @semcache/semantic-cache-service db:migrate
 pnpm --filter @semcache/knowledge-base-service db:migrate
 ```
 
@@ -151,6 +152,7 @@ Set `OPENROUTER_API_KEY` in `apps/llm-service/.env` (copied from `apps/llm-servi
 - Application design, telecom UX standards, and UI architecture (`shadcn/ui` + Radix UI + Tailwind CSS): [docs/app-design-and-standards.md](./docs/app-design-and-standards.md)
 - Authentication, CSRF protection, rate limiting, RBAC policies, API Gateway identity headers, and React integration: [docs/authentication-and-authorization.md](./docs/authentication-and-authorization.md)
 - OpenRouter chat integration (`@nestjs/ai`), LangGraph dialog orchestration (`@langchain/langgraph`), and free-model enforcement: [docs/chat-and-llm-architecture.md](./docs/chat-and-llm-architecture.md)
+- Semantic cache (`pgvector`, HNSW, caching regimes, adaptive threshold, operator API, & KB invalidation): [docs/semantic-cache-architecture.md](./docs/semantic-cache-architecture.md)
 
 ---
 

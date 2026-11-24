@@ -51,8 +51,9 @@ export class KnowledgeBaseController {
   @MessagePattern(SERVICE_TCP_PATTERNS.KB_DOCUMENTS_DELETE)
   async deleteDocument(
     @Payload('documentId', ParseUUIDPipe) documentId: string,
+    @Payload('headers') headers?: Record<string, string>,
   ): Promise<DeleteKnowledgeDocumentResponseDto> {
-    return this.knowledgeBaseService.deleteDocument(documentId);
+    return this.knowledgeBaseService.deleteDocument(documentId, headers);
   }
 
   @Can(KnowledgeBasePolicy, 'manageDocuments')
@@ -60,8 +61,9 @@ export class KnowledgeBaseController {
   async reprocessDocument(
     @Payload('documentId', ParseUUIDPipe) documentId: string,
     @Payload('body') dto?: ReprocessKnowledgeDocumentDto,
+    @Payload('headers') headers?: Record<string, string>,
   ): Promise<KnowledgeDocumentDetailResponseDto> {
-    return this.knowledgeBaseService.reprocessDocument(documentId, dto);
+    return this.knowledgeBaseService.reprocessDocument(documentId, dto, headers);
   }
 
   @Authenticate({ optional: true })

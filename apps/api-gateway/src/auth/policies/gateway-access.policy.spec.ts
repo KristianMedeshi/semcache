@@ -47,5 +47,8 @@ describe('GatewayAccessPolicy', () => {
     expect(policy.updateProfile(customer, otherId)).toBe(false);
     expect(policy.manageUsers(customer)).toBe(false);
     expect(policy.manageUsers(admin)).toBe(true);
+    expect(policy.manageSemanticCache(customer)).toBe(false);
+    expect(policy.manageSemanticCache(admin)).toBe(true);
+    expect(policy.manageSemanticCache(null)).toBe(false);
   });
 });

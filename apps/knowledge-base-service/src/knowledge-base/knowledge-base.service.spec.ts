@@ -14,7 +14,10 @@ import { DocumentProcessorService } from './document-processor.service';
 import type { KnowledgeBaseRepository } from './knowledge-base.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
 
-function createKnowledgeBaseHarness(options?: { llmSendImpl?: jest.Mock }) {
+function createKnowledgeBaseHarness(options?: {
+  llmSendImpl?: jest.Mock;
+  cacheSendImpl?: jest.Mock;
+}) {
   const docs = new Map<string, KnowledgeDocumentRecord>();
   const chunksByDoc = new Map<string, KnowledgeChunkRecord[]>();
 
@@ -131,14 +134,20 @@ function createKnowledgeBaseHarness(options?: { llmSendImpl?: jest.Mock }) {
     );
 
   const llmClient = { send: llmSendMock } as unknown as ClientProxy;
+  const cacheSendMock =
+    options?.cacheSendImpl ??
+    jest.fn(() => of({ invalidatedCount: 1, scope: 'sources', documentIds: [] }));
+  const semanticCacheClient = { send: cacheSendMock } as unknown as ClientProxy;
   const processor = new DocumentProcessorService();
   const service = new KnowledgeBaseService(
     mockRepo as KnowledgeBaseRepository,
     processor,
     llmClient,
+    undefined,
+    semanticCacheClient,
   );
 
-  return { service, mockRepo, llmSendMock, docs, chunksByDoc };
+  return { service, mockRepo, llmSendMock, cacheSendMock, docs, chunksByDoc };
 }
 
 describe('KnowledgeBaseService', () => {
@@ -237,5 +246,28 @@ describe('KnowledgeBaseService', () => {
     ).rejects.toThrow(BadRequestException);
 
     await expect(service.retrieveContext({ query: '   ' })).rejects.toThrow(BadRequestException);
+  });
+
+  it('notifies semantic-cache-service on reprocess and delete, and tolerates cache errors', async () => {
+    const cacheSendMock = jest
+      .fn()
+      .mockReturnValueOnce(of({ invalidatedCount: 1, scope: 'sources' }))
+      .mockReturnValueOnce(throwError(() => new Error('Cache TCP unavailable')));
+
+    const { service } = createKnowledgeBaseHarness({ cacheSendImpl: cacheSendMock });
+    const doc = await service.uploadDocument({
+      title: 'Roaming Guide',
+      content: '25 GB EU roaming included.',
+    });
+
+    await service.reprocessDocument(doc.id, undefined, { 'x-internal-user-id': 'admin-1' });
+    expect(cacheSendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES, {
+      headers: { 'x-internal-user-id': 'admin-1' },
+      body: { documentIds: [doc.id] },
+    });
+
+    const deleted = await service.deleteDocument(doc.id);
+    expect(deleted.deleted).toBe(true);
+    expect(cacheSendMock).toHaveBeenCalledTimes(2);
   });
 });

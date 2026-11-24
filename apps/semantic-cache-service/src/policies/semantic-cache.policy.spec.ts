@@ -27,9 +27,17 @@ describe('SemanticCachePolicy', () => {
     expect(policy.store(null)).toBe(true);
   });
 
-  it('restricts cache invalidation to admins', () => {
+  it('restricts cache invalidation, settings management, and stats to admins', () => {
     expect(policy.invalidate(admin)).toBe(true);
     expect(policy.invalidate(customer)).toBe(false);
     expect(policy.invalidate(null)).toBe(false);
+
+    expect(policy.manageSettings(admin)).toBe(true);
+    expect(policy.manageSettings(customer)).toBe(false);
+    expect(policy.manageSettings(null)).toBe(false);
+
+    expect(policy.readStats(admin)).toBe(true);
+    expect(policy.readStats(customer)).toBe(false);
+    expect(policy.readStats(null)).toBe(false);
   });
 });

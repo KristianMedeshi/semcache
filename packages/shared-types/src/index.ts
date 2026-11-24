@@ -52,6 +52,15 @@ export enum QueryCategory {
 }
 
 /**
+ * Semantic cache operational regime.
+ */
+export enum CacheMode {
+  DISABLED = 'disabled',
+  FIXED = 'fixed',
+  ADAPTIVE = 'adaptive',
+}
+
+/**
  * Semantic cache lookup outcome status.
  */
 export enum CacheHitStatus {
@@ -69,6 +78,8 @@ export interface SemanticEvaluationMetadata {
   adaptiveThreshold: number;
   localClusterDensity?: number;
   cacheStatus: CacheHitStatus;
+  mode?: CacheMode;
+  neighborCount?: number;
 }
 
 /**
@@ -161,6 +172,14 @@ export const SERVICE_TCP_PATTERNS = {
   KB_DOCUMENTS_DELETE: 'kb.documents.delete',
   KB_DOCUMENTS_REPROCESS: 'kb.documents.reprocess',
   KB_CONTEXT_RETRIEVE: 'kb.context.retrieve',
+  CACHE_LOOKUP: 'cache.lookup',
+  CACHE_STORE: 'cache.store',
+  CACHE_INVALIDATE_BY_SOURCES: 'cache.invalidate.bySources',
+  CACHE_INVALIDATE_BY_CATEGORY: 'cache.invalidate.byCategory',
+  CACHE_CLEAR_ALL: 'cache.clear.all',
+  CACHE_SETTINGS_GET: 'cache.settings.get',
+  CACHE_SETTINGS_UPDATE: 'cache.settings.update',
+  CACHE_STATS_GET: 'cache.stats.get',
 } as const;
 
 export type ServiceTcpPattern = (typeof SERVICE_TCP_PATTERNS)[keyof typeof SERVICE_TCP_PATTERNS];

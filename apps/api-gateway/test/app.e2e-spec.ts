@@ -14,9 +14,12 @@ import type {
   DialogMessageStreamEventDto,
   DialogTcpRequestDto,
   KnowledgeBaseTcpRequestDto,
+  SemanticCacheTcpRequestDto,
 } from '@semcache/shared-dtos';
 import {
+  CacheMode,
   ChatMessageRole,
+  QueryCategory,
   SERVICE_TCP_PATTERNS,
   ServiceName,
   UserRole,
@@ -33,6 +36,10 @@ const capturedDialogRequests: Array<{ pattern: string; payload: DialogTcpRequest
 const capturedKbRequests: Array<{
   pattern: string;
   payload: KnowledgeBaseTcpRequestDto<unknown>;
+}> = [];
+const capturedCacheRequests: Array<{
+  pattern: string;
+  payload: SemanticCacheTcpRequestDto<unknown>;
 }> = [];
 
 @Controller()
@@ -55,13 +62,17 @@ class MockAuthController {
   @MessagePattern(SERVICE_TCP_PATTERNS.AUTH_ME)
   me(@Payload() payload: AuthTcpRequestDto<unknown>) {
     capturedAuthRequests.push({ pattern: SERVICE_TCP_PATTERNS.AUTH_ME, payload });
-    if (!payload.headers?.cookie) {
+    const cookieHeader = Array.isArray(payload.headers?.cookie)
+      ? payload.headers?.cookie[0]
+      : payload.headers?.cookie;
+    if (!cookieHeader) {
       throw new RpcException({ statusCode: 401, message: 'Unauthorized' });
     }
+    const isAdmin = cookieHeader.includes('admin-test-token');
     return {
-      id: '11111111-1111-4111-8111-111111111111',
-      email: 'alice@example.com',
-      role: UserRole.CUSTOMER,
+      id: isAdmin ? '99999999-9999-4999-8999-999999999999' : '11111111-1111-4111-8111-111111111111',
+      email: isAdmin ? 'admin@example.com' : 'alice@example.com',
+      role: isAdmin ? UserRole.ADMIN : UserRole.CUSTOMER,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
@@ -239,11 +250,68 @@ class MockKbController {
 })
 class MockKbModule {}
 
+@Controller()
+class MockSemanticCacheController {
+  @MessagePattern(SERVICE_TCP_PATTERNS.CACHE_SETTINGS_GET)
+  getSettings(@Payload() payload: SemanticCacheTcpRequestDto<unknown>) {
+    capturedCacheRequests.push({ pattern: SERVICE_TCP_PATTERNS.CACHE_SETTINGS_GET, payload });
+    return { id: 'default', mode: CacheMode.ADAPTIVE, fixedThreshold: 0.9 };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.CACHE_SETTINGS_UPDATE)
+  updateSettings(@Payload() payload: SemanticCacheTcpRequestDto<{ mode?: CacheMode }>) {
+    capturedCacheRequests.push({ pattern: SERVICE_TCP_PATTERNS.CACHE_SETTINGS_UPDATE, payload });
+    return { id: 'default', mode: payload.body?.mode ?? CacheMode.FIXED, fixedThreshold: 0.92 };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.CACHE_STATS_GET)
+  getStats(@Payload() payload: SemanticCacheTcpRequestDto<unknown>) {
+    capturedCacheRequests.push({ pattern: SERVICE_TCP_PATTERNS.CACHE_STATS_GET, payload });
+    return { mode: CacheMode.ADAPTIVE, totalEntries: 4, totalHits: 12, byCategory: [] };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES)
+  invalidateBySources(@Payload() payload: SemanticCacheTcpRequestDto<{ documentIds: string[] }>) {
+    capturedCacheRequests.push({
+      pattern: SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES,
+      payload,
+    });
+    return {
+      invalidatedCount: 2,
+      scope: 'sources',
+      documentIds: payload.body?.documentIds ?? [],
+    };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_CATEGORY)
+  invalidateByCategory(
+    @Payload() payload: SemanticCacheTcpRequestDto<{ category: QueryCategory }>,
+  ) {
+    capturedCacheRequests.push({
+      pattern: SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_CATEGORY,
+      payload,
+    });
+    return { invalidatedCount: 1, scope: 'category', category: payload.body?.category };
+  }
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL)
+  clearAll(@Payload() payload: SemanticCacheTcpRequestDto<unknown>) {
+    capturedCacheRequests.push({ pattern: SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL, payload });
+    return { invalidatedCount: 4, scope: 'all' };
+  }
+}
+
+@Module({
+  controllers: [MockSemanticCacheController],
+})
+class MockSemanticCacheModule {}
+
 describe('API Gateway (e2e)', () => {
   let app: INestApplication<App>;
   let mockAuthMicroservice: INestMicroservice;
   let mockDialogMicroservice: INestMicroservice;
   let mockKbMicroservice: INestMicroservice;
+  let mockSemanticCacheMicroservice: INestMicroservice;
   const originalEnv = { ...process.env };
 
   beforeAll(async () => {
@@ -274,15 +342,28 @@ describe('API Gateway (e2e)', () => {
     });
     await mockKbMicroservice.listen();
 
+    mockSemanticCacheMicroservice = await NestFactory.createMicroservice<MicroserviceOptions>(
+      MockSemanticCacheModule,
+      {
+        transport: Transport.TCP,
+        options: { host: '127.0.0.1', port: 0 },
+        logger: false,
+      },
+    );
+    await mockSemanticCacheMicroservice.listen();
+
     const authAddress = mockAuthMicroservice.unwrap<Server>().address() as AddressInfo;
     const dialogAddress = mockDialogMicroservice.unwrap<Server>().address() as AddressInfo;
     const kbAddress = mockKbMicroservice.unwrap<Server>().address() as AddressInfo;
+    const cacheAddress = mockSemanticCacheMicroservice.unwrap<Server>().address() as AddressInfo;
     process.env.AUTH_SERVICE_HOST = '127.0.0.1';
     process.env.AUTH_SERVICE_PORT = String(authAddress.port);
     process.env.DIALOG_SERVICE_HOST = '127.0.0.1';
     process.env.DIALOG_SERVICE_PORT = String(dialogAddress.port);
     process.env.KNOWLEDGE_BASE_SERVICE_HOST = '127.0.0.1';
     process.env.KNOWLEDGE_BASE_SERVICE_PORT = String(kbAddress.port);
+    process.env.SEMANTIC_CACHE_SERVICE_HOST = '127.0.0.1';
+    process.env.SEMANTIC_CACHE_SERVICE_PORT = String(cacheAddress.port);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -297,6 +378,7 @@ describe('API Gateway (e2e)', () => {
     capturedAuthRequests.length = 0;
     capturedDialogRequests.length = 0;
     capturedKbRequests.length = 0;
+    capturedCacheRequests.length = 0;
   });
 
   afterAll(async () => {
@@ -304,6 +386,7 @@ describe('API Gateway (e2e)', () => {
     await mockAuthMicroservice.close();
     await mockDialogMicroservice.close();
     await mockKbMicroservice.close();
+    await mockSemanticCacheMicroservice.close();
     process.env = { ...originalEnv };
   });
 
@@ -471,6 +554,69 @@ describe('API Gateway (e2e)', () => {
     expect(capturedKbRequests.map((r) => r.pattern)).toEqual([
       SERVICE_TCP_PATTERNS.KB_DOCUMENTS_LIST,
       SERVICE_TCP_PATTERNS.KB_CONTEXT_RETRIEVE,
+    ]);
+  });
+
+  it('enforces ADMIN RBAC, validates payloads, and proxies /admin/semantic-cache/* over TCP', async () => {
+    await request(app.getHttpServer()).get('/admin/semantic-cache/settings').expect(401);
+
+    await request(app.getHttpServer())
+      .get('/admin/semantic-cache/settings')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .patch('/admin/semantic-cache/settings')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .send({ fixedThreshold: 1.5 })
+      .expect(400);
+
+    const getRes = await request(app.getHttpServer())
+      .get('/admin/semantic-cache/settings')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .expect(200);
+    expect(getRes.body.mode).toBe(CacheMode.ADAPTIVE);
+
+    const patchRes = await request(app.getHttpServer())
+      .patch('/admin/semantic-cache/settings')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .send({ mode: CacheMode.FIXED, fixedThreshold: 0.92 })
+      .expect(200);
+    expect(patchRes.body.mode).toBe(CacheMode.FIXED);
+
+    const statsRes = await request(app.getHttpServer())
+      .get('/admin/semantic-cache/stats')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .expect(200);
+    expect(statsRes.body.totalEntries).toBe(4);
+
+    const docId = '11111111-1111-4111-8111-111111111111';
+    const invSourcesRes = await request(app.getHttpServer())
+      .post('/admin/semantic-cache/invalidate/sources')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .send({ documentIds: [docId] })
+      .expect(200);
+    expect(invSourcesRes.body.invalidatedCount).toBe(2);
+
+    const invCatRes = await request(app.getHttpServer())
+      .delete(`/admin/semantic-cache/entries/category/${QueryCategory.BILLING}`)
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .expect(200);
+    expect(invCatRes.body.scope).toBe('category');
+
+    const clearRes = await request(app.getHttpServer())
+      .delete('/admin/semantic-cache/entries')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .expect(200);
+    expect(clearRes.body.scope).toBe('all');
+
+    expect(capturedCacheRequests.map((r) => r.pattern)).toEqual([
+      SERVICE_TCP_PATTERNS.CACHE_SETTINGS_GET,
+      SERVICE_TCP_PATTERNS.CACHE_SETTINGS_UPDATE,
+      SERVICE_TCP_PATTERNS.CACHE_STATS_GET,
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES,
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_CATEGORY,
+      SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL,
     ]);
   });
 });

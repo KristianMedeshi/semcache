@@ -1,5 +1,6 @@
 import {
   CacheHitStatus,
+  CacheMode,
   ChatMessageRole,
   HealthCheckStatus,
   KnowledgeDocumentFormat,
@@ -30,12 +31,62 @@ export interface ApiErrorResponseDto {
 }
 
 /**
+ * Shared validation limits and defaults for semantic cache operations and adaptive thresholds.
+ */
+export const SEMANTIC_CACHE_VALIDATION_LIMITS = {
+  QUERY_MIN_LENGTH: 1,
+  QUERY_MAX_LENGTH: 8_000,
+  RESPONSE_MIN_LENGTH: 1,
+  RESPONSE_MAX_LENGTH: 32_000,
+  EMBEDDING_DIMENSIONS: 384,
+  MIN_THRESHOLD: 0,
+  MAX_THRESHOLD: 1,
+  DEFAULT_FIXED_THRESHOLD: 0.9,
+  DEFAULT_BASE_THRESHOLD: 0.85,
+  DEFAULT_MIN_ADAPTIVE_THRESHOLD: 0.72,
+  DEFAULT_MAX_ADAPTIVE_THRESHOLD: 0.97,
+  DEFAULT_DENSITY_WEIGHT: 0.08,
+  DEFAULT_DENSITY_K_NEIGHBORS: 5,
+  MIN_DENSITY_K_NEIGHBORS: 1,
+  MAX_DENSITY_K_NEIGHBORS: 50,
+  MIN_DENSITY_WEIGHT: -0.5,
+  MAX_DENSITY_WEIGHT: 0.5,
+  MIN_CATEGORY_WEIGHT: -0.3,
+  MAX_CATEGORY_WEIGHT: 0.3,
+  MAX_SOURCE_IDS_PER_ENTRY: 50,
+} as const;
+
+/**
+ * Default per-category adaptive threshold offsets for telecom customer support queries.
+ */
+export const DEFAULT_SEMANTIC_CACHE_CATEGORY_WEIGHTS: Record<QueryCategory, number> = {
+  [QueryCategory.BILLING]: 0.05,
+  [QueryCategory.ACCOUNT_MANAGEMENT]: 0.04,
+  [QueryCategory.TECHNICAL_SUPPORT]: 0.01,
+  [QueryCategory.PRODUCT_INQUIRY]: -0.02,
+  [QueryCategory.GENERAL]: -0.03,
+};
+
+/**
+ * Reference to a Knowledge Base document/chunk linked to a cached response.
+ */
+export interface CacheKnowledgeSourceReferenceDto {
+  documentId: string;
+  documentTitle?: string;
+  chunkId?: string;
+  chunkIndex?: number;
+}
+
+/**
  * DTO contract for semantic cache lookup request between Dialog/Gateway and Semantic Cache Service.
  */
 export interface SemanticCacheLookupRequestDto {
   query: string;
+  embedding: number[];
   category?: QueryCategory;
   sessionId?: string;
+  mode?: CacheMode;
+  fixedThresholdOverride?: number;
 }
 
 /**
@@ -43,8 +94,133 @@ export interface SemanticCacheLookupRequestDto {
  */
 export interface SemanticCacheLookupResponseDto {
   status: CacheHitStatus;
+  mode: CacheMode;
+  entryId?: string;
   cachedResponse?: string;
-  evaluation?: SemanticEvaluationMetadata;
+  matchedQuery?: string;
+  knowledgeSourceIds?: string[];
+  knowledgeSources?: CacheKnowledgeSourceReferenceDto[];
+  evaluation: SemanticEvaluationMetadata;
+}
+
+/**
+ * DTO contract for storing a query-response pair in the semantic cache.
+ */
+export interface SemanticCacheStoreRequestDto {
+  query: string;
+  response: string;
+  embedding: number[];
+  category?: QueryCategory;
+  knowledgeSourceIds?: string[];
+  knowledgeSources?: CacheKnowledgeSourceReferenceDto[];
+  model?: string;
+  metadata?: Record<string, string | number | boolean>;
+}
+
+/**
+ * DTO representing a persisted semantic cache entry.
+ */
+export interface SemanticCacheEntryResponseDto {
+  id: string;
+  query: string;
+  response: string;
+  category: QueryCategory;
+  model: string | null;
+  hitCount: number;
+  lastHitAt: string | null;
+  knowledgeSourceIds: string[];
+  knowledgeSources: CacheKnowledgeSourceReferenceDto[];
+  metadata: Record<string, string | number | boolean>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * DTO contract for invalidating cached entries linked to updated Knowledge Base documents.
+ */
+export interface InvalidateCacheBySourcesRequestDto {
+  documentIds: string[];
+}
+
+/**
+ * DTO contract for clearing cached entries in a specific intent category.
+ */
+export interface InvalidateCacheByCategoryRequestDto {
+  category: QueryCategory;
+}
+
+export type CacheInvalidationScope = 'sources' | 'category' | 'all';
+
+/**
+ * DTO returned after invalidating or clearing semantic cache entries.
+ */
+export interface CacheInvalidationResponseDto {
+  invalidatedCount: number;
+  scope: CacheInvalidationScope;
+  category?: QueryCategory;
+  documentIds?: string[];
+}
+
+export type SemanticCacheCategoryWeightsDto = Record<QueryCategory, number>;
+
+/**
+ * Persisted semantic cache regime and adaptive threshold configuration.
+ */
+export interface SemanticCacheSettingsResponseDto {
+  id: string;
+  mode: CacheMode;
+  fixedThreshold: number;
+  adaptiveBaseThreshold: number;
+  minAdaptiveThreshold: number;
+  maxAdaptiveThreshold: number;
+  densityWeight: number;
+  densityKNeighbors: number;
+  categoryWeights: SemanticCacheCategoryWeightsDto;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Partial update payload for semantic cache settings.
+ */
+export interface UpdateSemanticCacheSettingsRequestDto {
+  mode?: CacheMode;
+  fixedThreshold?: number;
+  adaptiveBaseThreshold?: number;
+  minAdaptiveThreshold?: number;
+  maxAdaptiveThreshold?: number;
+  densityWeight?: number;
+  densityKNeighbors?: number;
+  categoryWeights?: Partial<SemanticCacheCategoryWeightsDto>;
+}
+
+/**
+ * Per-category entry count and hit summary.
+ */
+export interface SemanticCacheCategoryStatsDto {
+  category: QueryCategory;
+  entryCount: number;
+  totalHits: number;
+}
+
+/**
+ * Aggregate operational statistics for the semantic cache.
+ */
+export interface SemanticCacheStatsResponseDto {
+  mode: CacheMode;
+  totalEntries: number;
+  totalHits: number;
+  byCategory: SemanticCacheCategoryStatsDto[];
+}
+
+/**
+ * TCP RPC request envelope forwarded to `semantic-cache-service`.
+ */
+export interface SemanticCacheTcpRequestDto<TBody = undefined> {
+  headers?: Record<string, string>;
+  category?: QueryCategory;
+  body?: TBody;
 }
 
 export type HealthCheckResponseDto = HealthCheckStatus;

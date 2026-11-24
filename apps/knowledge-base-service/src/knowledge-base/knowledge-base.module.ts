@@ -9,7 +9,11 @@ import { KnowledgeBasePolicy } from '../policies/knowledge-base.policy';
 import { DocumentProcessorService } from './document-processor.service';
 import { KnowledgeBaseController } from './knowledge-base.controller';
 import { KnowledgeBaseRepository } from './knowledge-base.repository';
-import { KnowledgeBaseService, LLM_SERVICE_CLIENT } from './knowledge-base.service';
+import {
+  KnowledgeBaseService,
+  LLM_SERVICE_CLIENT,
+  SEMANTIC_CACHE_SERVICE_CLIENT,
+} from './knowledge-base.service';
 
 @Module({
   imports: [DatabaseModule],
@@ -30,6 +34,25 @@ import { KnowledgeBaseService, LLM_SERVICE_CLIENT } from './knowledge-base.servi
         });
       },
     },
+    {
+      provide: SEMANTIC_CACHE_SERVICE_CLIENT,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<KnowledgeBaseEnv, true>): ClientProxy => {
+        const { host, port } = resolveServiceTcpEndpoint(
+          config,
+          ServiceName.SEMANTIC_CACHE_SERVICE,
+          {
+            hostKey: 'SEMANTIC_CACHE_SERVICE_HOST',
+            portKey: 'SEMANTIC_CACHE_SERVICE_PORT',
+            urlKey: 'SEMANTIC_CACHE_SERVICE_URL',
+          },
+        );
+        return ClientProxyFactory.create({
+          transport: Transport.TCP,
+          options: { host, port },
+        });
+      },
+    },
     InternalIdentityAuth,
     KnowledgeBasePolicy,
     DocumentProcessorService,
@@ -39,9 +62,12 @@ import { KnowledgeBaseService, LLM_SERVICE_CLIENT } from './knowledge-base.servi
   exports: [KnowledgeBaseService, KnowledgeBaseRepository, KnowledgeBasePolicy],
 })
 export class KnowledgeBaseModule implements OnModuleDestroy {
-  constructor(@Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy) {}
+  constructor(
+    @Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy,
+    @Inject(SEMANTIC_CACHE_SERVICE_CLIENT) private readonly semanticCacheClient: ClientProxy,
+  ) {}
 
   async onModuleDestroy(): Promise<void> {
-    await this.llmClient.close();
+    await Promise.all([this.llmClient.close(), this.semanticCacheClient.close()]);
   }
 }

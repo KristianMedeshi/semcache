@@ -14,7 +14,9 @@ import {
   formatRpcErrorMessage,
 } from '@semcache/shared-config';
 import {
+  type CacheInvalidationResponseDto,
   type DeleteKnowledgeDocumentResponseDto,
+  type InvalidateCacheBySourcesRequestDto,
   KNOWLEDGE_BASE_VALIDATION_LIMITS,
   type KnowledgeContextSourceReferenceDto,
   type KnowledgeDocumentDetailResponseDto,
@@ -25,6 +27,7 @@ import {
   type RetrieveKnowledgeContextRequestDto,
   type RetrieveKnowledgeContextResponseDto,
   type RetrievedKnowledgeChunkDto,
+  type SemanticCacheTcpRequestDto,
   type UploadKnowledgeDocumentRequestDto,
 } from '@semcache/shared-dtos';
 import {
@@ -33,7 +36,7 @@ import {
   QueryCategory,
   SERVICE_TCP_PATTERNS,
 } from '@semcache/shared-types';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import type { KnowledgeBaseEnv } from '../config/knowledge-base.env';
 import type { KnowledgeDocumentRecord } from '../db/schema';
 import { DocumentProcessorService } from './document-processor.service';
@@ -44,6 +47,8 @@ import {
 } from './knowledge-base.repository';
 
 export const LLM_SERVICE_CLIENT = Symbol('LLM_SERVICE_CLIENT');
+export const SEMANTIC_CACHE_SERVICE_CLIENT = Symbol('SEMANTIC_CACHE_SERVICE_CLIENT');
+const CACHE_INVALIDATION_TIMEOUT_MS = 3_000;
 
 @Injectable()
 export class KnowledgeBaseService {
@@ -54,6 +59,9 @@ export class KnowledgeBaseService {
     private readonly processor: DocumentProcessorService,
     @Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy,
     @Optional() private readonly config?: ConfigService<KnowledgeBaseEnv, true>,
+    @Optional()
+    @Inject(SEMANTIC_CACHE_SERVICE_CLIENT)
+    private readonly semanticCacheClient?: ClientProxy,
   ) {}
 
   async uploadDocument(
@@ -90,6 +98,7 @@ export class KnowledgeBaseService {
   async reprocessDocument(
     documentId: string,
     options?: { chunkSize?: number; chunkOverlap?: number },
+    headers?: Record<string, string>,
   ): Promise<KnowledgeDocumentDetailResponseDto> {
     const existing = await this.repository.findDocumentById(documentId);
     if (!existing) {
@@ -108,7 +117,9 @@ export class KnowledgeBaseService {
       throw new BadRequestException('chunkOverlap must be strictly less than chunkSize');
     }
 
-    return this.processAndStoreDocument(existing, { chunkSize, chunkOverlap });
+    const result = await this.processAndStoreDocument(existing, { chunkSize, chunkOverlap });
+    await this.invalidateLinkedCacheEntries(documentId, headers);
+    return result;
   }
 
   async listDocuments(
@@ -136,11 +147,16 @@ export class KnowledgeBaseService {
     };
   }
 
-  async deleteDocument(documentId: string): Promise<DeleteKnowledgeDocumentResponseDto> {
+  async deleteDocument(
+    documentId: string,
+    headers?: Record<string, string>,
+  ): Promise<DeleteKnowledgeDocumentResponseDto> {
     const result = await this.repository.deleteDocument(documentId);
     if (!result.deleted) {
       throw new NotFoundException(`Knowledge document ${documentId} not found`);
     }
+
+    await this.invalidateLinkedCacheEntries(documentId, headers);
 
     return {
       id: documentId,
@@ -312,6 +328,37 @@ export class KnowledgeBaseService {
           `[Source ${index + 1}: ${result.documentTitle}${result.fileName ? ` (${result.fileName})` : ''} | Category: ${result.category} | Section Chunk #${result.chunkIndex + 1}]\n${result.content}`,
       )
       .join('\n\n---\n\n');
+  }
+
+  private async invalidateLinkedCacheEntries(
+    documentId: string,
+    headers?: Record<string, string>,
+  ): Promise<void> {
+    if (!this.semanticCacheClient) {
+      return;
+    }
+
+    try {
+      await firstValueFrom(
+        this.semanticCacheClient
+          .send<
+            CacheInvalidationResponseDto,
+            SemanticCacheTcpRequestDto<InvalidateCacheBySourcesRequestDto>
+          >(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES, {
+            ...(headers ? { headers } : {}),
+            body: { documentIds: [documentId] },
+          })
+          .pipe(timeout(CACHE_INVALIDATION_TIMEOUT_MS)),
+      );
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'kb.semantic_cache.invalidation_failed',
+          documentId,
+          error: error instanceof Error ? error.message : 'Unknown cache TCP error',
+        }),
+      );
+    }
   }
 
   private formatProcessingError(error: unknown): string {

@@ -23,7 +23,11 @@ export function App() {
   useEffect(() => {
     applyThemeToDocument(theme);
 
-    if (theme !== 'system' || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    if (
+      theme !== 'system' ||
+      typeof window === 'undefined' ||
+      typeof window.matchMedia !== 'function'
+    ) {
       return;
     }
 

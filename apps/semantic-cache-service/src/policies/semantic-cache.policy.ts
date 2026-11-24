@@ -12,6 +12,18 @@ export class SemanticCachePolicy {
   }
 
   invalidate(user: AuthenticatedUser | null): boolean {
+    return this.isAdmin(user);
+  }
+
+  manageSettings(user: AuthenticatedUser | null): boolean {
+    return this.isAdmin(user);
+  }
+
+  readStats(user: AuthenticatedUser | null): boolean {
+    return this.isAdmin(user);
+  }
+
+  private isAdmin(user: AuthenticatedUser | null): boolean {
     return user !== null && user.role === UserRole.ADMIN;
   }
 }

@@ -17,6 +17,9 @@ export const knowledgeBaseEnvSchema = baseEnvSchema
     LLM_SERVICE_HOST: optionalString(),
     LLM_SERVICE_PORT: positiveInt('LLM_SERVICE_PORT').optional(),
     LLM_SERVICE_URL: optionalString(),
+    SEMANTIC_CACHE_SERVICE_HOST: optionalString(),
+    SEMANTIC_CACHE_SERVICE_PORT: positiveInt('SEMANTIC_CACHE_SERVICE_PORT').optional(),
+    SEMANTIC_CACHE_SERVICE_URL: optionalString(),
     KB_CHUNK_SIZE: positiveInt('KB_CHUNK_SIZE').default(
       KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_SIZE,
     ),

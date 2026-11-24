@@ -11,6 +11,7 @@ import { StripInternalHeadersMiddleware } from './auth/strip-internal-headers.mi
 import { gatewayEnvSchema } from './config/gateway.env';
 import { GatewayDialogsModule } from './dialogs/gateway-dialogs.module';
 import { GatewayKnowledgeBaseModule } from './knowledge-base/gateway-knowledge-base.module';
+import { GatewaySemanticCacheModule } from './semantic-cache/gateway-semantic-cache.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { GatewayKnowledgeBaseModule } from './knowledge-base/gateway-knowledge-b
     GatewayAuthModule,
     GatewayDialogsModule,
     GatewayKnowledgeBaseModule,
+    GatewaySemanticCacheModule,
   ],
   controllers: [AppController],
   providers: [
