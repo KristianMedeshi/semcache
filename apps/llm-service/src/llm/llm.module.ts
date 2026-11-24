@@ -3,9 +3,9 @@ import { Module } from '@nestjs/common';
 import { AiModule } from '@nestjs/ai';
 import { FakeModel } from '@nestjs/ai/testing';
 import { ConfigService } from '@semcache/shared-config';
-import type { LlmEnv } from '../config/llm.env';
+import { DEFAULT_LM_STUDIO_BASE_URL, type LlmEnv } from '../config/llm.env';
 import { LlmController } from './llm.controller';
-import { LlmService, OPENROUTER_PROVIDER } from './llm.service';
+import { LM_STUDIO_PROVIDER, LlmService, OPENROUTER_PROVIDER } from './llm.service';
 import { LlmPolicy } from './policies/llm.policy';
 
 export function createOpenRouterProvider(
@@ -21,24 +21,52 @@ export function createOpenRouterProvider(
   });
 }
 
+export function createLmStudioProvider(
+  config: ConfigService<LlmEnv, true>,
+): OpenAICompatibleProvider | null {
+  const provider = config.get('LLM_PROVIDER') ?? 'openrouter';
+  const configuredBaseUrl = config.get('LM_STUDIO_BASE_URL') ?? '';
+  const baseURL =
+    configuredBaseUrl.length > 0
+      ? configuredBaseUrl
+      : provider === 'lmstudio'
+        ? DEFAULT_LM_STUDIO_BASE_URL
+        : '';
+
+  if (baseURL.length === 0) {
+    return null;
+  }
+
+  return createOpenAICompatible({
+    name: 'lmstudio',
+    baseURL,
+    apiKey: config.get('LM_STUDIO_API_KEY') || 'lm-studio',
+  });
+}
+
 @Module({
   imports: [
     AiModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<LlmEnv, true>) => {
+        const provider = config.get('LLM_PROVIDER') ?? 'openrouter';
         const openRouterApiKey = config.get('OPENROUTER_API_KEY') ?? '';
         const hasApiKey =
           openRouterApiKey.length > 0 &&
           openRouterApiKey !== 'replace_with_your_openrouter_api_key';
         const defaultModelName = config.getOrThrow('OPENROUTER_DEFAULT_MODEL');
+        const lmStudioDefaultModel = config.getOrThrow('LM_STUDIO_DEFAULT_MODEL');
+        const lmStudioProvider = createLmStudioProvider(config);
 
         const defaultModel =
-          config.getOrThrow('NODE_ENV') === 'test' && !hasApiKey
-            ? new FakeModel(() => 'Simulated free OpenRouter assistant response', {
-                provider: 'openrouter',
-                modelId: defaultModelName,
-              })
-            : createOpenRouterProvider(config).chatModel(defaultModelName);
+          provider === 'lmstudio' && lmStudioProvider
+            ? lmStudioProvider.chatModel(lmStudioDefaultModel)
+            : config.getOrThrow('NODE_ENV') === 'test' && !hasApiKey
+              ? new FakeModel(() => 'Simulated free OpenRouter assistant response', {
+                  provider: 'openrouter',
+                  modelId: defaultModelName,
+                })
+              : createOpenRouterProvider(config).chatModel(defaultModelName);
 
         return {
           models: {
@@ -58,6 +86,11 @@ export function createOpenRouterProvider(
       provide: OPENROUTER_PROVIDER,
       inject: [ConfigService],
       useFactory: (config: ConfigService<LlmEnv, true>) => createOpenRouterProvider(config),
+    },
+    {
+      provide: LM_STUDIO_PROVIDER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<LlmEnv, true>) => createLmStudioProvider(config),
     },
     LlmService,
     LlmPolicy,

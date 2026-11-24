@@ -1,7 +1,7 @@
 import {
+  ALLOWED_LLM_MODEL_MESSAGE,
+  ALLOWED_LLM_MODEL_REGEX,
   DIALOG_VALIDATION_LIMITS,
-  FREE_OPENROUTER_MODEL_MESSAGE,
-  FREE_OPENROUTER_MODEL_REGEX,
   type LlmChatCompletionRequestDto,
   type LlmChatMessageDto,
 } from '@semcache/shared-dtos';
@@ -43,7 +43,7 @@ export class ChatCompletionRequestDto implements LlmChatCompletionRequestDto {
   @IsOptional()
   @IsString()
   @MaxLength(DIALOG_VALIDATION_LIMITS.MODEL_MAX_LENGTH)
-  @Matches(FREE_OPENROUTER_MODEL_REGEX, { message: FREE_OPENROUTER_MODEL_MESSAGE })
+  @Matches(ALLOWED_LLM_MODEL_REGEX, { message: ALLOWED_LLM_MODEL_MESSAGE })
   model?: string;
 
   @IsOptional()

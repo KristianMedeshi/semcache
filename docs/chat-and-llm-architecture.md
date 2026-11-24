@@ -126,3 +126,7 @@ In `apps/llm-service/.env`:
 - `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`
 - `OPENROUTER_DEFAULT_MODEL=openrouter/free`
 - `OPENROUTER_TIMEOUT_MS=180000`
+- `LLM_PROVIDER=openrouter` (set to `lmstudio` for local load testing against LM Studio)
+- `LM_STUDIO_BASE_URL=http://localhost:1234/v1`
+- `LM_STUDIO_DEFAULT_MODEL=support-llm`
+- `LM_STUDIO_ALLOWED_MODELS=support-llm,qwen/qwen3-1.7b`
