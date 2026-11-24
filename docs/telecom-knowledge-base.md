@@ -1,820 +1,821 @@
-# SemCache Mobile — Customer Support Knowledge Base
+---
+title: Customer Support Knowledge Base
+version: 1.0
+language: en
+coverage: mobile, home internet, billing, contracts, roaming, SIM/eSIM, service incidents
+intended_use: retrieval-augmented generation (RAG)
+source_basis: dataset_2000.jsonl
+---
 
-Document ID: KB-TELECOM-001
-Language: English
-Version: 1.0
-Last reviewed: 2026-11-23
-Audience: Telecom Assistant (AI customer support) and human agents
-Currency: Euro (EUR, €). All prices include VAT unless stated otherwise.
+# Customer Support Knowledge Base
 
-> NOTE FOR MAINTAINERS: All plans, prices, limits, phone numbers, and policies in this document are illustrative sample data for a fictional operator called "SemCache Mobile". Replace them with real values before production use. Each section is written to be self-contained so that it can be retrieved independently (chunked) without losing meaning.
+## 1. Purpose and service scope
+
+This guide supports customer-service conversations for a telecommunications provider offering mobile plans, SIM and eSIM services, roaming, home internet, router equipment, billing, contracts, and network support.
+
+It is written as operational knowledge rather than a list of question-and-answer pairs. Customers may describe the same issue in different words, use English or Ukrainian, misspell technical terms, mention a device or city, or combine several requests in one message. Classify the underlying need before responding.
+
+### 1.1 Important limits of this knowledge base
+
+The source dataset identifies the topics customers ask about, but it does **not** provide a verified live tariff catalogue, current prices, exact APN strings, country-by-country roaming rates, payment fees, policy thresholds, router-specific LED definitions, outage ETAs, compensation formulas, or the meanings of individual payment/MNP/VoWiFi error codes.
+
+Therefore:
+
+- Do not invent a price, allowance, discount, fee, deadline, eligibility rule, coverage statement, or service-restoration time.
+- Treat plan details, account status, payment status, service availability, and network incidents as time-sensitive or account-specific.
+- Use the current customer account, official tariff catalogue, billing ledger, roaming price list, device documentation, outage system, and approved internal procedures when available.
+- If authoritative information is not available, explain what must be checked and route the case to the relevant support team.
+- Never imply that an action has been completed unless the relevant system confirms it.
+
+### 1.2 Customer communication principles
+
+- Respond in the language used by the customer where possible. The dataset contains both English and Ukrainian requests.
+- Acknowledge urgency or inconvenience without promising an outcome.
+- Ask only for information needed to identify the account or diagnose the issue. Do not request passwords, full payment-card details, one-time passcodes, or a full PUK code in chat.
+- Do not repeat sensitive personal or payment information unnecessarily.
+- Distinguish mobile data from home Wi-Fi, voice calls from SMS, SIM replacement from eSIM transfer, and service cancellation from number porting.
+- If a customer has already tried the app, do not simply repeat “try the app.” Offer another approved route or collect the result of the attempted step.
+- Location can help identify a local incident, but a city mentioned in a message is not proof of the customer’s service address or current location.
 
 ---
 
-# 0. Assistant Guidelines
+## 2. Plans, pricing, allowances, and plan changes
 
-## 0.1 Role and tone
+### 2.1 Understanding a plan and its monthly price
 
-Telecom Assistant is the official AI support assistant of SemCache Mobile. It answers questions about mobile plans, data usage, payments, roaming, SIM and eSIM, network troubleshooting, and account management.
+Customers may ask about the monthly cost of a named plan, the price after a promotional period, or the difference between plans. Explain that the applicable amount can depend on the exact plan, subscription type, active promotion, billing cycle, and account-specific terms.
 
-- Be friendly, concise, and clear. Use plain language and avoid technical jargon unless the customer asks for it.
-- Give step-by-step instructions as numbered lists.
-- Always answer using information from this knowledge base. If the information is not available, say so honestly and offer to connect the customer with a human agent.
-- Never invent prices, dates, coverage promises, or policies.
-- Ask one short clarifying question when the request is ambiguous (for example: "Are you on a prepaid or a monthly plan?").
+Before quoting a price:
 
-## 0.2 Security rules
+1. Confirm the exact plan name and whether the customer means a mobile or home-internet service.
+2. Check the current official catalogue and the customer's active account.
+3. Separate the standard recurring price from a temporary promotional price.
+4. Explain when a promotion ends and what price applies afterward only when the current offer terms confirm it.
+5. Clarify whether the displayed amount includes all recurring components and whether one-time charges are separate.
 
-- SemCache Mobile staff and the assistant NEVER ask for the customer's account password, full card number, card CVV, or one-time verification codes in chat.
-- Never ask the customer to share a one-time code (OTP) with anyone. If a customer reports that someone asked for their code, treat it as possible fraud and advise them to contact a human agent immediately.
-- The assistant cannot change account ownership, cancel a contract, or approve refunds. These actions require a human agent and identity verification.
+Do not infer the price of one plan from another plan with a similar name. A typo or near-match in a plan name should be clarified rather than silently corrected.
 
-## 0.3 Customer-facing transparency rule
+### 2.2 Unlimited plans and fair-use terms
 
-The assistant must not mention internal technology such as caching, similarity scores, embeddings, token counts, model names, or response timings. Answers should read as natural support replies from the official SemCache Mobile assistant.
+“Unlimited” may describe the availability of a service without necessarily meaning that every use case is unrestricted. Customers may ask about speed management, fair-use conditions, tethering or hotspot use, and roaming.
 
-## 0.4 When to escalate to a human agent
+Check the specific plan's current terms for:
 
-Offer escalation to a human agent when:
+- Any fair-use policy and the circumstances in which it applies.
+- Whether speed management can occur and how it is described in the plan terms.
+- Whether hotspot/tethering is included and whether separate conditions apply.
+- Whether domestic use and roaming use have different allowances or restrictions.
 
-1. The customer explicitly asks for a human.
-2. The customer reports suspected fraud, a stolen phone or SIM, or unauthorized charges.
-3. The customer disputes a bill or requests a refund or compensation.
-4. The customer wants to cancel a contract, port out their number, or transfer ownership.
-5. The problem remains unresolved after the troubleshooting steps in this document.
-6. The customer is distressed or has an urgent safety-related issue.
+Do not treat hotspot limits, roaming allowances, or fair-use rules as interchangeable. A domestic unlimited allowance should not be represented as an unlimited roaming allowance.
 
----
+### 2.3 Finding a plan with a particular data allowance
 
-# 1. Company and Contact Overview
+Customers may request an exact data amount, sometimes together with unlimited access to selected social-network services. Search the current catalogue for the precise allowance and included features.
 
-## 1.1 About SemCache Mobile
+If no exact match is listed, explain the closest available alternatives only after checking the current catalogue. Do not claim that a plan exists simply because the requested data amount sounds plausible. Clarify whether “unlimited social networks” means zero-rated access to named applications and whether any exclusions apply under the offer terms.
 
-SemCache Mobile is a mobile network operator offering 5G and 4G (LTE) services, prepaid and monthly (postpaid) plans, family plans, eSIM, and international roaming.
+### 2.4 Student, youth, and other discounts
 
-## 1.2 Contact channels
+A customer identifying as a student may ask about discounts on a mobile plan, eSIM line, home internet, data add-on, router rental, family plan, or youth plan. These are different products and should be checked separately.
 
-| Channel                  | Details                                                           | Availability             |
-| ------------------------ | ----------------------------------------------------------------- | ------------------------ |
-| Telecom Assistant (chat) | In the SemCache Support web app and mobile app                    | 24/7                     |
-| Human agents (chat)      | "Talk to a human agent" button in chat                            | Daily 07:00–23:00 CET    |
-| Phone support            | Dial 1234 from a SemCache number, or +00 800 123 4567 from abroad | Daily 07:00–23:00 CET    |
-| Shops                    | Store locator in the app                                          | Store opening hours vary |
+The dataset does not establish a universal student discount. Verify:
 
-## 1.3 Human agent wait times
+- Whether a current discount exists for the specific product.
+- Eligibility requirements and acceptable proof of status.
+- Whether the offer is limited to new customers, selected plans, or a particular billing arrangement.
+- Whether it can be combined with other promotions.
+- Its validity period and what happens when eligibility expires.
 
-Typical estimated wait time to reach a human agent is 2–8 minutes during opening hours. During peak times (weekdays 17:00–20:00) it can be up to 15 minutes. When the customer asks for a human agent, a summary of the conversation is handed over so the customer does not have to repeat the issue.
+Do not promise a discount based only on student status or assume that a discount on one service applies to another.
 
-## 1.4 Self-service tools
+### 2.5 Buying extra data
 
-- My SemCache app (iOS and Android) and the web account portal: check usage, pay bills, change plans, buy add-ons, manage eSIM, manage roaming.
-- USSD short codes (work on any phone, no internet needed):
-  - *123# — check balance and remaining allowances
-  - *124# — buy add-ons
-  - *125# — roaming menu
-- SMS keywords sent to 1234: DATA (data left), BALANCE (prepaid balance), BILL (current bill amount).
+When a customer's included data is exhausted, they may need a one-time data add-on or a plan change. First identify which allowance has run out: mobile data, a home 5G router allowance, or a roaming pack.
 
----
+Explain how to locate eligible add-ons through the authenticated account/app or approved customer channel. Before purchase, confirm the add-on's data amount, price, validity period, eligible service, and whether it renews automatically. Do not invent a bundle size or price. A home-router add-on is not necessarily the same as a mobile-phone add-on.
 
-# 2. Mobile Plans and Subscriptions
+### 2.6 Sharing data with family members
 
-## 2.1 Plan overview (monthly / postpaid, 12-month or no-commitment options)
+Customers may ask to share data with family members, add another line, or include a child's number. Confirm whether the current plan supports multi-line or family sharing and identify the line types that can participate.
 
-### 5G Essential — €25 per month
+Clarify:
 
-- 30 GB of 5G/4G data per month
-- Unlimited calls and SMS within the country
-- EU roaming: 10 GB per month
-- Hotspot (tethering): 10 GB
-- Best for: light and moderate users who mostly use Wi-Fi at home.
+- Whether the additional number must be on the same account or an eligible plan.
+- Who controls the shared allowance and can view usage.
+- Whether the feature has limits, charges, or account-owner approval requirements.
+- Whether parental controls are a separate feature from data sharing.
 
-### 5G Unlimited — €40 per month
+A request to share data with employees or other business users is not automatically a family-sharing request. Route business-line and corporate-account cases through the business support process.
 
-- Unlimited data: 100 GB at full 5G/4G speed, then speed reduced to 3 Mbps for the rest of the billing cycle
-- Unlimited calls and SMS within the country
-- EU roaming: 30 GB per month
-- Hotspot: 30 GB
-- Best for: heavy users, streaming, remote work, and gaming.
+### 2.7 Streaming and entertainment benefits
 
-### 5G Unlimited Premium — €55 per month
+Customers may ask whether a plan includes a streaming or music service, such as Netflix, Spotify, Apple Music, YouTube Premium, Disney+, HBO Max, Megogo, or another provider, and how long the benefit lasts.
 
-- Unlimited data: 300 GB at priority speed, then 5 Mbps
-- Unlimited calls and SMS within the country, plus 100 minutes per month to EU countries
-- EU roaming: 50 GB per month, plus 5 GB in Zone 2 and Zone 3 countries
-- Hotspot: 100 GB
-- Video streaming up to 4K, priority network access during congestion
-- Best for: frequent travelers, professionals, and customers who want the best speeds.
+Benefits can vary by plan, campaign, activation date, and eligibility. Check the customer's exact plan and the current partner-benefit terms. Confirm whether the service is included, whether the customer must activate it separately, the benefit period, what happens when the free period ends, and whether the partner may require a separate account.
 
-## 2.2 Prepaid plans (no contract)
+Do not infer that a named service is included because another entertainment service is offered on a different plan. Do not describe a promotional benefit as permanently free unless the terms explicitly say so.
 
-### Flex Prepaid — €10 per 30 days
+### 2.8 Upgrading, downgrading, and changing plans
 
-- 10 GB of data
-- 100 minutes of calls and unlimited SMS
-- Best for: occasional use or a secondary SIM.
+A plan change may involve selecting a new plan, reviewing its terms, confirming the request, and waiting for the effective date shown by the account system.
 
-### Prepaid Plus — €20 per 30 days
+For an upgrade or downgrade:
 
-- 40 GB of data (5G where available)
-- Unlimited calls and SMS
-- EU roaming: 5 GB
-- Best for: regular users who prefer no contract.
+1. Confirm the current plan and the desired plan.
+2. Check eligibility, availability, and any account restrictions.
+3. Compare the new recurring price, included allowances, promotion terms, and features.
+4. Explain the effective date and whether the current cycle is affected, using the account's displayed information.
+5. Confirm how unused allowances are treated only if the applicable terms specify this.
 
-How prepaid works: the customer tops up their balance and the plan package renews automatically every 30 days if there is enough balance. If the balance is insufficient on the renewal date, the package is not renewed and only pay-as-you-go rates apply until the balance is topped up (data €0.02 per MB, calls €0.15 per minute, SMS €0.10 each).
+A customer paying for a handset in instalments may still have a separate device-financing obligation. Do not assume that changing the service plan changes or cancels the instalment agreement.
 
-## 2.3 Family plans
+### 2.9 Keeping an old price after moving to a new plan
 
-- 2 lines — €60 per month
-- 3 lines — €85 per month
-- 4 lines — €105 per month
-- Each additional line (up to 6 lines total) — €15 per month
-- Each line gets the same benefits as 5G Unlimited (100 GB full-speed data per line).
-- One account owner manages and pays for all lines. Lines can be added or removed in the app under Plans > Family.
-- Family members can live at different addresses. A multi-line discount applies automatically.
+A customer moving from a legacy, family, business, youth, senior, or data-specific plan to a new plan may ask to retain the old price. Explain that a plan change can move the customer to the new plan's current pricing and may end legacy or promotional terms.
 
-## 2.4 Which plan is right for me? (decision guide)
+Check the customer's account and the written offer terms. Never promise price protection unless an explicit retention or migration offer confirms it. Clearly distinguish a one-time migration offer from a permanent price guarantee.
 
-Use these questions to recommend a plan:
+### 2.10 Plan questions that need clarification
 
-1. How much mobile data do you use per month? Under 10 GB: Flex Prepaid. 10–40 GB: Prepaid Plus or 5G Essential. Over 40 GB: 5G Unlimited or Premium.
-2. Do you want a contract? If no: prepaid. If yes: postpaid is cheaper per GB.
-3. Do you travel abroad often? Frequent travelers benefit from 5G Unlimited Premium or a Travel Pass add-on.
-4. Do you need to share with family? Choose a Family plan for 2 or more lines.
-5. Do you use hotspot or tethering for work? Choose 5G Unlimited or higher.
+Do not confuse:
 
-Quick recommendations:
-
-- Student on a budget, mostly Wi-Fi: Flex Prepaid or 5G Essential.
-- Daily streaming and social media: 5G Unlimited.
-- Remote worker using hotspot: 5G Unlimited or Premium.
-- Couple or family: Family plan.
-
-## 2.5 Add-ons
-
-| Add-on                    | Price        | Details                                                                          |
-| ------------------------- | ------------ | -------------------------------------------------------------------------------- |
-| Extra Data 5 GB           | €5           | Valid until the end of the current billing cycle (postpaid) or 30 days (prepaid) |
-| Extra Data 20 GB          | €15          | Same validity                                                                    |
-| Hotspot Boost 20 GB       | €7           | Extra tethering allowance                                                        |
-| International Minutes 100 | €6           | Calls to EU countries                                                            |
-| Device Insurance          | €6 per month | Covers accidental damage and theft; deductible applies                           |
-
-Add-ons can be purchased in the app, by dialing *124#, or in the web portal.
-
-## 2.6 Changing or canceling a plan
-
-- Upgrade: takes effect immediately, charges are pro-rated.
-- Downgrade: takes effect at the start of the next billing cycle.
-- No-commitment plans can be changed at any time. Customers on a 12-month contract may be charged an early termination fee equal to the remaining discounts; the exact amount is shown in the app under Plans > Contract details.
-- Cancellation and number porting must be handled by a human agent. A 30-day notice period may apply for postpaid plans.
-
-## 2.7 Plan FAQ
-
-**Q: Is 5G included in all plans?**
-A: Yes. 5G is included in all plans in areas with 5G coverage and on 5G-compatible devices. No extra fee applies.
-
-**Q: What happens after I use all my full-speed data on an unlimited plan?**
-A: You can keep using data, but the speed is reduced (3 Mbps on 5G Unlimited, 5 Mbps on Premium) until the next billing cycle starts. You can buy Extra Data to restore full speed.
-
-**Q: Is there a contract?**
-A: Postpaid plans are available with no commitment or with a 12-month commitment, which gives a €5 per month discount. Prepaid plans have no contract.
-
-**Q: Can I keep my current phone number?**
-A: Yes. Number porting is free and usually takes 1 business day. Contact a human agent or visit a shop.
+- An upgrade with a downgrade.
+- A monthly plan price with the price after a promotion.
+- A data add-on with a new tariff.
+- Domestic fair use with roaming fair use.
+- Family data sharing with corporate employee sharing.
+- A plan's entertainment benefit with a separate paid subscription.
+- The date a plan change is requested with the date it becomes effective.
 
 ---
 
-# 3. Mobile Internet and Data Usage
+## 3. Billing, payments, invoices, and refunds
 
-## 3.1 How to check remaining data
+### 3.1 Understanding an unfamiliar charge
 
-Choose any of these methods:
+Customers may notice an unfamiliar recurring charge, a one-time connection or activation fee, a roaming charge, or a deduction from prepaid balance. Begin by identifying the transaction rather than assuming it is an error.
 
-1. **My SemCache app:** open the app and go to Home > Usage. You will see data used, data remaining, and the date the allowance resets.
-2. **Web portal:** sign in and open Usage.
-3. **USSD:** dial *123# and choose "Data".
-4. **SMS:** send the word DATA to 1234. A reply with the remaining data arrives within a minute.
+Review the itemized bill or account transaction history and compare:
 
-## 3.2 When does my data reset?
+- Charge description and transaction date.
+- Service or number associated with the charge.
+- Whether it is recurring, one-time, usage-based, or third-party.
+- Any recent plan change, add-on purchase, roaming usage, premium service, or account modification.
+- Whether the amount is pending, posted, reversed, or duplicated.
 
-- Postpaid: data resets on the first day of your billing cycle. The billing cycle date is shown in the app under Billing > Billing cycle. It does not change unless you request it.
-- Prepaid: data resets every 30 days from the date the package was activated or renewed.
-- Unused data does not roll over to the next cycle, except when the customer has the "Data Rollover" add-on (€2 per month, rolls over up to 10 GB).
+If the description is unclear, explain the available line-item detail and open a billing investigation. A customer may ask for a breakdown of a one-time fee they say was not disclosed; capture the charge date, amount, service, and any relevant order or contract reference. Do not assume the fee is valid or invalid before reviewing the account and applicable terms.
 
-## 3.3 Speed reduction after the data allowance
+### 3.2 Duplicate charges and refund requests
 
-- 5G Essential: after the 30 GB limit, speed is limited to 1 Mbps (or the customer can buy Extra Data).
-- 5G Unlimited: after 100 GB, speed is limited to 3 Mbps.
-- 5G Unlimited Premium: after 300 GB, speed is limited to 5 Mbps.
-- Prepaid: after the data package is used, data stops unless the customer buys an add-on or has pay-as-you-go balance.
+A customer may report two subscription charges in one month, two payments for the same invoice, or an accidental duplicate top-up. These situations are not identical.
 
-## 3.4 Data usage alerts
+Check whether both entries are completed transactions, whether one is pending, and whether the entries relate to the same service period. For duplicate payments, identify the payment references and the account to which each payment was applied.
 
-SemCache Mobile sends an SMS and an app notification when 80% and 100% of the data allowance has been used. Alerts can be configured in the app under Settings > Notifications > Data alerts.
+Explain the applicable review and refund process based on the billing system. Do not promise an immediate refund or a fixed processing time unless the current policy confirms it. If the customer disputes a premium SMS or subscription they say they did not authorize, treat it as a separate third-party-service dispute and follow the approved investigation and blocking procedure.
 
-## 3.5 Tips to reduce data usage
+### 3.3 Payment methods, fees, and failed payments
 
-1. Connect to Wi-Fi when available.
-2. Turn off automatic app updates on mobile data.
-3. Set streaming quality to "Standard" or "Data saver".
-4. Turn on Data Saver mode (Android) or Low Data Mode (iPhone).
-5. Disable background app refresh for apps you rarely use.
-6. Download playlists, maps, and videos over Wi-Fi.
+Customers may ask whether a bill can be paid using a bank, card wallet, payment app, or online payment provider, and whether a fee applies. Supported methods and commissions can change.
 
-## 3.6 Why is my data usage higher than expected?
+Before confirming a method:
 
-Common reasons are video streaming and video calls, automatic cloud photo backups, system and app updates, hotspot use by other devices, and background app refresh. The Usage screen in the app shows data usage by day. If the usage appears incorrect, the customer should contact a human agent with the date and amount in question.
+- Check the currently approved payment channels.
+- Confirm whether the method supports the customer's account or invoice type.
+- Verify any fee shown by the provider and any fee disclosed by the payment processor.
+- Explain how the customer can confirm that payment was credited.
 
-## 3.7 Data usage FAQ
+Do not assume that support for one wallet or bank implies support for another. Do not guarantee that a third-party payment service is commission-free without current confirmation.
 
-**Q: Does hotspot data count toward my data allowance?**
-A: Hotspot uses the same data, but each plan has a separate hotspot limit (for example 30 GB on 5G Unlimited). When the hotspot limit is reached, hotspot speed is reduced to 1 Mbps while normal data on the phone continues to work.
+### 3.4 Payment errors in the app
 
-**Q: Does Wi-Fi calling or Wi-Fi usage count as mobile data?**
-A: No. Data used over Wi-Fi is not counted.
+A payment may fail with an alphanumeric error message. Record the exact code as displayed, the time of the attempt, the payment method, and whether the customer's bank shows a pending or completed transaction.
 
-**Q: Is there a data speed difference between 4G and 5G?**
-A: 5G can reach typical speeds of 150–600 Mbps in good coverage, and 4G typically 20–100 Mbps. Real speeds depend on location, device, signal, and network load.
+General triage:
 
----
+1. Check whether the invoice is still unpaid in the account.
+2. Check whether the payment provider shows a pending, declined, or completed transaction.
+3. Avoid asking the customer to repeat a payment while the first attempt may still be processing.
+4. If the account and payment provider disagree, refer the case to billing/payment operations with the transaction reference.
+5. If the code is not documented in the approved error-code catalogue, do not guess what it means.
 
-# 4. Account Balance, Billing and Payments
+The dataset includes examples of payment error strings, but does not define their meanings. An error code must be looked up in the current internal code reference.
 
-## 4.1 How to pay my bill
+### 3.5 Automatic payments
 
-Customers can pay a SemCache Mobile bill in these ways:
+Customers may want to enable, disable, or update the payment card used for automatic billing. Confirm whether the request concerns a mobile service, home internet, or a corporate account.
 
-1. **AutoPay (recommended):** the bill is charged automatically to a saved card or bank account on the due date.
-2. **Card payment in the app or web portal:** go to Billing > Pay now, choose a card (Visa, Mastercard, or Maestro), and confirm. Apple Pay and Google Pay are supported.
-3. **Bank transfer:** use the payment reference on the bill. Transfers usually take 1–2 business days to appear.
-4. **In a shop:** pay by card or cash at any SemCache Mobile store.
+Use the authenticated billing settings or the approved support workflow. Explain how the customer can review the saved payment method and the next scheduled debit. For a card change, use the approved secure payment flow; never ask the customer to send full card details in a chat.
 
-## 4.2 How to set up AutoPay
+The dataset does not establish whether multiple backup cards are supported. Check the current billing feature set before promising a secondary payment method. A request to turn autopay off is different from a request to change its card.
 
-1. Open the My SemCache app and go to Billing > AutoPay.
-2. Tap "Set up AutoPay".
-3. Add a payment card or bank account (SEPA direct debit).
-4. Confirm with a one-time code sent to your phone, or with your card's 3-D Secure check.
-5. AutoPay is now active. The bill is charged on the due date. A confirmation message is sent after each payment.
+### 3.6 Invoices, statements, and tax documents
 
-AutoPay customers receive a €2 monthly discount on postpaid plans. To change or update an expired payment card, go to Billing > AutoPay > Update card and save the new card. AutoPay can be turned off at any time under Billing > AutoPay > Turn off.
+Customers may need a monthly invoice, a VAT/tax invoice for a company, or an older itemized usage record. Clarify the document type, billing period, account holder, and whether it is a personal or business account.
 
-## 4.3 Billing cycle and due date
+Explain where authenticated customers can access available invoices and statements in the account portal or app. For company tax documents, verify the legal entity details and the document requirements. If the company code or other registered business information is wrong, route a correction request through the approved business-billing process.
 
-- Bills are issued once per month on the billing cycle date.
-- The payment due date is 14 days after the bill is issued.
-- Bills are delivered electronically (e-bill) in the app and by email. Paper bills cost €2 extra per month.
+An invoice is not the same as an itemized call list. Historical records may have different retention and retrieval rules; do not promise that records from an old period are still available unless the records system confirms it.
 
-## 4.4 Late payments
+### 3.7 Due dates and late payments
 
-- A grace period of 7 days after the due date applies with no penalty.
-- After the grace period, a late fee of €5 is added.
-- If the bill remains unpaid for 30 days after the due date, outgoing services may be restricted (incoming calls still work). After 60 days the service may be suspended.
-- Once the bill is paid, service is restored within 1 hour in most cases.
-- Customers who have trouble paying on time can request a payment plan from a human agent.
+The payment deadline depends on the service and billing arrangement. A postpaid invoice due date should not be applied to a prepaid account, where service use and balance top-ups work differently.
 
-## 4.5 Checking my bill and balance
-
-- Postpaid: Billing > Current bill shows the amount, itemized charges, and the due date. Send BILL to 1234 for a quick SMS summary.
-- Prepaid: dial *123# or send BALANCE to 1234 to see the balance and package expiry.
-
-## 4.6 Prepaid top-up
-
-Ways to top up: the My SemCache app (card, Apple Pay, Google Pay), the web portal, top-up vouchers sold in shops and kiosks, or bank transfer. Minimum top-up is €5, maximum is €100 per transaction. The balance is valid for 12 months after the last top-up.
-
-## 4.7 Understanding my bill
-
-A typical bill contains:
-
-- Monthly plan fee
-- Add-ons and one-time purchases
-- Usage outside the plan (premium-rate numbers, roaming outside included zones)
-- Discounts (AutoPay, loyalty, multi-line)
-- VAT
-
-Charges unfamiliar to the customer can be reviewed under Billing > Itemized charges. Premium-rate SMS subscriptions and third-party content can be blocked under Settings > Services > Block third-party charges.
-
-## 4.8 Disputing a charge, double charges, and refunds
-
-- Duplicate or double charges and unrecognized line items can be disputed in the app under Billing > Dispute or via a human agent.
-- Customers should provide the bill date, the amount, and a short description.
-- Refund processing time: approved refunds for confirmed double charges or billing errors are returned to the original payment method within 5–10 business days.
-- Disputes must be submitted within 60 days of the bill date.
-
-## 4.9 Payment troubleshooting
-
-**Card payment declined:**
-
-1. Check that the card number, expiry date, and CVV are correct.
-2. Make sure the card allows online payments and has sufficient funds.
-3. Complete the 3-D Secure check with the bank app or SMS.
-4. Try another card or Apple Pay / Google Pay.
-5. If the problem continues, contact the card issuer or a human agent.
-
-**Payment made, but service not restored:** wait up to 1 hour. If the service is still restricted, restart the phone and contact a human agent.
-
-## 4.10 Billing FAQ
-
-**Q: Can I change my billing date?**
-A: Yes, once every 6 months. A human agent can change it; the next bill will be pro-rated.
-
-**Q: Can I get an invoice for my company?**
-A: Yes. Business invoices with a VAT ID can be requested under Billing > Invoice details or through a human agent.
-
-**Q: Will I be charged for using the app?**
-A: No. The My SemCache app does not use your data allowance when used on SemCache Mobile's network (zero-rated).
+Check the invoice or account for the due date, accepted payment methods, and any consequences of late payment. Explain late fees, restrictions, or suspension only when the current contract and policy support them. Do not invent a universal monthly due date or penalty.
 
 ---
 
-# 5. Roaming and International Services
+## 4. Contracts, cancellation, number portability, and suspension
 
-## 5.1 How roaming works
+### 4.1 Cancelling a mobile or home-internet contract
 
-Roaming means using your phone abroad on a partner operator's network. SemCache Mobile divides countries into three zones.
+First establish which service the customer wants to end: mobile postpaid, prepaid service, home internet, or a bundled service. Cancellation requirements can differ by product and account ownership.
 
-| Zone                    | Countries (examples)                                                   | How it works                                                                                                            |
-| ----------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Zone 1: EU/EEA          | All EU countries, Iceland, Norway, Liechtenstein                       | "Roam like at home": use your plan's included minutes, SMS, and roaming data at no extra cost (fair use policy applies) |
-| Zone 2: Extended Europe | United Kingdom, Switzerland, Turkey, Western Balkans, Ukraine, Moldova | Use a Travel Pass for predictable pricing. Without a pass, pay-as-you-go rates apply                                    |
-| Zone 3: Worldwide       | USA, Canada, Asia, Middle East, Africa, South America, Oceania         | Use a Travel Pass. Without a pass, pay-as-you-go rates apply                                                            |
+A typical case review includes:
 
-The EU/EEA zone is based on the European "Roam like at home" rules. Zone assignments can change; the current list is in the app under Roaming > Country list.
+- Verifying the account holder and the service to be terminated.
+- Checking the minimum commitment period and contract terms.
+- Identifying outstanding invoices, device instalments, equipment rental, or other obligations.
+- Explaining the approved submission channel and required confirmation.
+- Explaining when service ends and whether a final bill will be issued.
 
-## 5.2 EU roaming data allowance by plan
+Do not say that a contract is cancelled until the cancellation request is accepted and the system confirms the effective date.
 
-- 5G Essential: 10 GB per month
-- 5G Unlimited: 30 GB per month
-- 5G Unlimited Premium: 50 GB per month
-- Prepaid Plus: 5 GB per 30 days
-- Flex Prepaid: no included EU roaming data; use a Travel Pass or pay-as-you-go
-  After the EU roaming allowance is used, data costs €0.005 per MB (€5 per GB), or the customer can buy a Roaming Data Booster.
+### 4.2 Documents and authorized representatives
 
-## 5.3 Travel Passes
+The documents needed depend on the account type, ownership, and reason for termination. A personal customer, company account, estate representative, or person acting under authorization may have different requirements.
 
-Travel Passes give a fixed data, call, and SMS bundle for a fixed number of days, which avoids surprise charges.
+For a request made by someone other than the account holder, verify the approved authority or representation documents. For a deceased account holder, use the designated bereavement/estate process and request only the documentation required by that process. Do not disclose account information or transfer ownership based solely on a family relationship.
 
-### Zone 2 Travel Pass
+The dataset does not provide a definitive document checklist. Refer to the current contract-termination procedure for the exact list.
 
-| Pass       | Price           | Includes                                                                       |
-| ---------- | --------------- | ------------------------------------------------------------------------------ |
-| Day Pass   | €5 per day      | 1 GB data per day, unlimited incoming calls, 30 minutes outgoing calls, 30 SMS |
-| Week Pass  | €25 for 7 days  | 8 GB total, 150 minutes, 100 SMS                                               |
-| Month Pass | €60 for 30 days | 25 GB total, 300 minutes, 300 SMS                                              |
+### 4.3 Early termination and device instalments
 
-### Zone 3 (Worldwide) Travel Pass
+If a customer ends a contract during a minimum term, charges may depend on the agreement and applicable early-termination terms. A customer who is still paying for a handset may have a separate remaining device balance.
 
-| Pass       | Price            | Includes                                                                         |
-| ---------- | ---------------- | -------------------------------------------------------------------------------- |
-| Day Pass   | €10 per day      | 500 MB data per day, unlimited incoming calls, 20 minutes outgoing calls, 20 SMS |
-| Week Pass  | €45 for 7 days   | 5 GB total, 100 minutes, 100 SMS                                                 |
-| Month Pass | €100 for 30 days | 15 GB total, 200 minutes, 200 SMS                                                |
+Review the signed agreement and account ledger before quoting any amount. Do not assume that moving abroad automatically waives a fee, or that a device instalment balance disappears when service is cancelled. Present service termination charges and device-financing obligations separately.
 
-How a Day Pass works: a Day Pass is activated automatically on the first use of roaming data in that 24-hour period if the customer has enabled "Auto Day Pass" in the app. Otherwise, the customer must buy it manually. Pass validity is counted in 24-hour periods starting from activation.
+### 4.4 A sales promise that is missing from the contract
 
-## 5.4 How to prepare for travel (checklist)
+A customer may say that a kiosk or sales representative promised several free months, but the benefit is absent from the signed agreement. Treat this as a sales-disclosure or contract-dispute case, not as an ordinary cancellation request.
 
-1. Check whether your destination is in Zone 1, 2, or 3 in the app under Roaming > Country list.
-2. Buy a Travel Pass if traveling outside the EU/EEA, before departure or on arrival with Wi-Fi.
-3. Make sure your phone is unlocked and compatible with local networks.
-4. Turn on Data roaming in your phone settings (iPhone: Settings > Mobile Service > Mobile Data Options > Data Roaming; Android: Settings > Network > SIM > Roaming).
-5. Set a roaming spending cap (see 5.6).
-6. Download offline maps and enable Wi-Fi calling for cheaper calls.
-7. Remember that voicemail retrieval abroad is charged as an outgoing call.
+Collect the approximate sales date, location/channel, product, promised benefit, available receipt or promotional material, and the relevant contract reference. Refer it for review against the offer that was active at the time. Do not promise penalty-free cancellation or assert that the verbal promise is binding before the review is complete.
 
-## 5.5 How to activate roaming
+### 4.5 Transferring contract ownership
 
-- Roaming is enabled by default for postpaid plans in Zone 1.
-- For Zone 2 and Zone 3 roaming, enable it in the app under Roaming > Settings, or dial *125#.
-- Prepaid customers need a minimum balance of €5 to use roaming outside Zone 1.
-- After landing, switch off Airplane mode and wait up to 2 minutes for the phone to connect to a partner network. A welcome SMS confirms the connection and shows the zone.
+A customer may want to transfer a contract registered to a spouse, parent, adult child, former partner, former employee, or another person. This is an ownership-change request and requires identity and authorization checks.
 
-## 5.6 Roaming spending cap and alerts
+The process may depend on whether the current account holder is available, whether the account is personal or corporate, and whether special circumstances apply. Do not treat possession of the SIM or payment of bills as proof of ownership. Follow the current ownership-transfer process and protect the account holder's information.
 
-- A default spending limit of €50 per billing cycle applies to out-of-plan roaming charges. When the limit is reached, roaming data is paused.
-- Customers get alerts at 80% and 100% of the cap by SMS.
-- The cap can be raised or removed under Roaming > Settings > Spending limit.
-- Out-of-plan roaming data is also blocked automatically when a Travel Pass is not active in Zone 3, unless the customer opts in.
+### 4.6 Keeping a number when moving to another operator
 
-## 5.7 Roaming pay-as-you-go rates (without a pass)
+Number portability allows an eligible customer to request transfer of a number to another provider. It is distinct from cancelling a service and receiving a new number.
 
-| Service        | Zone 2           | Zone 3           |
-| -------------- | ---------------- | ---------------- |
-| Data           | €0.015 per MB    | €0.03 per MB     |
-| Outgoing calls | €0.40 per minute | €1.20 per minute |
-| Incoming calls | €0.20 per minute | €0.80 per minute |
-| SMS (outgoing) | €0.15            | €0.30            |
-| SMS (incoming) | Free             | Free             |
+Explain the current portability process and eligibility checks. The receiving provider may coordinate parts of the request, while the existing provider may need to validate account details and resolve disqualifying conditions. Do not tell a customer to cancel the number first if they intend to port it; premature cancellation may affect the transfer.
 
-## 5.8 Fair use policy in the EU/EEA
+If a port-out request is rejected, record the exact rejection reason or code and check it in the current MNP (mobile number portability) reference. The dataset contains sample rejection codes but does not define them. Never infer a rejection reason from the code alone.
 
-Roam-like-at-home applies to customers who live in the home country or have stable links to it. If a customer spends more time abroad than at home over a 4-month period and mostly uses roaming, SemCache Mobile may contact the customer and apply a small surcharge on roaming data (up to €0.005 per MB) after a notice period.
+A request to port a prepaid number is not automatically governed by the same workflow as a postpaid contract. Confirm the account type.
 
-## 5.9 Roaming troubleshooting
+### 4.7 Temporary suspension versus permanent closure
 
-**No signal or no data abroad:**
+A customer who will be away may want to pause service temporarily. Confirm whether the request is for a temporary suspension, a permanent disconnection, or a change to a lower-cost plan.
 
-1. Make sure Data roaming is turned on.
-2. Restart the phone or toggle Airplane mode on and off for 10 seconds.
-3. Select the network manually: Settings > Mobile Network > Network selection > choose a partner operator (if more than one is available, try another).
-4. Check that your plan or Travel Pass is active in the app.
-5. Check that you are not over the roaming spending cap.
-6. If you still cannot connect, contact support. Calls to support from abroad are free via +00 800 123 4567 (or via the chat in the app over Wi-Fi).
+Check the product's suspension eligibility, duration, charges, reactivation requirements, and effects on bundled services. A request to pause several employee numbers should be handled as a corporate-account request. Do not treat “I am away” as an instruction to permanently close a number.
 
-**Unexpected roaming charges:** check Billing > Itemized charges and ask a human agent to review them. Common reasons: connecting to a ship or airplane network (not covered by passes), calls to premium numbers, and the phone connecting to a network in a bordering country by mistake. When near borders, set the network to manual selection.
+### 4.8 Final bill after cancellation or porting
 
-## 5.11 Calling home and international calls
+A final statement may include charges accrued through the service end date, outstanding recurring amounts, usage, equipment or rental adjustments, and any applicable contract charges. The exact composition depends on the account and contract.
 
-- To call abroad from the home network, dial + followed by the country code and number, for example +49 for Germany.
-- International calls from the home country to EU countries are included in the Premium plan up to 100 minutes. On other plans, they cost €0.10 per minute to Zone 1 and €0.50 per minute to Zone 2/3.
-- International Minutes 100 add-on (€6) adds 100 minutes to EU countries.
-
-## 5.12 Roaming FAQ
-
-**Q: Do I need to pay extra for roaming in the EU?**
-A: No, within your plan's EU roaming allowance there are no extra charges.
-
-**Q: Can I use my Travel Pass in several countries?**
-A: A pass works within its zone. For example, a Zone 3 pass works in all Zone 3 countries during its validity.
-
-**Q: Does using Wi-Fi abroad cost anything?**
-A: No. Wi-Fi does not use roaming data.
-
-**Q: What if I lose my phone abroad?**
-A: Contact a human agent immediately. The SIM can be blocked right away and a replacement eSIM or SIM can be arranged.
+Explain that the final bill should be checked after the termination or porting event has been processed. If rented equipment is returned, confirm receipt and condition in the equipment system before explaining any related adjustment. Do not estimate a final balance without account data.
 
 ---
 
-# 6. SIM Cards and eSIM
+## 5. SIM cards, eSIM, activation, replacement, and account security
 
-## 6.1 SIM vs eSIM
+### 5.1 Activating a newly purchased physical SIM
 
-- A physical SIM is a small card inserted into the phone. SemCache Mobile supplies a combined Nano/Micro/Mini SIM.
-- An eSIM is a digital SIM built into the device. It is activated by scanning a QR code or through the app. No plastic card is needed.
-- Most phones can hold both a physical SIM and an eSIM (dual SIM).
+Activation depends on the SIM type, account registration, and whether the SIM is intended for voice and data or data-only equipment. Guide the customer through the current activation flow and identity checks.
 
-## 6.2 eSIM-compatible devices
+Clarify whether the customer is:
 
-Compatible devices include (examples; the full list is in the app):
+- Activating a new number.
+- Replacing an existing SIM while keeping the number.
+- Activating a data-only SIM for a router.
+- Registering as a visitor or foreign customer using an accepted identity document.
 
-- Apple iPhone XS, XR and newer (iPhone 14 and newer in some countries are eSIM-only)
-- Samsung Galaxy S20 and newer, Galaxy Z Flip/Fold series
-- Google Pixel 3 and newer
-- Many recent Xiaomi, Oppo, Motorola, and Huawei models
-- Some smartwatches and tablets with cellular
-  The phone must be network-unlocked (not locked to another operator). Check by dialing *#06# and looking for an EID number; if an EID is shown, the device supports eSIM.
+Do not assume that the same activation process applies to tourists, corporate SIMs, and consumer voice SIMs. Use the current registration requirements.
 
-## 6.3 How to activate an eSIM (new customer or new eSIM)
+### 5.2 Replacing a damaged physical SIM
 
-You need: an eSIM-compatible, unlocked phone, a stable Wi-Fi connection, and the QR code or activation details from SemCache Mobile (shown in the app, web portal, or email).
+A damaged SIM replacement is intended to restore service while retaining the customer's number, subject to account verification and the replacement policy.
 
-**iPhone:**
+Verify the account holder, affected number, and whether the SIM is personal or company-registered. Explain the available replacement channels and delivery or collection options only after checking what is currently supported. Do not promise courier delivery or a particular delivery time unless the service is confirmed for the customer's location.
 
-1. Connect to Wi-Fi.
-2. Go to Settings > Mobile Service (or Cellular) > Add eSIM.
-3. Choose "Use QR Code" and scan the QR code.
-4. Follow the prompts, give the line a label (for example "Personal"), and choose which line to use for calls and data.
-5. Wait for the activation to finish (up to 5 minutes). A message "Cellular plan activated" appears.
+A request for a replacement SIM registered to a company must be authorized by the business account's designated representative.
 
-**Android (Samsung example):**
+### 5.3 Choosing a specific or memorable number
 
-1. Connect to Wi-Fi.
-2. Go to Settings > Connections > SIM manager > Add eSIM > Scan QR code from service provider.
-3. Scan the QR code and follow the on-screen instructions.
-4. Choose which SIM is used for calls, messages, and data.
-5. Wait for activation. Restart the phone if the network name does not appear.
+Customers may ask for a number ending in a particular sequence. Explain that number selection depends on the available-number inventory and current number-selection rules. Do not guarantee a requested suffix or claim that a particular number is available without checking inventory.
 
-If the QR code cannot be scanned, enter the details manually: SM-DP+ address and activation code are displayed under the QR code in the app (Manage eSIM > Manual setup).
+### 5.4 Activating an eSIM
 
-Important: A QR code works only once. After it has been installed, it cannot be used again. If the installation failed midway or the QR code does not work, do not delete the partially installed profile; contact support to get a new QR code.
+An eSIM is a digital SIM profile installed on a compatible device. Before guiding activation, confirm that the device supports eSIM and that the customer's plan and account are eligible.
 
-## 6.4 How to get an eSIM from the app (existing customers)
+A safe high-level activation flow is:
 
-1. Open the My SemCache app and sign in.
-2. Go to Account > SIM & eSIM > Get eSIM.
-3. Verify your identity with an SMS code.
-4. Scan or tap the QR code on a second device, or tap "Install on this device" (supported on iPhone with iOS 17.4 and newer, and on selected Android devices).
-5. Your physical SIM is deactivated when the eSIM becomes active.
+1. Confirm the device and operating-system compatibility using the manufacturer's current guidance.
+2. Obtain the eSIM activation details through the provider's authenticated channel.
+3. Ensure the device has a suitable internet connection for profile download.
+4. Follow the device's cellular/mobile-plan installation flow.
+5. Complete any provider confirmation or identity step.
+6. Check that the correct line is enabled for calls, messages, and mobile data.
 
-## 6.5 Transferring an eSIM to a new phone
+Activation codes and QR codes are sensitive and may be single-use. Do not ask the customer to post them in a public channel or share them with another person. Do not claim that a profile is active until the account and device status confirm it.
 
-1. In the app go to Account > SIM & eSIM > Transfer eSIM to a new device and confirm with an SMS code.
-2. A new QR code is generated.
-3. On the new phone, follow the eSIM activation steps in section 6.3 using the new QR code.
-4. After the new eSIM is activated, the eSIM on the old phone stops working.
-   Alternative on iPhone: use "Transfer from nearby iPhone" in Settings > Mobile Service when setting up the new phone, or "Quick Transfer" if both phones are on iOS 16 or newer. A transfer is free. Keep both phones close and connected to Wi-Fi.
+### 5.5 Moving an eSIM to a new phone
 
-## 6.6 Moving from eSIM to a physical SIM, or ordering a replacement SIM
+An eSIM transfer is not always the same as installing a second eSIM or converting a physical SIM. Confirm whether the customer still has access to the old phone and whether the old device is lost, damaged, or being replaced.
 
-- A replacement SIM costs €5 (free if the SIM is faulty). It is delivered within 2–3 business days or can be collected in a shop immediately.
-- To activate a new physical SIM: insert it, turn the phone on, and follow the activation SMS. You can also activate it in the app under Account > SIM & eSIM > Activate SIM by entering the ICCID printed on the card (19–20 digits).
+Use the provider's current eSIM reissue/transfer procedure. The old profile may need to be deactivated before a replacement profile can be used. If the old phone is lost, secure the number and account first; do not rely on access to the old device.
 
-## 6.7 Lost or stolen SIM or phone
+### 5.6 eSIM installation errors
 
-1. Contact a human agent immediately, or block the SIM in the app under Account > SIM & eSIM > Block SIM.
-2. The SIM is blocked within minutes to prevent misuse. Charges after the blocking request are not payable by the customer.
-3. A new SIM or eSIM can be issued, and the phone number is kept.
-4. Report the theft to the police and the device manufacturer. The IMEI number (dial *#06#) can be used to block the device.
+A customer may report a message such as an unreachable SM-DP+ server, an ineligible EID, an expired or invalid code, an activation limit, a required confirmation code, or a generic profile-download failure.
 
-## 6.7b PIN and PUK codes
+Capture the exact message, device model, operating-system version, time of attempt, and whether the QR code/profile has already been used. Check device compatibility, internet connectivity, profile status, and the current eSIM provisioning record. Avoid repeated installation attempts if the activation code may be single-use.
 
-- The SIM PIN protects the SIM. The default PIN is printed on the SIM card holder. After 3 wrong attempts the SIM is locked.
-- To unlock, enter the 8-digit PUK code, which can be found in the app under Account > SIM & eSIM > PUK code. After 10 wrong PUK attempts the SIM is permanently blocked and has to be replaced.
+The dataset lists example error messages but does not define their technical causes. Use the current eSIM troubleshooting reference or provisioning team rather than assigning a cause from the wording alone.
 
-## 6.8 eSIM troubleshooting
+### 5.7 Additional eSIM lines and connected devices
 
-| Problem                                            | Solution                                                                                             |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| QR code will not scan                              | Increase screen brightness, try another screen, or use manual setup details                          |
-| "Unable to complete cellular plan change" (iPhone) | Check Wi-Fi, update iOS, restart phone, retry. If it persists, request a new QR code                 |
-| "This code is no longer valid"                     | The QR code has already been used. Request a new one in the app                                      |
-| eSIM installed but no signal                       | Turn on the eSIM line under Mobile Service, toggle Airplane mode, restart, and wait up to 15 minutes |
-| Phone says SIM not supported                       | The phone may be network-locked or not eSIM compatible. Check with the manufacturer                  |
-| Old SIM still active                               | The physical SIM is deactivated automatically after eSIM activation. Remove it or turn the line off  |
+A customer may ask for a second eSIM line for a tablet, watch, laptop, car, tracker, or another connected device. Compatibility and eligibility differ by device and service type.
 
-## 6.9 SIM and eSIM FAQ
+Check whether the provider supports the device category, whether the plan allows an additional line, and whether the device requires a companion-number or shared-number feature. Do not assume that all eSIM-capable devices can use the same service.
 
-**Q: Does an eSIM cost extra?**
-A: No. eSIM activation is free for new and existing customers. Only a replacement physical SIM has a €5 fee.
+### 5.8 Lost or stolen phone: secure the SIM and account
 
-**Q: How long does eSIM activation take?**
-A: Usually 2–5 minutes. Rarely up to 15 minutes.
+A lost or stolen phone is a security-sensitive case. Prioritize protecting the mobile number and customer accounts.
 
-**Q: Can I have two numbers on one phone?**
-A: Yes, on dual SIM phones you can use one eSIM and one physical SIM, or two eSIMs on some devices. Each number needs its own plan.
+Recommended handling:
 
-**Q: Can I use eSIM for roaming?**
-A: Yes. Your SemCache Mobile eSIM works in the same way as a physical SIM for roaming.
+- Direct the customer to the provider's approved lost-device channel to request immediate SIM/line blocking.
+- Verify identity using the approved secure process.
+- Explain how to request a replacement SIM or eSIM after the account is secured.
+- Encourage the customer to use the device manufacturer's official lost-device tools and contact relevant financial institutions if payment or banking apps may be exposed.
+- If the customer reports unauthorized SIM replacement, treat it as suspected SIM-swap fraud and escalate urgently.
 
-**Q: Will I lose my number when I switch to eSIM?**
-A: No. The phone number stays the same.
+Blocking a SIM is not the same as remotely locking or erasing a handset by IMEI. Device blocking and SIM blocking are separate processes with separate eligibility and verification requirements.
+
+### 5.9 Suspected unauthorized SIM swap
+
+If a customer says their SIM was replaced without permission, or they were unexpectedly logged out of email, messaging, government, or banking applications, treat the case as a potential account-takeover incident.
+
+Priorities:
+
+1. Secure or suspend the affected mobile line through the approved fraud process.
+2. Verify the customer's identity through a secure channel.
+3. Escalate to the fraud/security team with the time of the suspected change and relevant account events.
+4. Advise the customer to secure important online accounts through their official recovery channels, beginning with email and financial accounts where appropriate.
+5. Do not request passwords, one-time codes, recovery codes, or banking credentials.
+6. Preserve relevant case references and avoid disclosing information about any other account holder.
+
+Do not treat this as a routine SIM replacement or merely an app-login problem.
+
+### 5.10 PUK-locked SIMs
+
+A SIM may request a PUK after repeated incorrect PIN entries. The PUK is a security credential associated with the SIM and must be retrieved only through the provider's approved authenticated process or original SIM documentation where applicable.
+
+Warn customers not to guess the code or continue entering random values. Repeated incorrect PUK attempts can permanently disable the SIM profile and require replacement. If the allowed attempts have been exhausted, follow the SIM replacement/escalation procedure. Never ask a customer to send the full PUK in chat.
 
 ---
 
-# 7. Network Connectivity and Technical Support
+## 6. Mobile network, data, messaging, and calling support
 
-## 7.1 "My mobile internet isn't working" — step-by-step troubleshooting
+### 6.1 Slow mobile internet
 
-Follow the steps in order and check after each step whether the problem is solved.
+When mobile data is slow, first determine whether the issue affects one device, one location, a particular time, or all locations.
 
-1. **Check the signal indicator.** If there are no bars or "No service" appears, go to section 7.2.
-2. **Toggle Airplane mode.** Turn it on for 15 seconds and off again.
-3. **Check that mobile data is on.** iPhone: Settings > Mobile Service > Mobile Data. Android: Settings > Network > Mobile data.
-4. **Check data allowance and balance.** Open the My SemCache app (works over Wi-Fi) or dial *123#. If the data allowance is used up on a prepaid plan or the bill is unpaid, mobile data is blocked.
-5. **Restart the phone.**
-6. **Check for a network outage** in the app under Network status, or on the coverage page. If there is an outage in your area, service is usually restored within a few hours.
-7. **Check data roaming.** Roaming can be accidentally enabled or disabled. At home, roaming should be off for normal use unless you are at a border.
-8. **Check APN settings** (see 7.4).
-9. **Update the phone software** (iOS or Android carrier settings).
-10. **Remove and reinsert the SIM** (or toggle the eSIM line off and on).
-11. **Reset network settings.** iPhone: Settings > General > Transfer or Reset iPhone > Reset > Reset Network Settings. Android: Settings > System > Reset options > Reset Wi-Fi, mobile and Bluetooth. Saved Wi-Fi passwords will be removed.
-12. **Try the SIM in another phone** (or another SIM in your phone) to find out whether the problem is the SIM or the device.
-    If the problem remains, offer to connect the customer with a human agent and provide a short summary of the steps already tried.
+Collect:
 
-## 7.2 No signal / "No service"
+- Device model and operating-system version.
+- Approximate location and whether the customer is indoors, outdoors, or moving.
+- Whether the issue affects all applications or only one service.
+- Whether the device shows 4G/5G and whether signal strength changes.
+- Whether the customer's data allowance or plan conditions may be relevant.
+- Whether other devices on the same network are affected.
 
-1. Move to a different location. Basements, elevators, thick walls, and some buildings block the signal.
-2. Check Airplane mode is off.
-3. Set the network mode to Automatic (5G/4G/3G) and choose "Automatic" in Network selection.
-4. Make sure the SIM is inserted correctly and clean, or the eSIM line is turned on.
-5. Check the SIM is not locked: if the phone asks for a PIN, enter it. If the SIM is locked, use the PUK (see 6.7b).
-6. Check that the account is active and the bill is paid.
-7. Restart the phone.
-8. If many users in your area have the same issue, there may be an outage.
+Basic checks may include toggling airplane mode, restarting the device, confirming mobile data is enabled, checking the selected network mode, and testing in another location. Use manufacturer-specific instructions where menu names differ.
 
-## 7.3 Slow internet speed
+If performance is poor only inside a building, distinguish indoor coverage from a general network outage. If it occurs repeatedly at a particular time, record the time window and affected service and investigate possible congestion or a recurring incident. Do not promise a speed or coverage level that is not documented for the customer's plan and location.
 
-1. Run a speed test at the same place several times (typical 5G speed is 150–600 Mbps, 4G 20–100 Mbps).
-2. Check whether the data limit has been reached and the speed is reduced (see section 3.3).
-3. Move close to a window or outside; indoor coverage is often weaker.
-4. Avoid peak hours (18:00–22:00) when networks are busiest. Premium customers get priority.
-5. Turn off VPN and battery saver or Data Saver while testing.
-6. Close apps running in the background and downloads.
-7. Toggle Airplane mode, restart the phone, and switch network mode between 5G and 4G (LTE) to see which is better in your location.
-8. Update the phone software and carrier settings.
+Slow mobile data is not the same issue as slow home Wi-Fi. Route home-router cases to the home-internet troubleshooting workflow.
 
-## 7.4 APN settings
+### 6.2 Mobile APN settings
 
-APN (Access Point Name) settings tell the phone how to connect to mobile data. They are configured automatically in most cases. If mobile data fails, check or enter them manually.
+APN (Access Point Name) settings allow a device to connect to the provider's mobile data service. Customers may need settings after changing devices, resetting network settings, or inserting a new SIM.
 
-**Internet APN:**
+Provide only the current approved APN profile for the correct service and device category. Confirm whether the request concerns:
 
-- Name: SemCache Internet
-- APN: internet.semcache.mobile
-- Username: (leave empty)
-- Password: (leave empty)
-- MCC: 001
-- MNC: 01
-- Authentication type: None (or PAP)
-- APN type: default,supl
-- APN protocol: IPv4/IPv6
-- APN roaming protocol: IPv4/IPv6
-- Bearer: Unspecified
+- Mobile internet on a handset.
+- MMS configuration.
+- A home 5G router.
+- A data-only SIM or another specialized device.
 
-**MMS APN (picture messages):**
+These configurations are not necessarily interchangeable. The dataset does not contain the actual APN values, so do not invent an APN name, username, password, authentication type, proxy, or protocol. Direct the customer to the current device- and service-specific configuration reference or technical support.
 
-- Name: SemCache MMS
-- APN: mms.semcache.mobile
-- MMSC: http://mms.semcache.mobile/servlets/mms
-- MMS proxy: 10.10.10.10
-- MMS port: 8080
-- APN type: mms
+### 6.3 A device cannot connect to 5G while other devices can
 
-How to open APN settings:
+If other phones connect to 5G but one handset does not, investigate device-specific compatibility and configuration before assuming a network-wide problem.
 
-- iPhone: Settings > Mobile Service > Mobile Data Network. Enter the APN under Mobile Data. (On many iPhones APN is managed by the carrier profile and cannot be edited; update carrier settings or reset network settings.)
-- Android: Settings > Network & internet > SIM > Access Point Names > "+" (add new). Save, and select the new APN.
+Check:
 
-If you changed APN settings by mistake, use "Reset to default" in the APN menu.
+- Whether the exact device model and regional variant support the provider's 5G bands.
+- Whether the software is current.
+- Whether 5G is enabled in the device's preferred network settings.
+- Whether the SIM, plan, and account are provisioned for 5G.
+- Whether the customer is in a confirmed 5G coverage area.
+- Whether dual-SIM settings or the selected data line affect connectivity.
 
-## 7.5 5G coverage and settings
+A device name alone is not enough to confirm compatibility. Use the manufacturer's specification for the exact model/region and the provider's current compatibility list.
 
-- 5G is available in many cities and expanding. Check the coverage map in the app or on the website by entering an address.
-- Requirements: a 5G-compatible phone, a 5G-capable plan (all SemCache Mobile plans), and being in an area with 5G coverage.
-- To enable 5G: iPhone: Settings > Mobile Service > Mobile Data Options > Voice & Data > 5G Auto (or 5G On). Android: Settings > Network & internet > SIM > Preferred network type > 5G/4G/3G/2G (auto).
-- "5G Auto" saves battery by using 5G only when it improves performance. Choose "5G On" for maximum speed.
-- If the phone shows 4G or LTE indoors, the 5G signal may be weak there. Try near a window.
-- Some 5G bands may not be supported on phones from other regions.
+### 6.4 SMS verification codes not arriving
 
-## 7.6 Calls and SMS problems
+If verification messages from an online service are not received, establish whether ordinary person-to-person SMS works and whether the problem affects one sender or many senders.
 
-**Cannot make or receive calls:**
+Check basic signal and messaging status, blocked/spam message settings, device storage or filtering behavior, and whether the number can receive other SMS. If only international or short-code verification messages are affected, capture the service name, sender ID if visible, country, and approximate time. Escalate through the messaging team if routing or sender restrictions may be involved.
 
-1. Check for signal and Airplane mode.
-2. Turn on VoLTE (HD Voice): iPhone: Settings > Mobile Service > Mobile Data Options > Enable LTE > Voice & Data. Android: Settings > Network > SIM > Enable VoLTE.
-3. Check that Do Not Disturb, Call Forwarding, and Call Barring are off. Dial ##002# to cancel all call forwarding.
-4. Make sure the number is not blocked, and that the account has no restrictions.
-5. Restart the phone and test again.
-   **Wi-Fi Calling:** Enable under Settings > Mobile Service > Wi-Fi Calling (iPhone) or Settings > Connections > Wi-Fi Calling (Android). Wi-Fi Calling is included free of charge and is useful in buildings with a weak signal.
-   **SMS not sent or received:** check the message center number (+001 1000 0000), restart the phone, free up phone storage, and make sure the sender is not blocked.
+Do not confuse receiving SMS with sending SMS. If the customer cannot send messages, use the outgoing-SMS troubleshooting path.
 
-## 7.7 Hotspot (tethering) not working
+### 6.5 VoLTE and voice-call problems
 
-1. Check the plan includes hotspot data and the limit has not been reached.
-2. Turn on mobile data on the phone.
-3. Enable Personal Hotspot (iPhone) or Mobile hotspot (Android).
-4. Check the APN type contains "dun" or use "default,supl,dun" for tethering on some Android phones.
-5. Restart both devices and try again.
+VoLTE allows compatible devices to place voice calls over the LTE network. If a customer cannot make or receive calls, first determine whether the issue is call setup, incoming calls, outgoing calls, or both.
 
-## 7.8 Network outages, restoration times, and incident tickets
+Check device and regional compatibility, software version, VoLTE setting, SIM/account provisioning, network mode, and whether dual-SIM configuration affects the selected voice line. Use the manufacturer's instructions for enabling the feature.
 
-- **Check outage status:** If many customers are affected, the app shows an outage banner under Network status with the affected area and an estimated restoration time.
-- **Restoration times and alerts:** Typical restoration time is 4 to 24 hours depending on the cause. Planned maintenance is announced 48 hours in advance. Customers can subscribe to outage alerts under Settings > Notifications > Outage alerts (SMS alerts are sent for outages longer than 1 hour).
-- **Compensation:** If an outage lasts more than 24 hours, an affected customer may request a proportional fee credit from a human agent. Outages shorter than 24 hours or caused by local power blackouts are not eligible for automatic credit.
-- **Report an outage and track tickets:** Report a network outage or damaged cable in the app under Help > Report a problem or by calling support. Track open trouble tickets under Help > My requests; unresolved tickets are escalated automatically after 72 hours.
+An older device without VoLTE may be affected by network technology changes, but the dataset does not establish a specific 3G shutdown date or device compatibility outcome. Verify the current network migration notice and compatibility list before advising whether a particular handset will continue to make calls.
 
-## 7.9 Security and spam
+### 6.6 VoWiFi errors
 
-- Suspicious SMS or calls pretending to be SemCache Mobile: do not click links or share codes. SemCache Mobile never asks for passwords or OTP codes.
-- Spam call blocking can be enabled under Settings > Services > Spam protection (free of charge).
-- Report suspected fraud to a human agent.
+VoWiFi (Wi-Fi Calling) enables supported devices to place calls using a Wi-Fi connection when the feature is available and provisioned. A customer may report SIP, IMS, E911, or a generic VoWiFi error code.
 
-## 7.10 Technical support FAQ
+Record the exact code, device model, operating-system version, Wi-Fi network type, approximate location, and whether ordinary cellular calls work. Check feature eligibility, account provisioning, device software, Wi-Fi connectivity, and any emergency-address or regional requirements that apply.
 
-**Q: Why does my phone show LTE or 4G instead of 5G?**
-A: Possibly there is no 5G coverage at your location, or the phone is set to 4G, or 5G Auto is limiting 5G use. See section 7.5.
-
-**Q: Why is my internet slow in the evening?**
-A: Networks are busiest from 18:00 to 22:00. Try moving to another place or using Wi-Fi.
-
-**Q: Why did my phone lose service after I updated it?**
-A: Software updates can reset carrier settings. Restart the phone, check APN settings, and reset network settings if needed.
-
-**Q: Can I use my phone abroad without changing settings?**
-A: In EU/EEA countries yes. For other countries, enable Data roaming and buy a Travel Pass.
-
-## 7.11 Home fiber router and Wi-Fi troubleshooting
-
-- **Factory reset:** Hold the physical Reset button on the back of the router for 10 seconds until all LEDs blink, then wait 2–3 minutes for reboot.
-- **Change Wi-Fi name and password:** Connect to the router, open `http://192.168.1.1` in a browser, sign in with the admin password on the router label, and go to Wireless > Wi-Fi Settings. (Admin password is changed under System > Administration.)
-- **PPPoE and bridge mode:** Fiber routers use the PPPoE username and password from your home internet contract. Bridge mode can be enabled under Network > WAN > Bridge Mode or by contacting support.
-- **Red LOS or PON light:** A solid or blinking red LOS/PON indicator means a fiber signal loss (check that the fiber patch cord is seated cleanly and not bent; if it stays red, report an outage under Help > Report a problem).
-- **Port forwarding:** Configured under Advanced > NAT / Port Forwarding by specifying the local device IP and TCP/UDP port range.
+The dataset contains example codes such as SIP and IMS values but does not map them to causes or remedies. Do not invent a code explanation. Consult the current VoWiFi error reference or escalate to the voice-network team.
 
 ---
 
-# 8. Account Management and Human Support
+## 7. Home internet, routers, Wi-Fi, and local connectivity
 
-## 8.1 Creating an account and signing in
+### 7.1 Changing the Wi-Fi password
 
-1. Open the My SemCache app or the website and select "Sign up".
-2. Enter name, email, and password, then verify your email address.
-3. Link your mobile number with an SMS verification code.
-   Forgot your password: select "Forgot password" on the sign-in page, enter your email, and follow the reset link (valid for 30 minutes). If the email does not arrive, check spam folders or contact support.
+A Wi-Fi password controls access to the wireless network. It is different from the router's administrator password, which controls access to router settings.
 
-## 8.2 Updating profile details
+A general process is:
 
-- Name, email, phone contact, address, and notification preferences can be edited in the app under Account > Profile.
-- A change of legal name or account owner requires identity verification by a human agent and a photo of an ID document.
-- Address changes are applied to the next bill.
+1. Connect to the customer's router using an authorized device.
+2. Open the router's management interface or the provider's supported app.
+3. Authenticate using the router's administrator credentials.
+4. Locate the wireless/Wi-Fi security settings.
+5. Update the network password and save the change.
+6. Reconnect devices using the new password.
 
-## 8.3 Security settings
+Menu names and access methods vary by router model and firmware. Use the model-specific guide. Do not ask the customer to share the administrator password in chat. Changing the Wi-Fi password may disconnect currently connected devices.
 
-- Turn on two-step verification under Account > Security.
-- Review signed-in devices and sign out from others.
-- Set a SIM PIN and a customer service PIN to protect against SIM-swap fraud.
+### 7.2 Router administrator password
 
-## 8.4 Changing number, porting, suspension, and cancellation
+The administrator password protects the router configuration interface; it is not the Wi-Fi password. Changing one does not necessarily change the other.
 
-- **Keep your number (porting):** Request number porting during sign-up or in a shop; porting in or out takes 1–3 business days and requires no outstanding unpaid balance.
-- **Temporary suspension (vacation freeze):** Postpaid numbers can be temporarily suspended for up to 6 months for €2 per month without losing the phone number.
-- **Cancelling a contract:** Contact a human agent or submit a written cancellation notice 30 days in advance via the app, a shop (with an ID/passport), or registered mail. Settle any outstanding balance and return leased router equipment.
-- **Early termination and final bill:** Leaving during a 12-month minimum commitment incurs an early termination fee equal to 50% of remaining monthly fees (shown under Plans > Contract details). The final invoice is prorated by day, and any unused prepaid balance is refunded within 30 days.
-- **New phone number:** A new phone number can be assigned for a fee of €5.
+Use the model-specific instructions and the approved credential recovery process. Do not recommend using an unknown default credential or sharing administrative access with an untrusted person.
 
-## 8.5 Talking to a human agent
+### 7.3 Factory reset
 
-Customers can reach a human agent through the "Talk to a human agent" option in chat. Details:
+A factory reset restores a router to its default configuration. It may erase Wi-Fi names and passwords, internet access settings, custom configuration, and provider-specific settings.
 
-- Availability: daily 07:00–23:00 CET.
-- Before the transfer, the customer sees an estimated wait time and a summary of the conversation that will be shared with the agent.
-- Outside opening hours, customers can leave a message and the callback will happen on the next business day, or they can continue with Telecom Assistant.
-- Prepare these items to speed up resolution: the phone number, the issue description, and what troubleshooting steps have already been tried. The agent will verify identity with security questions or an in-app code.
+Before recommending a reset:
 
-## 8.6 Complaints
+- Confirm the router model and the reason for the reset.
+- Explain that the customer may lose custom settings and need to reconfigure the connection.
+- Confirm that the customer has any required provider configuration or can obtain it through the approved channel.
+- Prefer a normal restart or targeted troubleshooting when a full reset is unnecessary.
 
-Customers can file a complaint through a human agent or in the app under Help > Complaints. SemCache Mobile responds within 5 business days and resolves complaints within 30 days. If the customer is not satisfied, they may contact the national telecom regulator or the consumer ombudsman.
+Use the physical reset control and timing specified by the manufacturer's model-specific instructions. Do not give a universal press duration for all routers. If the router uses provider-managed credentials or fiber/PPPoE configuration, involve technical support before resetting.
 
-## 8.7 Privacy
+### 7.4 Guest Wi-Fi
 
-SemCache Mobile processes personal data in accordance with data protection law (GDPR). Customers can request a copy of their data, correction, or deletion under Account > Privacy, or by contacting a human agent.
+A guest network can provide visitors with internet access without giving them the primary Wi-Fi password. Availability depends on router model and firmware.
 
----
+If supported, configure it through the router's approved interface, set a separate strong password, and review any guest isolation or access-duration options. Do not assume every router supports guest networking.
 
-# 9. Glossary
+### 7.5 Router lights and warning indicators
 
-- **APN (Access Point Name):** settings that connect the phone to the mobile data network.
-- **5G:** fifth-generation mobile network with higher speeds and lower latency than 4G.
-- **4G / LTE:** fourth-generation mobile network.
-- **eSIM:** a digital SIM profile installed on a device without a physical card.
-- **EID:** the unique identifier of an eSIM-capable device, found by dialing *#06#.
-- **ICCID:** the serial number printed on a physical SIM card.
-- **IMEI:** the unique identifier of the phone hardware, found by dialing *#06#.
-- **PIN / PUK:** codes used to protect and unlock a SIM card.
-- **Roaming:** using a mobile network of a partner operator while abroad.
-- **Postpaid:** a monthly plan billed after use.
-- **Prepaid:** a plan paid in advance with a balance or package.
-- **AutoPay:** automatic payment of the bill by saved card or bank account.
-- **Hotspot / Tethering:** sharing the phone's mobile data with other devices.
-- **VoLTE:** voice calls over the 4G/5G data network, for better call quality.
-- **Wi-Fi Calling:** making calls over a Wi-Fi network.
-- **Fair use policy:** a rule that prevents misuse of roaming and unlimited services.
-- **USSD:** short codes starting with * and ending with #, such as *123#.
-- **MMS:** multimedia message that carries pictures and videos.
+Customers may report a red or flashing light labelled LOS, PON, DSL, WAN, Internet, Power, Alarm, or a LAN port. Indicator meaning varies by manufacturer, model, connection type, and light behavior.
 
----
+Ask for the router model, exact label, color, whether the light is steady or flashing, and whether service is working. Consult the model-specific LED guide. Do not assign a universal meaning to a red light.
 
-# 10. Frequently Asked Questions (Quick Answers)
+For fiber equipment, LOS/PON indicators may relate to optical link status; DSL indicators relate to a DSL line; WAN/Internet indicators may relate to the upstream connection; Power and LAN indicators have separate meanings. These are broad categories, not a diagnosis. If a fiber cable appears damaged or disconnected, advise the customer not to look into the optical connector or handle exposed fiber and route the case to technical support.
 
-**Q: Which mobile plan is right for me?**
-A: It depends on your data use, travel habits, and number of lines. Light users do well with Flex Prepaid (€10) or 5G Essential (€25). Heavy users and remote workers should choose 5G Unlimited (€40). Frequent travelers benefit from 5G Unlimited Premium (€55). Families save with a Family plan starting at €60 for 2 lines. Tell the assistant how much data you use and where you travel, and it can recommend a plan.
+### 7.6 Home internet is slow
 
-**Q: How much mobile data do I have left?**
-A: Open the My SemCache app and check Home > Usage, dial *123#, or send DATA to 1234. The allowance resets on your billing cycle date (postpaid) or every 30 days from your package activation (prepaid).
+For slow home internet, distinguish Wi-Fi performance from the broadband connection itself.
 
-**Q: How can I pay my bill?**
-A: Pay by card, Apple Pay, or Google Pay in the app or web portal (Billing > Pay now), by bank transfer using the payment reference on the bill, in a shop, or set up AutoPay (Billing > AutoPay) to pay automatically and save €2 per month.
+Ask whether the issue affects all devices, whether a device connected by Ethernet is also slow, whether the router lights indicate a fault, and when the issue occurs. A speed test near the router and, where possible, over Ethernet can help separate Wi-Fi limitations from an upstream line issue.
 
-**Q: How does international roaming work?**
-A: In EU/EEA countries (Zone 1) you use your plan's minutes, SMS, and roaming data with no extra charges, within your allowance. In Zone 2 (UK, Switzerland, Turkey, Western Balkans) and Zone 3 (rest of the world) buy a Travel Pass to avoid higher pay-as-you-go rates. Enable data roaming on your phone and set a spending cap in the app.
+Basic checks include restarting the router using the approved process, checking cable connections without disturbing fiber connectors, moving closer to the router, and testing another device. If only one room or one device is affected, investigate local Wi-Fi conditions before treating it as a network outage.
 
-**Q: How do I activate my eSIM?**
-A: Connect to Wi-Fi, then on iPhone go to Settings > Mobile Service > Add eSIM; on Android go to Settings > Connections > SIM manager > Add eSIM. Scan the QR code from the My SemCache app or email. Activation takes 2–5 minutes. Each QR code can be used only once.
+### 7.7 Bridge mode, PPPoE, and port forwarding
 
-**Q: My mobile internet isn't working. What should I do?**
-A: Toggle Airplane mode for 15 seconds, check that mobile data is on, restart the phone, check your data allowance and bill status in the app, and check Network status for outages. If it is still not working, verify the APN settings (APN: internet.semcache.mobile), update the phone software, or reset network settings. If the problem remains, ask to speak to a human agent.
+Bridge mode, PPPoE credentials, and port forwarding are advanced router configuration topics. They are not the same as changing the Wi-Fi password or resetting the router.
 
-**Q: How can I speak to a person?**
-A: Select "Talk to a human agent" in the chat. Agents are available daily from 07:00 to 23:00 CET, and your conversation summary is shared so you don't need to repeat yourself.
+- **Bridge mode** changes how routing functions are handled and may affect the provider's managed configuration.
+- **PPPoE** uses connection credentials on supported access types. Credentials must be supplied through an authenticated provider channel.
+- **Port forwarding** directs incoming network traffic to a device or service inside the customer's network. The exact procedure depends on router model, network design, and whether the service uses a public/reachable IP address.
 
-**Q: Is there a fee to change my plan?**
-A: Changing between plans is free. Upgrades start immediately with pro-rated charges, and downgrades start from the next billing cycle. Early termination fees may apply if you leave a 12-month contract before it ends.
-
-**Q: What should I do if my phone or SIM is lost or stolen?**
-A: Block the SIM right away in the app (Account > SIM & eSIM > Block SIM) or contact a human agent. A replacement SIM or eSIM can be issued and you keep your phone number.
-
-**Q: Can the assistant cancel my contract or refund a payment?**
-A: No. Cancellations, ownership changes, number porting, and refunds require identity verification and are handled by a human agent. The assistant can connect you with one.
+Use the provider's model-specific instructions and security guidance. Confirm that the customer is authorized to administer the router. Do not invent menu paths, credentials, port values, or guarantee that port forwarding will work on every access technology. If the customer is configuring a server, camera, NAS, VPN, game, or home-automation device, collect the router model and service context and route advanced cases appropriately.
 
 ---
 
-# 11. Short Answer Templates (for consistent responses)
+## 8. Roaming, international use, and travel
 
-## Template: plan recommendation
+### 8.1 Using data in another country
 
-"Based on what you've told me, [plan name] (€[price] per month) would be a good fit: it includes [data], [calls and SMS], and [roaming allowance]. Would you like me to compare it with another plan or explain how to switch?"
+Roaming availability and charges depend on the destination, partner network, plan, roaming agreement, and any active travel pack. “Europe” or “nearby country” is not precise enough to establish the applicable price or allowance.
 
-## Template: data remaining
+Before travel, confirm:
 
-"You can check your remaining data in the My SemCache app under Home > Usage, by dialing *123#, or by sending DATA to 1234. Your allowance resets on [your billing cycle date / 30 days after package activation]."
+- The exact destination country.
+- Whether the plan includes roaming there.
+- Whether a roaming pack is available and active.
+- The applicable data, call, and SMS rates.
+- Any fair-use limit, validity period, or automatic-renewal condition.
+- Whether the device's data-roaming setting must be enabled.
 
-## Template: escalation
+Do not assume that EU/EEA treatment applies to every European country. Switzerland, Turkey, and other destinations may have different terms. The dataset does not provide a current country list or rates; use the live roaming price list.
 
-"I'd be glad to connect you with a human agent. Agents are available daily from 07:00 to 23:00 CET, and I'll share a summary of our conversation so you don't need to repeat it. Would you like me to transfer you now?"
+### 8.2 Roaming data packs
 
-## Template: out of scope
+Customers may want to activate a roaming pack before departure. Confirm the destination, travel dates, pack eligibility, validity period, included data, price, and activation timing.
 
-"I'm not able to help with that in chat, but a human agent can. I can transfer you now, or I can help with another question about your mobile services."
+Explain the current activation process through the authenticated app/account or approved support channel. If activation is scheduled or takes effect only under certain conditions, state those conditions from the current product terms. A corporate SIM may require an account administrator or business support.
 
-## Template: unknown information
+### 8.3 Checking remaining roaming data
 
-"I don't have confirmed information about that, and I don't want to give you a wrong answer. A human agent can check it for you. Would you like me to connect you?"
+Roaming allowance is separate from the customer's domestic data balance. Direct customers to the roaming usage view in the account/app or another approved usage-check channel.
+
+Clarify whether the customer wants to check domestic data, roaming data, or the validity of a roaming pack. Do not present the domestic balance as the remaining roaming allowance.
+
+### 8.4 A roaming pack stops working earlier than expected
+
+If a pack was expected to last several days but stopped working sooner, check the remaining allowance, validity start and end times, destination eligibility, partner network, and whether the pack was applied to the correct number.
+
+Possible areas to investigate include data exhaustion, expiry, use in a country not covered by the pack, account provisioning, device settings, or a partner-network issue. These are diagnostic possibilities, not conclusions. Check the usage ledger and pack status before explaining why service stopped.
+
+### 8.5 No mobile network abroad
+
+If a customer arrives abroad and has no service, confirm the country, local network, device model, SIM/eSIM status, roaming eligibility, and whether the phone can see available networks.
+
+General checks may include restarting the device, confirming that the line is enabled, checking network selection, and verifying roaming settings. If manual network selection is supported, use the provider's current partner-network guidance. If service is registered but data does not work, use the separate mobile-data troubleshooting path.
+
+A customer near a national border may connect to a foreign network while still at home. Explain how to review automatic network selection and data-roaming settings, and advise checking the applicable charges before using the foreign network.
+
+### 8.6 Roaming charges for calls and SMS
+
+Data, outgoing calls, incoming calls, calls to the home country, and SMS may have different roaming rates. Confirm the country where the customer is physically registered on a network, the destination of the call, and the service type.
+
+Do not use the roaming data price to answer a call or SMS pricing question. Use the current country-specific rate table and explain any applicable connection or billing increments only when confirmed.
+
+### 8.7 Setting a roaming spending limit or disabling roaming
+
+Customers may want to limit unexpected charges or completely disable data roaming. Distinguish between:
+
+- Turning off data roaming on the handset.
+- Blocking roaming at the account/network level.
+- Setting a spending cap or notification threshold.
+- Disabling all roaming services, including voice and SMS.
+
+These controls have different effects. Explain only the options currently supported by the provider and the device. A handset setting may not block all roaming-related charges, such as voice or SMS. A cruise or airline environment may use specialized networks and may not behave like ordinary terrestrial roaming.
+
+### 8.8 Cruise ships and in-flight connectivity
+
+Ships and aircraft may use onboard satellite or specialized mobile networks. These services can have separate availability and pricing from ordinary land-based roaming, and the carrier may not control the onboard network's charges.
+
+Before travel, customers should check the airline or cruise operator's connectivity information and the provider's current roaming terms. Do not assume that a specific airline, aircraft, ship, sea, or route is covered by a standard roaming pack. Recommend disabling automatic data roaming or using airplane mode when the customer does not intend to connect, while noting that exact device behavior and onboard Wi-Fi are separate matters.
+
+---
+
+## 9. Outages, incident reporting, restoration, and compensation
+
+### 9.1 Checking whether there is an outage
+
+A customer may ask whether mobile or home-internet service is currently affected in their area. This requires live incident information; a static knowledge base cannot confirm a current outage.
+
+Collect the service type, approximate service location, affected number or connection reference, and when the problem began. Check the live outage/status system and distinguish a confirmed incident from an individual line or equipment fault.
+
+A city name alone may be too broad. Ask for the neighborhood or service address through an approved secure channel when needed. Do not claim that an outage exists or does not exist without checking current status.
+
+### 9.2 Cause of an outage
+
+Customers may ask whether an incident is caused by fiber damage, a power interruption, equipment failure, or another issue. Share only the cause published in the approved incident record.
+
+If the cause is not confirmed, say that the technical team is investigating rather than guessing. Do not infer the cause from the city, weather, or a red router light.
+
+### 9.3 Restoration estimates
+
+Restoration times can change as field teams investigate and repair incidents. Provide an ETA only when the live incident record includes an approved customer-facing estimate. Explain that an estimate is not a guarantee and may be revised.
+
+For damage to a fiber cable or a power-related incident, use the incident-specific updates. Do not promise a restoration time based on a previous outage or a general repair duration.
+
+### 9.4 Reporting a network problem
+
+A customer can report a local mobile, broadband, or recurring connectivity issue through the approved support channel. Capture:
+
+- Affected service and account/line reference.
+- Location or service address.
+- Start time and frequency.
+- Whether the issue is continuous or intermittent.
+- Devices and services affected.
+- Troubleshooting already completed.
+- Relevant router indicator or error message.
+
+A report about a fallen tower, exposed cable, damaged infrastructure, or another physical safety hazard must be treated as a safety incident and routed through the designated urgent channel. Do not ask the customer to approach, touch, or inspect damaged infrastructure.
+
+### 9.5 Tracking and escalating an incident ticket
+
+For a customer asking about an existing report, locate the case using its reference and verify the current status, assigned team, last update, and next action. Do not invent a technician visit date.
+
+If a ticket has remained unresolved or the customer reports repeated evening drops, record the history and escalate according to the service-level and incident-management process. A recurring evening issue may be a performance investigation rather than a confirmed area-wide outage.
+
+### 9.6 Outage notifications
+
+Customers may want to subscribe to, or stop receiving, service-incident notifications. Distinguish operational outage alerts from marketing or promotional SMS.
+
+Use the notification preferences available for the account and explain which alert categories the preference controls. Do not treat a request to stop marketing messages as a request to disable critical service notifications, or vice versa.
+
+### 9.7 Compensation, credits, and SLA claims
+
+Customers may ask for compensation after a period without service. Eligibility may differ between consumer service and a business agreement with a service-level agreement (SLA).
+
+Review:
+
+- The affected service and account type.
+- The confirmed incident and service-impact period.
+- The applicable consumer terms or business SLA.
+- Any exclusions, reporting requirements, or claim deadlines.
+- Whether a credit is automatic or requires a request.
+
+Do not promise a credit based only on the number of hours reported by the customer. The dataset does not specify a 24-hour threshold, a compensation formula, or a universal SLA credit rule. Use the current policy and the verified incident timeline.
+
+---
+
+## 10. Distinguishing similar requests
+
+These distinctions are important for accurate retrieval and routing:
+
+| Customer wording or situation                    | Correct topic                       | Do not confuse it with        |
+| ------------------------------------------------ | ----------------------------------- | ----------------------------- |
+| “My mobile data is slow”                         | Mobile network quality              | Home Wi-Fi performance        |
+| “My home Wi-Fi is slow”                          | Router/Wi-Fi and broadband          | Mobile data allowance         |
+| “I cannot receive verification codes”            | Incoming SMS delivery               | Outgoing SMS failure          |
+| “I cannot send SMS”                              | Outgoing messaging                  | Verification-code delivery    |
+| “My phone cannot make calls”                     | Voice/VoLTE troubleshooting         | Mobile data or APN            |
+| “VoWiFi shows an error”                          | Wi-Fi Calling diagnostics           | Ordinary VoLTE setup          |
+| “Change my Wi-Fi password”                       | Wireless network credentials        | Router administrator password |
+| “Reset my router”                                | Factory configuration reset         | Simple router restart         |
+| “Replace my damaged SIM”                         | Physical SIM replacement            | eSIM transfer                 |
+| “Move my eSIM to a new phone”                    | eSIM transfer/reissue               | Adding a second eSIM line     |
+| “My SIM was changed without permission”          | Fraud/security incident             | Routine SIM replacement       |
+| “My SIM asks for PUK”                            | SIM security/unlock                 | Phone screen passcode         |
+| “I want to keep my number with another provider” | Number portability                  | Ordinary cancellation         |
+| “Pause my service while away”                    | Temporary suspension                | Permanent closure             |
+| “My roaming data pack stopped”                   | Roaming pack status/usage           | Domestic data balance         |
+| “How much are calls abroad?”                     | Roaming voice rates                 | Roaming data price            |
+| “Will my phone work on a cruise/flight?”         | Maritime/in-flight connectivity     | Standard land roaming         |
+| “I was charged twice”                            | Duplicate transaction investigation | Unfamiliar single charge      |
+| “I need a VAT invoice”                           | Tax/business invoice                | Itemized call record          |
+| “The app shows a payment code”                   | Payment error lookup                | MNP or VoWiFi error           |
+| “A red light is on”                              | Model-specific router diagnostics   | Universal hardware diagnosis  |
+
+---
+
+## 11. Escalation and handoff guidance
+
+Escalate when the issue requires live account data, a specialist system, security handling, or a policy decision not contained in this guide.
+
+| Area                                                  | Escalate to                        | Include in the handoff                                                         |
+| ----------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------ |
+| Plan price, discount, promotion, or eligibility       | Tariff/retention support           | Exact plan, account type, requested offer, promotion context                   |
+| Unrecognized or duplicate charge, refund, tax invoice | Billing operations                 | Transaction date, amount, invoice reference, payment status                    |
+| Payment error code                                    | Payment operations                 | Exact code, method, timestamp, transaction reference                           |
+| Contract termination or ownership transfer            | Contract administration            | Service type, account holder verification status, reason, contract reference   |
+| Number portability rejection                          | MNP/number portability team        | Exact rejection code, request reference, account type                          |
+| SIM swap or lost/stolen device                        | Fraud/security team                | Time reported, affected number, verification status, actions already taken     |
+| eSIM activation/transfer error                        | eSIM provisioning                  | Device model, exact error, EID status where securely available, profile status |
+| APN, 5G, VoLTE, VoWiFi, SMS issue                     | Mobile technical support           | Device, location, service affected, exact error, tests performed               |
+| Router lights, PPPoE, bridge mode, port forwarding    | Home technical support             | Router model, access type, light label/state, configuration context            |
+| Live outage or restoration estimate                   | Network operations/incident desk   | Service, affected location, incident/ticket reference                          |
+| Compensation or SLA credit                            | Billing/claims or business support | Verified incident period, account type, applicable agreement                   |
+
+### 11.1 Security and privacy reminders
+
+- Never request a password, full card number, CVV, one-time password, banking login, or full PUK in chat.
+- Use approved identity verification before discussing account-specific information or making account changes.
+- Do not disclose another person's account details during contract-transfer or family-member requests.
+- For suspected SIM swap, lost phone, or unauthorized account activity, prioritize security escalation over routine troubleshooting.
+- Collect only the minimum information required for the case.
+
+---
+
+## 12. RAG retrieval and response guidance
+
+This section is intended for systems that retrieve passages from this document.
+
+### 12.1 Suggested metadata
+
+When chunking this document, attach metadata such as:
+
+- `domain`: `tariff_plan`, `billing`, `contract_termination`, `sim_esim`, `technical_support`, `roaming`, or `outage_incident`
+- `topic`: a short topic label such as `plan_change`, `payment_error`, `sim_swap_fraud`, `roaming_pack`, or `router_led`
+- `source_id`: the corresponding source identifier listed below
+- `language`: `en` (the source questions also include Ukrainian)
+- `content_type`: `process`, `troubleshooting`, `policy_boundary`, or `routing`
+
+Keep section headings with their paragraphs during chunking. Avoid splitting a troubleshooting sequence from its safety or escalation notes.
+
+### 12.2 Source identifiers represented in this guide
+
+The dataset groups requests under the following knowledge-source identifiers:
+
+| Source ID                   | Coverage                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| `kb-tariff-catalog-01`      | Plan prices, unlimited-plan fair use, exact data allowances, student discounts        |
+| `kb-tariff-switch-01`       | Upgrades, downgrades, effective dates, price retention                                |
+| `kb-tariff-bundles-01`      | Extra data, family sharing, streaming benefits                                        |
+| `kb-billing-autopay-01`     | Automatic payments, card changes, payment errors                                      |
+| `kb-billing-disputes-01`    | Unfamiliar charges, duplicate charges, refunds, one-time fees                         |
+| `kb-billing-statements-01`  | Invoices, due dates, payment methods, tax-invoice corrections                         |
+| `kb-contract-cancel-01`     | Contract cancellation, required documents, ownership transfer, sales-promise disputes |
+| `kb-contract-portout-01`    | Number portability, early termination, port-out rejections                            |
+| `kb-contract-suspension-01` | Temporary suspension and final bills                                                  |
+| `kb-esim-activation-01`     | eSIM activation, transfer, installation errors, additional eSIM lines                 |
+| `kb-sim-replacement-01`     | Physical SIM activation/replacement and number selection                              |
+| `kb-sim-security-01`        | Lost SIM blocking, PUK, suspected SIM-swap fraud                                      |
+| `kb-tech-apn-01`            | APN, SMS delivery, device-specific 5G issues                                          |
+| `kb-tech-quality-01`        | Slow mobile data, VoLTE, VoWiFi errors                                                |
+| `kb-tech-router-01`         | Router reset, Wi-Fi password, router indicators, advanced router settings             |
+| `kb-roaming-eu-01`          | EU and international usage, roaming voice/SMS distinctions                            |
+| `kb-roaming-packs-01`       | Roaming pack activation, remaining allowance, pack expiry or interruption             |
+| `kb-roaming-charges-01`     | Roaming spend controls, no service abroad, country rates, cruise/in-flight use        |
+| `kb-outage-status-01`       | Current area outages, incident causes, restoration estimates                          |
+| `kb-outage-reporting-01`    | Reporting issues, ticket status, recurring evening drops                              |
+| `kb-outage-compensation-01` | Outage notifications, compensation, business SLA credits                              |
+
+### 12.3 Answer construction
+
+A good support answer should:
+
+1. Identify the customer's actual intent and service type.
+2. Retrieve the most relevant section, including its boundaries and escalation notes.
+3. Give practical next steps in a clear order.
+4. State which details must be verified in a live system.
+5. Ask a focused follow-up only if a necessary detail is missing.
+6. Avoid copying a dataset prompt or inventing a policy answer not present in the source.
+7. Clearly distinguish a general process from a confirmed account-specific result.
+
+### 12.4 When retrieval is insufficient
+
+If the retrieved passage explains the process but does not contain the requested current value, do not fill the gap with a guess. For example:
+
+- For a plan price, retrieve the current tariff catalogue.
+- For a country roaming price, retrieve the current destination rate table.
+- For APN values, retrieve the approved configuration for the exact service.
+- For an error code, retrieve the current error-code reference.
+- For an outage or ETA, query the live incident system.
+- For a refund, compensation, or early-termination amount, inspect the account and applicable policy.
+- For a router LED, retrieve the manufacturer's guide for the exact model.
+
+The correct response when live data is unavailable is to say what needs to be checked and offer the appropriate handoff—not to fabricate a definitive answer.
+
+---
+
+## 13. Language and terminology notes
+
+The source questions are written in both English and Ukrainian. The same support intent may appear with spelling mistakes, informal wording, missing punctuation, transliteration, or a mixture of technical terms and everyday language.
+
+Useful terminology:
+
+- **Tariff/plan**: тариф, plan, package.
+- **Monthly fee**: абонплата, recurring subscription charge.
+- **Data allowance**: гігабайти, data bundle, included data.
+- **Roaming**: роумінг, international use on a partner network.
+- **SIM replacement**: заміна SIM-картки.
+- **eSIM transfer**: перенесення eSIM на новий телефон.
+- **PUK**: SIM unlock code; handle as sensitive account information.
+- **Number portability**: перенесення номера до іншого оператора.
+- **VoLTE**: voice calls over LTE.
+- **VoWiFi / Wi-Fi Calling**: calls over Wi-Fi.
+- **APN**: mobile data access-point configuration.
+- **Outage**: збій, аварія, service incident.
+- **Final bill**: остаточний рахунок.
+- **Automatic payment**: автоплатіж.
+- **Tax invoice**: податкова накладна / VAT or tax invoice, depending on the document.
+
+Do not rely on literal keyword matching alone. Interpret the service, symptom, and requested action together.

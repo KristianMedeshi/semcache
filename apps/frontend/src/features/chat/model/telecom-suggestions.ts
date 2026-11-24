@@ -1,4 +1,12 @@
-import { CreditCard, Globe, QrCode, Signal, Smartphone, Wifi, type LucideIcon } from 'lucide-react';
+import {
+  Smartphone,
+  CreditCard,
+  Wifi,
+  Globe,
+  FileText,
+  Headphones,
+  type LucideIcon,
+} from 'lucide-react';
 
 export interface TelecomSuggestion {
   id: string;
@@ -8,47 +16,55 @@ export interface TelecomSuggestion {
   icon: LucideIcon;
 }
 
-export const TELECOM_SUGGESTIONS: readonly TelecomSuggestion[] = [
+export interface TelecomSuggestion {
+  id: string;
+  category: string;
+  prompt: string;
+  subtitle: string;
+  icon: LucideIcon;
+}
+
+export const TELECOM_SUGGESTIONS: TelecomSuggestion[] = [
   {
-    id: 'mobile-plans',
-    category: 'Mobile Plans',
-    prompt: 'Which mobile plan is right for me?',
-    subtitle: 'Compare 5G unlimited, family, and prepaid plans',
+    id: 'plans',
+    category: 'Plans & Pricing',
+    prompt: 'What mobile plans, offers and discounts are available?',
+    subtitle: 'Explore plans, data packages, pricing and promotions.',
     icon: Smartphone,
   },
   {
-    id: 'internet-usage',
-    category: 'Internet Usage',
-    prompt: 'How much mobile data do I have left?',
-    subtitle: 'Check remaining high-speed data and cycle reset',
-    icon: Wifi,
-  },
-  {
-    id: 'payments',
-    category: 'Payments',
-    prompt: 'How can I pay my bill?',
-    subtitle: 'AutoPay, card payments, and billing balance',
+    id: 'billing',
+    category: 'Billing & Payments',
+    prompt: 'Can you help me understand my bill or a payment issue?',
+    subtitle: 'Get help with invoices, unexpected charges and refunds.',
     icon: CreditCard,
   },
   {
+    id: 'technical',
+    category: 'Technical Support',
+    prompt: "I'm experiencing problems with my mobile network or internet.",
+    subtitle: 'Troubleshoot connectivity, SIM cards, eSIM and Wi-Fi.',
+    icon: Headphones,
+  },
+  {
     id: 'roaming',
-    category: 'Roaming',
-    prompt: 'How does international roaming work?',
-    subtitle: 'Travel passes, EU/global zones, and daily rates',
+    category: 'Roaming & Travel',
+    prompt: 'How can I use my mobile services while travelling abroad?',
+    subtitle: 'Learn about roaming, international rates and data packages.',
     icon: Globe,
   },
   {
-    id: 'sim-esim',
-    category: 'SIM & eSIM',
-    prompt: 'How do I activate my eSIM?',
-    subtitle: 'Instant QR setup and device transfer guide',
-    icon: QrCode,
+    id: 'contracts',
+    category: 'Contracts & Services',
+    prompt: 'How can I manage, change or cancel my contract?',
+    subtitle: 'Get assistance with subscriptions and number portability.',
+    icon: FileText,
   },
   {
-    id: 'technical-support',
-    category: 'Technical Support',
-    prompt: "My mobile internet isn't working.",
-    subtitle: 'APN settings, 5G coverage, and connectivity fixes',
-    icon: Signal,
+    id: 'network',
+    category: 'Network & Wi-Fi',
+    prompt: 'Is there a network outage or a problem with my connection?',
+    subtitle: 'Check connectivity issues, router problems and service interruptions.',
+    icon: Wifi,
   },
 ] as const;
