@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./validation": {
+      "types": "./dist/validation/index.d.ts",
+      "default": "./dist/validation/index.js"
     }
   },
   "scripts": {
@@ -17,7 +21,9 @@
     "lint": "oxlint src/"
   },
   "dependencies": {
-    "@semcache/shared-types": "workspace:*"
+    "@semcache/shared-types": "workspace:*",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1"
   },
   "devDependencies": {
     "@semcache/eslint-config": "workspace:*",

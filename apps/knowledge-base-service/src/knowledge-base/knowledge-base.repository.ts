@@ -90,28 +90,14 @@ export class KnowledgeBaseRepository {
     return created;
   }
 
-  async updateDocumentStatus(
+  private async updateDocumentFields(
     documentId: string,
-    updates: {
-      status: KnowledgeDocumentStatus;
-      format?: KnowledgeDocumentFormat;
-      extractedContent?: string;
-      chunkCount?: number;
-      characterCount?: number;
-      errorMessage?: string | null;
-    },
+    fields: Partial<typeof knowledgeDocuments.$inferInsert>,
   ): Promise<KnowledgeDocumentRecord> {
     const rows = await this.db
       .update(knowledgeDocuments)
       .set({
-        status: updates.status,
-        ...(updates.format !== undefined ? { format: updates.format } : {}),
-        ...(updates.extractedContent !== undefined
-          ? { extractedContent: updates.extractedContent }
-          : {}),
-        ...(updates.chunkCount !== undefined ? { chunkCount: updates.chunkCount } : {}),
-        ...(updates.characterCount !== undefined ? { characterCount: updates.characterCount } : {}),
-        ...(updates.errorMessage !== undefined ? { errorMessage: updates.errorMessage } : {}),
+        ...fields,
         updatedAt: new Date(),
       })
       .where(eq(knowledgeDocuments.id, documentId))
@@ -124,6 +110,29 @@ export class KnowledgeBaseRepository {
     return updated;
   }
 
+  async updateDocumentStatus(
+    documentId: string,
+    updates: {
+      status: KnowledgeDocumentStatus;
+      format?: KnowledgeDocumentFormat;
+      extractedContent?: string;
+      chunkCount?: number;
+      characterCount?: number;
+      errorMessage?: string | null;
+    },
+  ): Promise<KnowledgeDocumentRecord> {
+    return this.updateDocumentFields(documentId, {
+      status: updates.status,
+      ...(updates.format !== undefined ? { format: updates.format } : {}),
+      ...(updates.extractedContent !== undefined
+        ? { extractedContent: updates.extractedContent }
+        : {}),
+      ...(updates.chunkCount !== undefined ? { chunkCount: updates.chunkCount } : {}),
+      ...(updates.characterCount !== undefined ? { characterCount: updates.characterCount } : {}),
+      ...(updates.errorMessage !== undefined ? { errorMessage: updates.errorMessage } : {}),
+    });
+  }
+
   async updateDocumentContent(
     documentId: string,
     updates: {
@@ -132,22 +141,11 @@ export class KnowledgeBaseRepository {
       metadata?: Record<string, string | number | boolean>;
     },
   ): Promise<KnowledgeDocumentRecord> {
-    const rows = await this.db
-      .update(knowledgeDocuments)
-      .set({
-        ...(updates.rawContent !== undefined ? { rawContent: updates.rawContent } : {}),
-        ...(updates.title !== undefined ? { title: updates.title } : {}),
-        ...(updates.metadata !== undefined ? { metadata: updates.metadata } : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(knowledgeDocuments.id, documentId))
-      .returning();
-
-    const updated = rows[0];
-    if (!updated) {
-      throw new Error(`Knowledge base document ${documentId} not found`);
-    }
-    return updated;
+    return this.updateDocumentFields(documentId, {
+      ...(updates.rawContent !== undefined ? { rawContent: updates.rawContent } : {}),
+      ...(updates.title !== undefined ? { title: updates.title } : {}),
+      ...(updates.metadata !== undefined ? { metadata: updates.metadata } : {}),
+    });
   }
 
   async replaceDocumentChunks(

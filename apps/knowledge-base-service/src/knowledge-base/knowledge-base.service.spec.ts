@@ -1,7 +1,5 @@
-import { randomUUID } from 'node:crypto';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ClientProxy } from '@nestjs/microservices';
-import type { RetrievedKnowledgeChunkDto } from '@semcache/shared-dtos';
 import {
   KnowledgeDocumentFormat,
   KnowledgeDocumentStatus,
@@ -9,7 +7,7 @@ import {
   SERVICE_TCP_PATTERNS,
 } from '@semcache/shared-types';
 import { of, throwError } from 'rxjs';
-import type { KnowledgeChunkRecord, KnowledgeDocumentRecord } from '../db/schema';
+import { InMemoryKnowledgeBaseRepository } from '../../test/in-memory-knowledge-base.repository';
 import { DocumentProcessorService } from './document-processor.service';
 import type { KnowledgeBaseRepository } from './knowledge-base.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
@@ -18,106 +16,30 @@ function createKnowledgeBaseHarness(options?: {
   llmSendImpl?: jest.Mock;
   cacheSendImpl?: jest.Mock;
 }) {
-  const docs = new Map<string, KnowledgeDocumentRecord>();
-  const chunksByDoc = new Map<string, KnowledgeChunkRecord[]>();
-
-  const mockRepo: Partial<KnowledgeBaseRepository> = {
-    createDocument: jest.fn(async (input) => {
-      const now = new Date();
-      const record: KnowledgeDocumentRecord = {
-        id: randomUUID(),
-        title: input.title,
-        fileName: input.fileName ?? null,
-        format: input.format,
-        category: input.category,
-        rawContent: input.rawContent,
-        extractedContent: '',
-        status: input.status ?? KnowledgeDocumentStatus.PENDING,
-        chunkCount: 0,
-        characterCount: 0,
-        errorMessage: null,
-        metadata: input.metadata ?? {},
-        uploadedBy: input.uploadedBy ?? null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      docs.set(record.id, record);
-      return record;
-    }),
-    updateDocumentStatus: jest.fn(async (id, updates) => {
-      const existing = docs.get(id);
-      if (!existing) {
-        throw new Error('Not found');
-      }
-      const updated: KnowledgeDocumentRecord = {
-        ...existing,
-        status: updates.status,
-        format: updates.format ?? existing.format,
-        extractedContent: updates.extractedContent ?? existing.extractedContent,
-        chunkCount: updates.chunkCount ?? existing.chunkCount,
-        characterCount: updates.characterCount ?? existing.characterCount,
-        errorMessage:
-          updates.errorMessage !== undefined ? updates.errorMessage : existing.errorMessage,
-        updatedAt: new Date(),
-      };
-      docs.set(id, updated);
-      return updated;
-    }),
-    replaceDocumentChunks: jest.fn(async (docId, chunks) => {
-      const now = new Date();
-      const records: KnowledgeChunkRecord[] = chunks.map((chunk) => ({
-        id: randomUUID(),
-        documentId: docId,
-        chunkIndex: chunk.chunkIndex,
-        content: chunk.content,
-        tokenCount: chunk.tokenCount,
-        characterCount: chunk.characterCount,
-        embedding: chunk.embedding,
-        metadata: chunk.metadata,
-        createdAt: now,
-      }));
-      chunksByDoc.set(docId, records);
-      return records;
-    }),
-    findAllDocuments: jest.fn(async () => [...docs.values()]),
-    findDocumentById: jest.fn(async (id) => docs.get(id) ?? null),
-    findChunksByDocumentId: jest.fn(async (id) => chunksByDoc.get(id) ?? []),
-    deleteDocument: jest.fn(async (id) => {
-      const existed = docs.delete(id);
-      const removedChunks = chunksByDoc.get(id)?.length ?? 0;
-      chunksByDoc.delete(id);
-      return { deleted: existed, deletedChunksCount: removedChunks };
-    }),
-    searchSimilarChunks: jest.fn(async (): Promise<RetrievedKnowledgeChunkDto[]> => {
-      const firstDoc = [...docs.values()].find((d) => d.status === KnowledgeDocumentStatus.READY);
+  const mockRepo = new InMemoryKnowledgeBaseRepository();
+  const spyRepo: Partial<KnowledgeBaseRepository> = {
+    createDocument: jest.fn((input) => mockRepo.createDocument(input)),
+    updateDocumentStatus: jest.fn((id, updates) => mockRepo.updateDocumentStatus(id, updates)),
+    updateDocumentContent: jest.fn((id, updates) => mockRepo.updateDocumentContent(id, updates)),
+    replaceDocumentChunks: jest.fn((docId, chunks) =>
+      mockRepo.replaceDocumentChunks(docId, chunks),
+    ),
+    findAllDocuments: jest.fn(() => mockRepo.findAllDocuments()),
+    findDocumentById: jest.fn((id) => mockRepo.findDocumentById(id)),
+    findChunksByDocumentId: jest.fn((id) => mockRepo.findChunksByDocumentId(id)),
+    deleteDocument: jest.fn((id) => mockRepo.deleteDocument(id)),
+    searchSimilarChunks: jest.fn(async () => {
+      const firstDoc = [...mockRepo.docs.values()].find(
+        (d) => d.status === KnowledgeDocumentStatus.READY,
+      );
       if (!firstDoc) {
         return [];
       }
-      const docChunks = chunksByDoc.get(firstDoc.id) ?? [];
-      const firstChunk = docChunks[0];
-      if (!firstChunk) {
-        return [];
-      }
-      return [
-        {
-          chunkId: firstChunk.id,
-          documentId: firstDoc.id,
-          documentTitle: firstDoc.title,
-          fileName: firstDoc.fileName,
-          category: firstDoc.category as QueryCategory,
-          chunkIndex: firstChunk.chunkIndex,
-          content: firstChunk.content,
-          similarity: 0.91,
-          source: {
-            documentId: firstDoc.id,
-            documentTitle: firstDoc.title,
-            fileName: firstDoc.fileName,
-            category: firstDoc.category as QueryCategory,
-            chunkId: firstChunk.id,
-            chunkIndex: firstChunk.chunkIndex,
-          },
-        },
-      ];
+      return mockRepo.searchSimilarChunks({
+        queryEmbedding: mockRepo.chunksByDoc.get(firstDoc.id)?.[0]?.embedding ?? [],
+        topK: 4,
+        minSimilarity: -1,
+      });
     }),
   };
 
@@ -140,14 +62,21 @@ function createKnowledgeBaseHarness(options?: {
   const semanticCacheClient = { send: cacheSendMock } as unknown as ClientProxy;
   const processor = new DocumentProcessorService();
   const service = new KnowledgeBaseService(
-    mockRepo as KnowledgeBaseRepository,
+    spyRepo as KnowledgeBaseRepository,
     processor,
     llmClient,
     undefined,
     semanticCacheClient,
   );
 
-  return { service, mockRepo, llmSendMock, cacheSendMock, docs, chunksByDoc };
+  return {
+    service,
+    mockRepo: spyRepo,
+    llmSendMock,
+    cacheSendMock,
+    docs: mockRepo.docs,
+    chunksByDoc: mockRepo.chunksByDoc,
+  };
 }
 
 describe('KnowledgeBaseService', () => {

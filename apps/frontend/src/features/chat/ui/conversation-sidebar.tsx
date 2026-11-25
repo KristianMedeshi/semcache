@@ -1,32 +1,16 @@
 import type { DialogResponseDto } from '@semcache/shared-dtos';
-import { formatDistanceToNow } from 'date-fns';
-import {
-  MessageSquarePlus,
-  MessagesSquare,
-  MoreHorizontal,
-  Pencil,
-  Search,
-  Trash2,
-} from 'lucide-react';
-import type { ReactNode } from 'react';
+import { MessageSquarePlus, MessagesSquare, Search } from 'lucide-react';
+import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
-import { cn } from '@/shared/lib/utils';
+import { ConversationActionDialogs } from '@/features/chat/ui/conversation-action-dialogs';
+import { ConversationListItem } from '@/features/chat/ui/conversation-list-item';
 import { Button } from '@/shared/ui/button';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
   SheetContent,
 } from '@/shared/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/shared/ui/dropdown-menu';
 import { Input } from '@/shared/ui/input';
 
 export interface ConversationSidebarProps {
@@ -40,14 +24,6 @@ export interface ConversationSidebarProps {
   onRenameDialog?: (dialogId: string, title: string) => Promise<void> | void;
   onDeleteDialog?: (dialogId: string) => Promise<void> | void;
   footer?: ReactNode;
-}
-
-function formatRelativeTime(isoDate: string): string {
-  try {
-    return formatDistanceToNow(new Date(isoDate), { addSuffix: true });
-  } catch {
-    return '';
-  }
 }
 
 export function ConversationSidebarContent({
@@ -72,12 +48,7 @@ export function ConversationSidebarContent({
     ? dialogs.filter((d) => d.title.toLowerCase().includes(normalizedQuery))
     : dialogs;
 
-  const openRenameDialog = (dialog: DialogResponseDto) => {
-    setRenamingDialog(dialog);
-    setRenameTitle(dialog.title);
-  };
-
-  const handleRenameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRenameSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = renameTitle.trim();
     if (!renamingDialog || !trimmed || !onRenameDialog) {
@@ -145,158 +116,41 @@ export function ConversationSidebarContent({
             </p>
           </div>
         ) : (
-          filteredDialogs.map((dialog) => {
-            const isSelected = dialog.id === activeDialogId;
-            const preview = lastMessagesByDialog[dialog.id] ?? 'Telecom support conversation';
-
-            return (
-              <div
-                key={dialog.id}
-                className={cn(
-                  'group relative flex w-full items-start gap-1 rounded-xl border px-3 py-2.5 transition-all',
-                  isSelected
-                    ? 'border-primary/25 bg-card text-foreground shadow-xs'
-                    : 'border-transparent text-muted-foreground hover:border-border/60 hover:bg-card/70 hover:text-foreground',
-                )}
-              >
-                {isSelected ? (
-                  <span
-                    aria-hidden="true"
-                    className="absolute top-2.5 bottom-2.5 left-0 w-1 rounded-r-full bg-primary"
-                  />
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={() => onSelectDialog(dialog.id)}
-                  aria-current={isSelected ? 'true' : undefined}
-                  className="flex min-w-0 flex-1 flex-col gap-1 text-left"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={cn(
-                        'truncate text-xs',
-                        isSelected
-                          ? 'font-semibold text-foreground'
-                          : 'font-medium text-foreground',
-                      )}
-                    >
-                      {dialog.title}
-                    </span>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {formatRelativeTime(dialog.updatedAt)}
-                    </span>
-                  </div>
-
-                  <p className="truncate text-[11px] text-muted-foreground">{preview}</p>
-                </button>
-
-                {(onRenameDialog || onDeleteDialog) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Actions for ${dialog.title}`}
-                        disabled={isBusy}
-                        className="size-7 shrink-0 rounded-md text-muted-foreground opacity-80 transition-opacity hover:text-foreground group-hover:opacity-100 data-[state=open]:opacity-100"
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="right" align="start" className="w-44">
-                      {onRenameDialog ? (
-                        <DropdownMenuItem onSelect={() => openRenameDialog(dialog)}>
-                          <Pencil className="size-4 text-muted-foreground" />
-                          Rename
-                        </DropdownMenuItem>
-                      ) : null}
-                      {onDeleteDialog ? (
-                        <DropdownMenuItem
-                          onSelect={() => setDeletingDialog(dialog)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="size-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      ) : null}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            );
-          })
+          filteredDialogs.map((dialog) => (
+            <ConversationListItem
+              key={dialog.id}
+              dialog={dialog}
+              isSelected={dialog.id === activeDialogId}
+              preview={lastMessagesByDialog[dialog.id] ?? 'Telecom support conversation'}
+              isBusy={isBusy}
+              onSelect={() => onSelectDialog(dialog.id)}
+              onStartRename={
+                onRenameDialog
+                  ? () => {
+                      setRenamingDialog(dialog);
+                      setRenameTitle(dialog.title);
+                    }
+                  : undefined
+              }
+              onStartDelete={onDeleteDialog ? () => setDeletingDialog(dialog) : undefined}
+            />
+          ))
         )}
       </div>
 
       {footer}
 
-      <Dialog
-        open={Boolean(renamingDialog)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRenamingDialog(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename Conversation</DialogTitle>
-            <DialogDescription>Update the title for this support conversation.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(event) => void handleRenameSubmit(event)} className="space-y-4">
-            <Input
-              value={renameTitle}
-              onChange={(event) => setRenameTitle(event.target.value)}
-              aria-label="Conversation title"
-              placeholder="Enter conversation title"
-              maxLength={120}
-              autoFocus
-            />
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setRenamingDialog(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isBusy || renameTitle.trim().length === 0}>
-                Save
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(deletingDialog)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeletingDialog(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Conversation</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to permanently delete &ldquo;{deletingDialog?.title}&rdquo; and
-              all of its messages? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeletingDialog(null)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={isBusy}
-              onClick={() => void handleConfirmDelete()}
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConversationActionDialogs
+        renamingDialog={renamingDialog}
+        renameTitle={renameTitle}
+        onRenameTitleChange={setRenameTitle}
+        onCloseRename={() => setRenamingDialog(null)}
+        onRenameSubmit={(event) => void handleRenameSubmit(event)}
+        deletingDialog={deletingDialog}
+        onCloseDelete={() => setDeletingDialog(null)}
+        onConfirmDelete={() => void handleConfirmDelete()}
+        isBusy={isBusy}
+      />
     </div>
   );
 }

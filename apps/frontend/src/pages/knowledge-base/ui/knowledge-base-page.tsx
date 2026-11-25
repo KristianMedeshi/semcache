@@ -3,33 +3,24 @@ import { ShieldAlert } from 'lucide-react';
 import { isAdmin } from '@/features/auth/api/auth.client';
 import { useCurrentUserQuery } from '@/features/auth/model/use-auth';
 import { KnowledgeBaseWorkspace } from '@/features/knowledge-base/ui/knowledge-base-workspace';
-import { BrandLogo } from '@/shared/ui/brand-logo';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { CardContent } from '@/shared/ui/card-content';
 import { CardDescription } from '@/shared/ui/card-description';
 import { CardHeader } from '@/shared/ui/card-header';
 import { CardTitle } from '@/shared/ui/card-title';
+import { SessionLoadingScreen } from '@/shared/ui/session-loading-screen';
 
 export function KnowledgeBasePage() {
   const { data: user, isPending } = useCurrentUserQuery();
 
   if (isPending) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md shadow-sm">
-          <CardHeader className="items-center text-center">
-            <BrandLogo subtitle="Operator Dashboard" />
-            <CardTitle className="pt-2 text-xl font-semibold tracking-tight">
-              Knowledge Base Management
-            </CardTitle>
-            <CardDescription>Verifying operator permissions...</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-muted-foreground">Checking session...</p>
-          </CardContent>
-        </Card>
-      </div>
+      <SessionLoadingScreen
+        subtitle="Operator Dashboard"
+        title="Knowledge Base Management"
+        description="Verifying operator permissions..."
+      />
     );
   }
 

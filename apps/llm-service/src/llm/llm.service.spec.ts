@@ -326,70 +326,27 @@ describe('LlmService', () => {
     await moduleRef.close();
   }, 30_000);
 
-  it('routes requests to LM Studio without OpenRouter API key when LLM_PROVIDER=lmstudio', async () => {
-    process.env.NODE_ENV = 'test';
-    delete process.env.OPENROUTER_API_KEY;
-    process.env.LLM_PROVIDER = 'lmstudio';
+  async function runLmStudioChatTest(options: {
+    providerEnv: string;
+    model: string;
+    replyText: string;
+    prompt: string;
+  }) {
+    process.env.LLM_PROVIDER = options.providerEnv;
     process.env.LM_STUDIO_BASE_URL = 'http://localhost:1234/v1';
     process.env.LM_STUDIO_DEFAULT_MODEL = 'support-llm';
 
     const fakeLmModel = new FakeModel(['unused']);
+    const chatModelMock = jest.fn().mockReturnValue(fakeLmModel);
     const generateTextMock = jest.fn().mockResolvedValue({
-      text: 'Local LM Studio reply',
+      text: options.replyText,
       finishReason: 'stop',
       steps: [],
       usage: { inputTokens: 8, outputTokens: 5, totalTokens: 13 },
       toolCalls: [],
       toolResults: [],
       responseMessages: [],
-      model: { provider: 'lmstudio.chat', modelId: 'qwen/qwen3-1.7b' },
-    });
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [SharedConfigModule.forRoot({ schema: llmEnvSchema, ignoreEnvFile: true })],
-      providers: [
-        { provide: AiService, useValue: { generateText: generateTextMock } },
-        { provide: OPENROUTER_PROVIDER, useValue: { chatModel: jest.fn() } },
-        {
-          provide: LM_STUDIO_PROVIDER,
-          useValue: { chatModel: jest.fn().mockReturnValue(fakeLmModel) },
-        },
-        LlmService,
-      ],
-    }).compile();
-
-    const service = moduleRef.get(LlmService);
-    const result = await service.generateChatCompletion({
-      model: 'qwen/qwen3-1.7b',
-      messages: [{ role: ChatMessageRole.USER, content: 'Check EU roaming' }],
-    });
-
-    expect(result.content).toBe('Local LM Studio reply');
-    expect(result.model).toBe('qwen/qwen3-1.7b');
-    expect(generateTextMock).toHaveBeenCalledWith({
-      model: fakeLmModel,
-      messages: [{ role: 'user', content: 'Check EU roaming' }],
-    });
-    await moduleRef.close();
-  });
-
-  it('routes explicit local model requests to LM Studio even when LLM_PROVIDER=openrouter', async () => {
-    process.env.NODE_ENV = 'development';
-    delete process.env.OPENROUTER_API_KEY;
-    process.env.LLM_PROVIDER = 'openrouter';
-    process.env.LM_STUDIO_BASE_URL = 'http://localhost:1234/v1';
-
-    const fakeLmModel = new FakeModel(['unused']);
-    const chatModelMock = jest.fn().mockReturnValue(fakeLmModel);
-    const generateTextMock = jest.fn().mockResolvedValue({
-      text: 'Routed local model reply',
-      finishReason: 'stop',
-      steps: [],
-      usage: { inputTokens: 6, outputTokens: 4, totalTokens: 10 },
-      toolCalls: [],
-      toolResults: [],
-      responseMessages: [],
-      model: { provider: 'lmstudio.chat', modelId: 'support-llm' },
+      model: { provider: 'lmstudio.chat', modelId: options.model },
     });
 
     const moduleRef = await Test.createTestingModule({
@@ -404,12 +361,45 @@ describe('LlmService', () => {
 
     const service = moduleRef.get(LlmService);
     const result = await service.generateChatCompletion({
+      model: options.model,
+      messages: [{ role: ChatMessageRole.USER, content: options.prompt }],
+    });
+    await moduleRef.close();
+
+    return { result, fakeLmModel, chatModelMock, generateTextMock };
+  }
+
+  it('routes requests to LM Studio without OpenRouter API key when LLM_PROVIDER=lmstudio', async () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.OPENROUTER_API_KEY;
+
+    const { result, fakeLmModel, generateTextMock } = await runLmStudioChatTest({
+      providerEnv: 'lmstudio',
+      model: 'qwen/qwen3-1.7b',
+      replyText: 'Local LM Studio reply',
+      prompt: 'Check EU roaming',
+    });
+
+    expect(result.content).toBe('Local LM Studio reply');
+    expect(result.model).toBe('qwen/qwen3-1.7b');
+    expect(generateTextMock).toHaveBeenCalledWith({
+      model: fakeLmModel,
+      messages: [{ role: 'user', content: 'Check EU roaming' }],
+    });
+  });
+
+  it('routes explicit local model requests to LM Studio even when LLM_PROVIDER=openrouter', async () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.OPENROUTER_API_KEY;
+
+    const { result, chatModelMock } = await runLmStudioChatTest({
+      providerEnv: 'openrouter',
       model: 'support-llm',
-      messages: [{ role: ChatMessageRole.USER, content: 'APN settings?' }],
+      replyText: 'Routed local model reply',
+      prompt: 'APN settings?',
     });
 
     expect(chatModelMock).toHaveBeenCalledWith('support-llm');
     expect(result.content).toBe('Routed local model reply');
-    await moduleRef.close();
   });
 });

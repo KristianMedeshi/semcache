@@ -3,8 +3,7 @@ import type { AddressInfo, Server } from 'node:net';
 import { Controller, type INestMicroservice, Injectable, Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import {
-  ClientProxy,
-  ClientProxyFactory,
+  type ClientProxy,
   MessagePattern,
   type MicroserviceOptions,
   Payload,
@@ -12,6 +11,7 @@ import {
 } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createSignedInternalHeaders, extractRpcErrorPayload } from '@semcache/shared-config';
+import { createTcpMicroserviceTestClient } from '@semcache/shared-config/testing';
 import type {
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
@@ -255,18 +255,7 @@ describe('Dialog Service (TCP e2e)', () => {
       .useValue({ end: jest.fn().mockResolvedValue(undefined) })
       .compile();
 
-    app = moduleFixture.createNestMicroservice<MicroserviceOptions>({
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: 0 },
-    });
-    await app.listen();
-
-    const dialogAddress = app.unwrap<Server>().address() as AddressInfo;
-    client = ClientProxyFactory.create({
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: dialogAddress.port },
-    });
-    await client.connect();
+    ({ app, client } = await createTcpMicroserviceTestClient(moduleFixture));
   });
 
   afterAll(async () => {
@@ -335,15 +324,18 @@ describe('Dialog Service (TCP e2e)', () => {
     expect(turn.assistantMessage.model).toBe('openrouter/free');
     expect(capturedKbQueries).toContain('Where is my invoice?');
 
-    const messages = await firstValueFrom(
-      client.send<DialogMessageResponseDto[]>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_LIST, {
-        headers: internalHeaders,
-        dialogId: createdDialog.id,
-      }),
-    );
-
+    const messages = await listDialogMessages(internalHeaders, createdDialog.id);
     expect(messages).toHaveLength(2);
   });
+
+  async function listDialogMessages(headers: Record<string, string>, dialogId: string) {
+    return firstValueFrom(
+      client.send<DialogMessageResponseDto[]>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_LIST, {
+        headers,
+        dialogId,
+      }),
+    );
+  }
 
   it('rejects non-free OpenRouter model requests with 400 Bad Request', async () => {
     const internalHeaders = createCustomerHeaders();
@@ -417,12 +409,7 @@ describe('Dialog Service (TCP e2e)', () => {
       assistantMessage: { content: 'Streamed assistant answer' },
     });
 
-    const messages = await firstValueFrom(
-      client.send<DialogMessageResponseDto[]>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_LIST, {
-        headers: internalHeaders,
-        dialogId: createdDialog.id,
-      }),
-    );
+    const messages = await listDialogMessages(internalHeaders, createdDialog.id);
     expect(messages).toHaveLength(2);
   });
 

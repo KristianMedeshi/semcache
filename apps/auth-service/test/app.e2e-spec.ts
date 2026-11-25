@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { AddressInfo, Server } from 'node:net';
 import { type INestMicroservice, Injectable } from '@nestjs/common';
 import {
   AuthenticationStorage,
@@ -7,14 +6,10 @@ import {
   type SessionRecord,
   type SessionStore,
 } from '@nestjs/authentication';
-import {
-  ClientProxy,
-  ClientProxyFactory,
-  type MicroserviceOptions,
-  Transport,
-} from '@nestjs/microservices';
+import type { ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { extractRpcErrorPayload } from '@semcache/shared-config';
+import { createTcpMicroserviceTestClient } from '@semcache/shared-config/testing';
 import type {
   AuthTcpResponseDto,
   LogoutResponseDto,
@@ -241,18 +236,7 @@ describe('AuthService Authentication & Authorization (TCP e2e)', () => {
       .useValue(passwordHasher)
       .compile();
 
-    app = moduleFixture.createNestMicroservice<MicroserviceOptions>({
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: 0 },
-    });
-    await app.listen();
-
-    const address = app.unwrap<Server>().address() as AddressInfo;
-    client = ClientProxyFactory.create({
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: address.port },
-    });
-    await client.connect();
+    ({ app, client } = await createTcpMicroserviceTestClient(moduleFixture));
 
     sessionStore = app.get(DrizzleSessionStore);
   });

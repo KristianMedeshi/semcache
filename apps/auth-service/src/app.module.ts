@@ -1,11 +1,12 @@
-import { type ExecutionContext, Injectable, Module, ValidationPipe } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { type ExecutionContext, Injectable, Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
 import { ThrottlerGuard, ThrottlerModule, minutes, normalizeIp } from '@nestjs/throttler';
 import {
   ConfigService,
   SharedConfigModule,
+  createRpcGlobalProviders,
   durationToMs,
   isTestSecurityBypassEnabled,
 } from '@semcache/shared-config';
@@ -14,7 +15,6 @@ import { AppService } from './app.service';
 import './auth/auth-types';
 import { accountEmail } from './auth/account-email';
 import { AuthModule } from './auth/auth.module';
-import { HttpToRpcExceptionFilter } from './common/http-to-rpc-exception.filter';
 import { type AuthEnv, authEnvSchema } from './config/auth.env';
 import { DatabaseModule } from './db/database.module';
 import { UsersModule } from './users/users.module';
@@ -121,22 +121,10 @@ class RpcThrottlerGuard extends ThrottlerGuard {
   controllers: [AppController],
   providers: [
     AppService,
-    {
-      provide: APP_FILTER,
-      useClass: HttpToRpcExceptionFilter,
-    },
+    ...createRpcGlobalProviders(),
     {
       provide: APP_GUARD,
       useClass: RpcThrottlerGuard,
-    },
-    {
-      provide: APP_PIPE,
-      useValue: new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        forbidUnknownValues: true,
-      }),
     },
   ],
 })

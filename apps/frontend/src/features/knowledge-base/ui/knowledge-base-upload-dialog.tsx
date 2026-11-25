@@ -1,22 +1,19 @@
-import {
-  KNOWLEDGE_BASE_VALIDATION_LIMITS,
-  type UploadKnowledgeDocumentRequestDto,
-} from '@semcache/shared-dtos';
+import { KNOWLEDGE_BASE_VALIDATION_LIMITS } from '@semcache/shared-dtos';
 import { KnowledgeDocumentFormat, QueryCategory } from '@semcache/shared-types';
-import { FileText, Loader2, Trash2, UploadCloud } from 'lucide-react';
+import { Loader2, UploadCloud } from 'lucide-react';
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  CATEGORY_LABELS,
-  FORMAT_LABELS,
   type ParsedUploadFile,
+  buildUploadPayloads,
   readUploadedFile,
 } from '@/features/knowledge-base/model/knowledge-base-helpers';
 import { useUploadKnowledgeDocumentsMutation } from '@/features/knowledge-base/model/use-knowledge-base';
+import { ManualDocumentForm } from '@/features/knowledge-base/ui/manual-document-form';
+import { QueryCategorySelect } from '@/features/knowledge-base/ui/query-category-select';
+import { UploadFilesPanel } from '@/features/knowledge-base/ui/upload-files-panel';
 import { getAuthServerError } from '@/shared/api/api-client';
 import { useFileDropZone } from '@/shared/lib/use-file-drop-zone';
-import { cn } from '@/shared/lib/utils';
-import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import {
   Dialog,
@@ -28,7 +25,57 @@ import {
 } from '@/shared/ui/dialog';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
-import { Textarea } from '@/shared/ui/textarea';
+
+function UploadChunkingSettings({
+  category,
+  onCategoryChange,
+  chunkSize,
+  onChunkSizeChange,
+  chunkOverlap,
+  onChunkOverlapChange,
+}: {
+  category: QueryCategory;
+  onCategoryChange: (value: QueryCategory) => void;
+  chunkSize: number;
+  onChunkSizeChange: (value: number) => void;
+  chunkOverlap: number;
+  onChunkOverlapChange: (value: number) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="kb-upload-category">Domain Category</Label>
+        <QueryCategorySelect
+          id="kb-upload-category"
+          value={category}
+          onChange={(val) => onCategoryChange(val as QueryCategory)}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="kb-chunk-size">Chunk Size (chars)</Label>
+        <Input
+          id="kb-chunk-size"
+          type="number"
+          min={KNOWLEDGE_BASE_VALIDATION_LIMITS.MIN_CHUNK_SIZE}
+          max={KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_CHUNK_SIZE}
+          value={chunkSize}
+          onChange={(e) => onChunkSizeChange(Number(e.target.value))}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="kb-chunk-overlap">Chunk Overlap (chars)</Label>
+        <Input
+          id="kb-chunk-overlap"
+          type="number"
+          min={0}
+          max={KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_CHUNK_OVERLAP}
+          value={chunkOverlap}
+          onChange={(e) => onChunkOverlapChange(Number(e.target.value))}
+        />
+      </div>
+    </div>
+  );
+}
 
 export interface KnowledgeBaseUploadDialogProps {
   open: boolean;
@@ -127,42 +174,20 @@ export function KnowledgeBaseUploadDialog({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (chunkOverlap >= chunkSize) {
-      toast.error('Chunk overlap must be smaller than chunk size.');
+    const { payloads, error } = buildUploadPayloads({
+      mode,
+      queuedFiles,
+      manualTitle,
+      manualFileName,
+      manualFormat,
+      manualContent,
+      category,
+      chunkSize,
+      chunkOverlap,
+    });
+    if (error || !payloads) {
+      toast.error(error ?? 'Invalid upload input.');
       return;
-    }
-
-    let payloads: UploadKnowledgeDocumentRequestDto[];
-    if (mode === 'files') {
-      if (queuedFiles.length === 0) {
-        toast.error('Select at least one document file to upload.');
-        return;
-      }
-      payloads = queuedFiles.map((file) => ({
-        title: file.title.trim() || file.fileName,
-        fileName: file.fileName,
-        format: file.format,
-        category,
-        content: file.content,
-        chunkSize,
-        chunkOverlap,
-      }));
-    } else {
-      if (manualTitle.trim().length === 0 || manualContent.trim().length === 0) {
-        toast.error('Document title and content are required.');
-        return;
-      }
-      payloads = [
-        {
-          title: manualTitle.trim(),
-          ...(manualFileName.trim() ? { fileName: manualFileName.trim() } : {}),
-          format: manualFormat,
-          category,
-          content: manualContent,
-          chunkSize,
-          chunkOverlap,
-        },
-      ];
     }
 
     try {
@@ -183,11 +208,16 @@ export function KnowledgeBaseUploadDialog({
 
       resetForm();
       onOpenChange(false);
-    } catch (error) {
-      toast.error(getAuthServerError(error as Error, 'Failed to upload knowledge documents.'));
+    } catch (err) {
+      toast.error(getAuthServerError(err as Error, 'Failed to upload knowledge documents.'));
       setProgress(null);
     }
   };
+
+  const submitLabel =
+    mode === 'files'
+      ? `Upload ${queuedFiles.length || ''} Document${queuedFiles.length === 1 ? '' : 's'}`
+      : 'Upload Document';
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
@@ -224,176 +254,41 @@ export function KnowledgeBaseUploadDialog({
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           {mode === 'files' ? (
-            <div className="space-y-3">
-              <div
-                {...dropZoneProps}
-                data-testid="kb-dialog-dropzone"
-                className={cn(
-                  'rounded-xl border border-dashed p-4 text-center transition-colors',
-                  isDragging
-                    ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
-                    : 'bg-muted/30',
-                )}
-              >
-                <Label htmlFor="kb-file-upload" className="cursor-pointer space-y-1.5">
-                  <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <UploadCloud className="size-5" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground">
-                    {isDragging
-                      ? 'Drop documents here to add them'
-                      : 'Drag & drop documents here, or choose from your computer'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Supported formats: .txt, .md, .html, .json, .pdf, .docx
-                  </p>
-                </Label>
-                <Input
-                  id="kb-file-upload"
-                  type="file"
-                  multiple
-                  accept=".txt,.md,.markdown,.html,.htm,.json,.pdf,.docx"
-                  onChange={(e) => void handleFileChange(e)}
-                  className="mt-3 cursor-pointer"
-                />
-              </div>
-
-              {queuedFiles.length > 0 ? (
-                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
-                  {queuedFiles.map((file, index) => (
-                    <div
-                      key={`${file.fileName}-${index}`}
-                      className="flex items-center gap-2 rounded-lg border bg-background p-2.5"
-                    >
-                      <FileText className="size-4 shrink-0 text-primary" />
-                      <Input
-                        aria-label={`Title for ${file.fileName}`}
-                        value={file.title}
-                        onChange={(e) => {
-                          const nextTitle = e.target.value;
-                          setQueuedFiles((prev) =>
-                            prev.map((item, idx) =>
-                              idx === index ? { ...item, title: nextTitle } : item,
-                            ),
-                          );
-                        }}
-                        className="h-8 flex-1 text-sm"
-                      />
-                      <Badge variant="secondary" className="shrink-0">
-                        {FORMAT_LABELS[file.format]}
-                      </Badge>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {file.content.length.toLocaleString()} chars
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Remove ${file.fileName}`}
-                        onClick={() =>
-                          setQueuedFiles((prev) => prev.filter((_, idx) => idx !== index))
-                        }
-                      >
-                        <Trash2 className="size-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <UploadFilesPanel
+              isDragging={isDragging}
+              dropZoneProps={dropZoneProps}
+              queuedFiles={queuedFiles}
+              onFileChange={(e) => void handleFileChange(e)}
+              onUpdateTitle={(index, title) =>
+                setQueuedFiles((prev) =>
+                  prev.map((item, idx) => (idx === index ? { ...item, title } : item)),
+                )
+              }
+              onRemoveFile={(index) =>
+                setQueuedFiles((prev) => prev.filter((_, idx) => idx !== index))
+              }
+            />
           ) : (
-            <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="kb-manual-title">Document Title</Label>
-                  <Input
-                    id="kb-manual-title"
-                    placeholder="e.g. 5G Unlimited Plan Policy"
-                    value={manualTitle}
-                    onChange={(e) => setManualTitle(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="kb-manual-filename">Reference Filename (optional)</Label>
-                  <Input
-                    id="kb-manual-filename"
-                    placeholder="e.g. 5g-unlimited.md"
-                    value={manualFileName}
-                    onChange={(e) => setManualFileName(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="kb-manual-format">Content Format</Label>
-                <select
-                  id="kb-manual-format"
-                  value={manualFormat}
-                  onChange={(e) => setManualFormat(e.target.value as KnowledgeDocumentFormat)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  {Object.values(KnowledgeDocumentFormat).map((fmt) => (
-                    <option key={fmt} value={fmt}>
-                      {FORMAT_LABELS[fmt]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="kb-manual-content">Document Content</Label>
-                <Textarea
-                  id="kb-manual-content"
-                  rows={6}
-                  placeholder="Paste company policy, FAQ, troubleshooting steps, or tariff details..."
-                  value={manualContent}
-                  onChange={(e) => setManualContent(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
+            <ManualDocumentForm
+              title={manualTitle}
+              onTitleChange={setManualTitle}
+              fileName={manualFileName}
+              onFileNameChange={setManualFileName}
+              format={manualFormat}
+              onFormatChange={setManualFormat}
+              content={manualContent}
+              onContentChange={setManualContent}
+            />
           )}
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="kb-upload-category">Domain Category</Label>
-              <select
-                id="kb-upload-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as QueryCategory)}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {Object.values(QueryCategory).map((cat) => (
-                  <option key={cat} value={cat}>
-                    {CATEGORY_LABELS[cat]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="kb-chunk-size">Chunk Size (chars)</Label>
-              <Input
-                id="kb-chunk-size"
-                type="number"
-                min={KNOWLEDGE_BASE_VALIDATION_LIMITS.MIN_CHUNK_SIZE}
-                max={KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_CHUNK_SIZE}
-                value={chunkSize}
-                onChange={(e) => setChunkSize(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="kb-chunk-overlap">Chunk Overlap (chars)</Label>
-              <Input
-                id="kb-chunk-overlap"
-                type="number"
-                min={0}
-                max={KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_CHUNK_OVERLAP}
-                value={chunkOverlap}
-                onChange={(e) => setChunkOverlap(Number(e.target.value))}
-              />
-            </div>
-          </div>
+          <UploadChunkingSettings
+            category={category}
+            onCategoryChange={setCategory}
+            chunkSize={chunkSize}
+            onChunkSizeChange={setChunkSize}
+            chunkOverlap={chunkOverlap}
+            onChunkOverlapChange={setChunkOverlap}
+          />
 
           {progress && uploadMutation.isPending ? (
             <div
@@ -423,10 +318,8 @@ export function KnowledgeBaseUploadDialog({
                   <Loader2 className="size-4 animate-spin" />
                   Uploading...
                 </>
-              ) : mode === 'files' ? (
-                `Upload ${queuedFiles.length || ''} Document${queuedFiles.length === 1 ? '' : 's'}`
               ) : (
-                'Upload Document'
+                submitLabel
               )}
             </Button>
           </DialogFooter>

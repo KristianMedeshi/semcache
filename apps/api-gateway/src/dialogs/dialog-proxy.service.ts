@@ -1,24 +1,21 @@
 import {
-  BadGatewayException,
-  HttpException,
   HttpStatus,
   Inject,
   Injectable,
   Logger,
   Optional,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
-import { extractRpcErrorPayload, formatRpcErrorMessage } from '@semcache/shared-config';
+import { formatRpcErrorMessage } from '@semcache/shared-config';
 import type {
   DialogMessageStreamErrorEventDto,
   DialogMessageStreamEventDto,
   DialogTcpRequestDto,
 } from '@semcache/shared-dtos';
 import type { Request, Response } from 'express';
-import { firstValueFrom } from 'rxjs';
 import { AuthProxyService } from '../auth/auth-proxy.service';
+import { BaseTcpProxyService } from '../common/base-tcp-proxy.service';
 import { MetricsService } from '../metrics/metrics.service';
 
 export const DIALOG_SERVICE_CLIENT = Symbol('DIALOG_SERVICE_CLIENT');
@@ -31,15 +28,17 @@ const SSE_HEADERS = {
 } as const;
 
 @Injectable()
-export class DialogProxyService {
-  private readonly logger = new Logger(DialogProxyService.name);
+export class DialogProxyService extends BaseTcpProxyService {
+  protected readonly logger = new Logger(DialogProxyService.name);
 
   constructor(
-    private readonly authProxyService: AuthProxyService,
+    authProxyService: AuthProxyService,
     @Inject(DIALOG_SERVICE_CLIENT) private readonly dialogClient: ClientProxy,
-    @Optional() private readonly authContext?: AuthenticationContext,
+    @Optional() authContext?: AuthenticationContext,
     @Optional() private readonly metricsService?: MetricsService,
-  ) {}
+  ) {
+    super(authProxyService, authContext);
+  }
 
   async forwardDialogRequest<TBody = undefined>(
     req: Request,
@@ -50,12 +49,13 @@ export class DialogProxyService {
     const payload = await this.buildAuthenticatedDialogPayload(req, options);
     const startedAt = performance.now();
 
-    let result: unknown;
-    try {
-      result = await firstValueFrom(this.dialogClient.send<unknown>(pattern, payload));
-    } catch (error) {
-      throw this.mapRpcError(error, pattern);
-    }
+    const result = await this.sendTcp<unknown>(
+      this.dialogClient,
+      pattern,
+      payload,
+      'gateway.dialog_proxy.network_error',
+      'Dialog service unavailable',
+    );
 
     if (result && typeof result === 'object' && 'cache' in result && result.cache) {
       const cache = result.cache as { status?: string; mode?: string; category?: string };
@@ -112,7 +112,12 @@ export class DialogProxyService {
             res.write(`data: ${JSON.stringify(event)}\n\n`);
           },
           error: (error: unknown) => {
-            const mapped = this.mapRpcError(error, pattern);
+            const mapped = this.mapRpcError(
+              error,
+              pattern,
+              'gateway.dialog_proxy.network_error',
+              'Dialog service unavailable',
+            );
             if (!headersSent) {
               if (!settled) {
                 settled = true;
@@ -163,19 +168,7 @@ export class DialogProxyService {
     req: Request,
     options?: { dialogId?: string; messageId?: string; body?: TBody },
   ): Promise<DialogTcpRequestDto<TBody>> {
-    const user =
-      this.authContext?.user ??
-      (await this.authProxyService.resolveCurrentUser(req.headers.cookie));
-    if (!user) {
-      throw new UnauthorizedException('Authentication required');
-    }
-
-    const identityHeaders = this.authProxyService.buildDownstreamIdentityHeaders({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      sessionId: 'gateway-dialog-proxy',
-    });
+    const identityHeaders = await this.buildIdentityHeaders(req, 'gateway-dialog-proxy');
 
     return {
       headers: identityHeaders,
@@ -183,21 +176,5 @@ export class DialogProxyService {
       ...(options?.messageId !== undefined ? { messageId: options.messageId } : {}),
       ...(options?.body !== undefined ? { body: options.body } : {}),
     };
-  }
-
-  private mapRpcError(error: unknown, pattern: string): HttpException {
-    const rpcError = extractRpcErrorPayload(error);
-    if (rpcError?.statusCode) {
-      return new HttpException(rpcError, rpcError.statusCode);
-    }
-
-    this.logger.error(
-      JSON.stringify({
-        event: 'gateway.dialog_proxy.network_error',
-        pattern,
-        error: error instanceof Error ? error.message : 'Unknown TCP error',
-      }),
-    );
-    return new BadGatewayException('Dialog service unavailable');
   }
 }

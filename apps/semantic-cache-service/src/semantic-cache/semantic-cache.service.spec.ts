@@ -1,148 +1,22 @@
-import { randomUUID } from 'node:crypto';
 import { BadRequestException } from '@nestjs/common';
-import {
-  DEFAULT_SEMANTIC_CACHE_CATEGORY_WEIGHTS,
-  type CacheKnowledgeSourceReferenceDto,
-} from '@semcache/shared-dtos';
+import { DEFAULT_SEMANTIC_CACHE_CATEGORY_WEIGHTS } from '@semcache/shared-dtos';
 import { CacheHitStatus, CacheMode, QueryCategory } from '@semcache/shared-types';
-import type { SemanticCacheEntryRecord, SemanticCacheSettingsRecord } from '../db/schema';
-import type { DefaultSettingsSeed, SemanticCacheRepository } from './semantic-cache.repository';
+import type { SemanticCacheRepository } from './semantic-cache.repository';
 import { SemanticCacheService } from './semantic-cache.service';
+import {
+  InMemorySemanticCacheRepository,
+  makeUnitVector,
+} from '../../test/in-memory-semantic-cache.repository';
 import { ThresholdCalculatorService } from './threshold-calculator.service';
 
-function makeUnitVector(seed: number): number[] {
-  const vec = Array.from({ length: 384 }, (_, idx) => (idx === seed % 384 ? 1 : 0.01));
-  const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0));
-  return vec.map((v) => v / norm);
-}
-
-function cosineSim(a: number[], b: number[]): number {
-  return a.reduce((sum, v, idx) => sum + v * (b[idx] ?? 0), 0);
-}
-
 function createServiceHarness() {
-  const entries = new Map<string, SemanticCacheEntryRecord>();
-  const sourcesByEntry = new Map<string, CacheKnowledgeSourceReferenceDto[]>();
-  let settingsRecord: SemanticCacheSettingsRecord | null = null;
-
-  const ensureSettings = (defaults: DefaultSettingsSeed): SemanticCacheSettingsRecord => {
-    if (!settingsRecord) {
-      const now = new Date();
-      settingsRecord = {
-        id: 'default',
-        mode: defaults.mode,
-        fixedThreshold: defaults.fixedThreshold,
-        adaptiveBaseThreshold: defaults.adaptiveBaseThreshold,
-        minAdaptiveThreshold: defaults.minAdaptiveThreshold,
-        maxAdaptiveThreshold: defaults.maxAdaptiveThreshold,
-        densityWeight: defaults.densityWeight,
-        densityKNeighbors: defaults.densityKNeighbors,
-        categoryWeights: { ...defaults.categoryWeights },
-        updatedBy: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-    }
-    return settingsRecord;
-  };
-
-  const mockRepo: Partial<SemanticCacheRepository> = {
-    getOrCreateSettings: jest.fn(async (defaults) => ensureSettings(defaults)),
-    updateSettings: jest.fn(async (defaults, updater) => {
-      const current = ensureSettings(defaults);
-      const next = updater(current);
-      settingsRecord = {
-        ...current,
-        ...next,
-        updatedAt: new Date(),
-      };
-      return settingsRecord;
-    }),
-    createEntry: jest.fn(async (input) => {
-      const now = new Date();
-      const entry: SemanticCacheEntryRecord = {
-        id: randomUUID(),
-        query: input.query,
-        response: input.response,
-        embedding: input.embedding,
-        category: input.category,
-        model: input.model ?? null,
-        hitCount: 0,
-        lastHitAt: null,
-        metadata: input.metadata ?? {},
-        createdAt: now,
-        updatedAt: now,
-      };
-      entries.set(entry.id, entry);
-      sourcesByEntry.set(entry.id, input.sources);
-      return { entry, sources: input.sources };
-    }),
-    findNearestNeighbors: jest.fn(async ({ embedding, category, limit }) => {
-      return [...entries.values()]
-        .filter((e) => e.category === category)
-        .map((entry) => ({
-          entry,
-          similarity: cosineSim(embedding, entry.embedding),
-          sources: sourcesByEntry.get(entry.id) ?? [],
-        }))
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, limit);
-    }),
-    recordHit: jest.fn(async (entryId) => {
-      const entry = entries.get(entryId);
-      if (entry) {
-        entry.hitCount += 1;
-        entry.lastHitAt = new Date();
-      }
-    }),
-    invalidateByDocumentIds: jest.fn(async (docIds) => {
-      const targetSet = new Set(docIds);
-      let count = 0;
-      for (const [entryId, sources] of sourcesByEntry.entries()) {
-        if (sources.some((s) => targetSet.has(s.documentId))) {
-          entries.delete(entryId);
-          sourcesByEntry.delete(entryId);
-          count += 1;
-        }
-      }
-      return count;
-    }),
-    invalidateByCategory: jest.fn(async (category) => {
-      let count = 0;
-      for (const [entryId, entry] of entries.entries()) {
-        if (entry.category === category) {
-          entries.delete(entryId);
-          sourcesByEntry.delete(entryId);
-          count += 1;
-        }
-      }
-      return count;
-    }),
-    clearAll: jest.fn(async () => {
-      const count = entries.size;
-      entries.clear();
-      sourcesByEntry.clear();
-      return count;
-    }),
-    getStats: jest.fn(async () => {
-      const grouped = new Map<QueryCategory, { entryCount: number; totalHits: number }>();
-      for (const entry of entries.values()) {
-        const cat = entry.category as QueryCategory;
-        const curr = grouped.get(cat) ?? { entryCount: 0, totalHits: 0 };
-        curr.entryCount += 1;
-        curr.totalHits += entry.hitCount;
-        grouped.set(cat, curr);
-      }
-      return [...grouped.entries()].map(([category, stats]) => ({ category, ...stats }));
-    }),
-  };
-
+  const mockRepo = new InMemorySemanticCacheRepository();
   const service = new SemanticCacheService(
-    mockRepo as SemanticCacheRepository,
+    mockRepo as unknown as SemanticCacheRepository,
     new ThresholdCalculatorService(),
   );
 
-  return { service, mockRepo, entries };
+  return { service, mockRepo, entries: mockRepo.entries };
 }
 
 describe('SemanticCacheService', () => {

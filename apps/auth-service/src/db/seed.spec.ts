@@ -1,51 +1,23 @@
 import { PasswordHasher } from '@nestjs/authentication';
-import type { UserResponseDto } from '@semcache/shared-dtos';
 import { UserRole } from '@semcache/shared-types';
 import { CredentialsService } from '../auth/credentials.service';
-import { UsersRepository, normalizeEmail } from '../users/users.repository';
+import {
+  type MockUsersRepository,
+  type StoredUserRecord,
+  createInMemoryUsersRepository,
+} from '../../test/in-memory-users.repository';
+import type { UsersRepository } from '../users/users.repository';
 import { buildDefaultSeedAccounts, seedAuthUsers, seedEnvSchema } from './seed';
 
 describe('seedAuthUsers', () => {
   let passwordHasher: PasswordHasher;
-  let storedUsers: Map<string, { user: UserResponseDto; passwordHash: string }>;
-  let usersRepositoryMock: Pick<
-    UsersRepository,
-    'findByEmail' | 'findCredentials' | 'create' | 'updatePasswordHash'
-  >;
+  let storedUsers: Map<string, StoredUserRecord>;
+  let usersRepositoryMock: MockUsersRepository;
   let credentialsService: CredentialsService;
 
   beforeEach(() => {
     passwordHasher = new PasswordHasher({ logN: 10 });
-    storedUsers = new Map();
-
-    usersRepositoryMock = {
-      async findByEmail(email: string) {
-        return storedUsers.get(normalizeEmail(email))?.user ?? null;
-      },
-      async findCredentials(email: string) {
-        return storedUsers.get(normalizeEmail(email)) ?? null;
-      },
-      async create(email: string, options: { passwordHash: string; role?: UserRole }) {
-        const normalized = normalizeEmail(email);
-        const now = new Date().toISOString();
-        const user: UserResponseDto = {
-          id: `00000000-0000-4000-8000-00000000000${storedUsers.size + 1}`,
-          email: normalized,
-          role: options.role ?? UserRole.CUSTOMER,
-          createdAt: now,
-          updatedAt: now,
-        };
-        storedUsers.set(normalized, { user, passwordHash: options.passwordHash });
-        return user;
-      },
-      async updatePasswordHash(id: string, passwordHash: string) {
-        for (const entry of storedUsers.values()) {
-          if (entry.user.id === id) {
-            entry.passwordHash = passwordHash;
-          }
-        }
-      },
-    };
+    ({ storedUsers, usersRepositoryMock } = createInMemoryUsersRepository());
 
     credentialsService = new CredentialsService(
       usersRepositoryMock as UsersRepository,

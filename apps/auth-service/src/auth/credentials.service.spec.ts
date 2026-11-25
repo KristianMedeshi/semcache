@@ -1,53 +1,23 @@
 import { ConflictException } from '@nestjs/common';
 import { PasswordHasher } from '@nestjs/authentication';
-import type { UserResponseDto } from '@semcache/shared-dtos';
 import { UserRole } from '@semcache/shared-types';
-import { UsersRepository, normalizeEmail } from '../users/users.repository';
+import {
+  type MockUsersRepository,
+  type StoredUserRecord,
+  createInMemoryUsersRepository,
+} from '../../test/in-memory-users.repository';
+import type { UsersRepository } from '../users/users.repository';
 import { CredentialsService } from './credentials.service';
 
 describe('CredentialsService', () => {
   let credentialsService: CredentialsService;
   let passwordHasher: PasswordHasher;
-  let storedUsers: Map<string, { user: UserResponseDto; passwordHash: string }>;
-  let usersRepositoryMock: Pick<
-    UsersRepository,
-    'findByEmail' | 'findCredentials' | 'create' | 'updatePasswordHash'
-  >;
+  let storedUsers: Map<string, StoredUserRecord>;
+  let usersRepositoryMock: MockUsersRepository;
 
   beforeEach(() => {
     passwordHasher = new PasswordHasher({ logN: 10 });
-    storedUsers = new Map();
-
-    usersRepositoryMock = {
-      async findByEmail(email: string) {
-        const entry = storedUsers.get(normalizeEmail(email));
-        return entry ? entry.user : null;
-      },
-      async findCredentials(email: string) {
-        const entry = storedUsers.get(normalizeEmail(email));
-        return entry ?? null;
-      },
-      async create(email: string, options: { passwordHash: string; role?: UserRole }) {
-        const normalized = normalizeEmail(email);
-        const now = new Date().toISOString();
-        const user: UserResponseDto = {
-          id: '11111111-1111-4111-8111-111111111111',
-          email: normalized,
-          role: options.role ?? UserRole.CUSTOMER,
-          createdAt: now,
-          updatedAt: now,
-        };
-        storedUsers.set(normalized, { user, passwordHash: options.passwordHash });
-        return user;
-      },
-      async updatePasswordHash(id: string, passwordHash: string) {
-        for (const entry of storedUsers.values()) {
-          if (entry.user.id === id) {
-            entry.passwordHash = passwordHash;
-          }
-        }
-      },
-    };
+    ({ storedUsers, usersRepositoryMock } = createInMemoryUsersRepository());
 
     credentialsService = new CredentialsService(
       usersRepositoryMock as UsersRepository,

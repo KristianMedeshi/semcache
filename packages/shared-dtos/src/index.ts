@@ -758,3 +758,22 @@ export interface KnowledgeBaseTcpRequestDto<TBody = undefined> {
   documentId?: string;
   body?: TBody;
 }
+
+const EXTENSION_FORMAT_MAP: ReadonlyArray<readonly [string, KnowledgeDocumentFormat]> = [
+  ['.markdown', KnowledgeDocumentFormat.MARKDOWN],
+  ['.md', KnowledgeDocumentFormat.MARKDOWN],
+  ['.html', KnowledgeDocumentFormat.HTML],
+  ['.htm', KnowledgeDocumentFormat.HTML],
+  ['.json', KnowledgeDocumentFormat.JSON],
+  ['.pdf', KnowledgeDocumentFormat.PDF],
+  ['.docx', KnowledgeDocumentFormat.DOCX],
+];
+
+/**
+ * Infers a `KnowledgeDocumentFormat` from a filename extension, defaulting to `TEXT`.
+ */
+export function inferKnowledgeDocumentFormat(fileName?: string): KnowledgeDocumentFormat {
+  const lower = fileName?.trim().toLowerCase() ?? '';
+  const match = EXTENSION_FORMAT_MAP.find(([ext]) => lower.endsWith(ext));
+  return match ? match[1] : KnowledgeDocumentFormat.TEXT;
+}

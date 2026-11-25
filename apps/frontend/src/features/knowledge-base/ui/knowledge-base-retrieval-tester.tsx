@@ -3,8 +3,8 @@ import { QueryCategory } from '@semcache/shared-types';
 import { FileText, Loader2, Search, Sparkles } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
-import { CATEGORY_LABELS } from '@/features/knowledge-base/model/knowledge-base-helpers';
 import { useSearchKnowledgeBaseMutation } from '@/features/knowledge-base/model/use-knowledge-base';
+import { QueryCategorySelect } from '@/features/knowledge-base/ui/query-category-select';
 import { getAuthServerError } from '@/shared/api/api-client';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
@@ -78,19 +78,13 @@ export function KnowledgeBaseRetrievalTester() {
               <Label htmlFor="kb-rag-category" className="text-xs">
                 Category
               </Label>
-              <select
+              <QueryCategorySelect
                 id="kb-rag-category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value as QueryCategory | 'all')}
-                className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs"
-              >
-                <option value="all">All categories</option>
-                {Object.values(QueryCategory).map((cat) => (
-                  <option key={cat} value={cat}>
-                    {CATEGORY_LABELS[cat]}
-                  </option>
-                ))}
-              </select>
+                onChange={setCategory}
+                includeAllOption
+                className="px-2.5 text-xs"
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="kb-rag-topk" className="text-xs">

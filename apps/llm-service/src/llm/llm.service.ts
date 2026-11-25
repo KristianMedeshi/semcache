@@ -1,5 +1,5 @@
 import type { OpenAICompatibleProvider } from '@ai-sdk/openai-compatible';
-import { type AiCallOptions, AiService, type AiTextResult } from '@nestjs/ai';
+import { AiService } from '@nestjs/ai';
 import {
   BadGatewayException,
   BadRequestException,
@@ -8,11 +8,9 @@ import {
   Injectable,
   Logger,
   Optional,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@semcache/shared-config';
 import {
-  FREE_OPENROUTER_MODEL_MESSAGE,
   KNOWLEDGE_BASE_VALIDATION_LIMITS,
   type LlmChatCompletionRequestDto,
   type LlmChatCompletionResponseDto,
@@ -20,30 +18,22 @@ import {
   type LlmGenerateEmbeddingsRequestDto,
   type LlmGenerateEmbeddingsResponseDto,
 } from '@semcache/shared-dtos';
-import { ChatMessageRole } from '@semcache/shared-types';
 import { Observable } from 'rxjs';
-import {
-  type LlmEnv,
-  isFreeOpenRouterModel,
-  isLocalLlmModel,
-  normalizeLocalModelId,
-} from '../config/llm.env';
+import type { LlmEnv } from '../config/llm.env';
 import {
   DEFAULT_LOCAL_EMBEDDING_MODEL,
   computeTransformersEmbeddings,
   estimateTokenCount,
   resolveLocalEmbeddingModelId,
 } from './deterministic-embedding.util';
+import {
+  buildLlmCompletionResponse,
+  formatProviderErrorLog,
+  prepareLlmChatCall,
+} from './llm-call-builder';
 
 export const OPENROUTER_PROVIDER = Symbol('OPENROUTER_PROVIDER');
 export const LM_STUDIO_PROVIDER = Symbol('LM_STUDIO_PROVIDER');
-
-const PLACEHOLDER_API_KEY = 'replace_with_your_openrouter_api_key';
-
-interface PreparedChatCall {
-  targetModel: string;
-  callOptions: AiCallOptions;
-}
 
 @Injectable()
 export class LlmService {
@@ -61,12 +51,17 @@ export class LlmService {
   async generateChatCompletion(
     dto: LlmChatCompletionRequestDto,
   ): Promise<LlmChatCompletionResponseDto> {
-    const { targetModel, callOptions } = this.prepareChatCall(dto);
+    const { targetModel, callOptions } = prepareLlmChatCall(
+      dto,
+      this.config,
+      this.openRouterProvider,
+      this.lmStudioProvider,
+    );
     const startedAt = performance.now();
 
     try {
       const result = await this.aiService.generateText(callOptions);
-      return this.buildCompletionResponse(result, targetModel, startedAt);
+      return buildLlmCompletionResponse(result, targetModel, startedAt);
     } catch (error) {
       throw this.toProviderException(error, targetModel);
     }
@@ -78,7 +73,12 @@ export class LlmService {
       let abortStream: (() => void) | undefined;
 
       const run = async () => {
-        const { targetModel, callOptions } = this.prepareChatCall(dto);
+        const { targetModel, callOptions } = prepareLlmChatCall(
+          dto,
+          this.config,
+          this.openRouterProvider,
+          this.lmStudioProvider,
+        );
         const startedAt = performance.now();
         const stream = this.aiService.streamText(callOptions);
         abortStream = () => stream.abort();
@@ -105,7 +105,7 @@ export class LlmService {
 
           subscriber.next({
             type: 'done',
-            completion: this.buildCompletionResponse(result, targetModel, startedAt),
+            completion: buildLlmCompletionResponse(result, targetModel, startedAt),
           });
           subscriber.complete();
         } catch (error) {
@@ -157,129 +157,12 @@ export class LlmService {
     };
   }
 
-  private prepareChatCall(dto: LlmChatCompletionRequestDto): PreparedChatCall {
-    const provider = this.config.get('LLM_PROVIDER') ?? 'openrouter';
-    const lmStudioDefaultModel = this.config.get('LM_STUDIO_DEFAULT_MODEL') ?? 'support-llm';
-    const allowedLocalModels = [
-      ...(this.config.get('LM_STUDIO_ALLOWED_MODELS') ?? ['support-llm', 'qwen/qwen3-1.7b']),
-      lmStudioDefaultModel,
-    ];
-    const requestedModel = dto.model?.trim();
-
-    const useLocalProvider =
-      provider === 'lmstudio' ||
-      (requestedModel !== undefined && isLocalLlmModel(requestedModel, allowedLocalModels));
-
-    let targetModel: string;
-    let customModelOption: { model: ReturnType<OpenAICompatibleProvider['chatModel']> } | undefined;
-
-    if (useLocalProvider) {
-      const rawLocalModel = requestedModel || lmStudioDefaultModel;
-      targetModel = normalizeLocalModelId(rawLocalModel);
-
-      if (provider !== 'lmstudio' || targetModel !== lmStudioDefaultModel) {
-        if (!this.lmStudioProvider) {
-          throw new ServiceUnavailableException(
-            'LM_STUDIO_BASE_URL is not configured for local models',
-          );
-        }
-        customModelOption = { model: this.lmStudioProvider.chatModel(targetModel) };
-      }
-    } else {
-      const defaultModel = this.config.getOrThrow('OPENROUTER_DEFAULT_MODEL');
-      targetModel = requestedModel || defaultModel;
-
-      if (!isFreeOpenRouterModel(targetModel)) {
-        throw new BadRequestException(FREE_OPENROUTER_MODEL_MESSAGE);
-      }
-
-      const openRouterApiKey = this.config.get('OPENROUTER_API_KEY') ?? '';
-      const hasApiKey = openRouterApiKey.length > 0 && openRouterApiKey !== PLACEHOLDER_API_KEY;
-
-      if (this.config.getOrThrow('NODE_ENV') !== 'test' && !hasApiKey) {
-        throw new ServiceUnavailableException('OPENROUTER_API_KEY is not configured');
-      }
-
-      if (hasApiKey && targetModel !== defaultModel) {
-        customModelOption = { model: this.openRouterProvider.chatModel(targetModel) };
-      }
-    }
-
-    const systemParts = dto.messages
-      .filter((message) => message.role === ChatMessageRole.SYSTEM)
-      .map((message) => message.content.trim())
-      .filter((content) => content.length > 0);
-    const instructions = systemParts.length > 0 ? systemParts.join('\n\n') : undefined;
-
-    const messages = dto.messages
-      .filter((message) => message.role !== ChatMessageRole.SYSTEM)
-      .map((message) => ({
-        role: message.role === ChatMessageRole.USER ? ('user' as const) : ('assistant' as const),
-        content: message.content,
-      }));
-
-    if (messages.length === 0) {
-      throw new BadRequestException('At least one non-system message is required');
-    }
-
-    const callOptions: AiCallOptions = {
-      ...(customModelOption ?? {}),
-      ...(instructions !== undefined ? { instructions } : {}),
-      messages,
-      ...(dto.temperature !== undefined ? { temperature: dto.temperature } : {}),
-      ...(dto.maxTokens !== undefined ? { maxOutputTokens: dto.maxTokens } : {}),
-    };
-
-    return { targetModel, callOptions };
-  }
-
-  private buildCompletionResponse(
-    result: AiTextResult,
-    targetModel: string,
-    startedAt: number,
-  ): LlmChatCompletionResponseDto {
-    const latencyMs = Math.max(1, Math.round(performance.now() - startedAt));
-    const promptTokens = result.usage.inputTokens ?? 0;
-    const completionTokens = result.usage.outputTokens ?? 0;
-    const totalTokens = result.usage.totalTokens ?? promptTokens + completionTokens;
-    const resolvedModel =
-      result.model?.provider !== 'fake' && result.model?.modelId
-        ? result.model.modelId
-        : targetModel;
-
-    return {
-      content: result.text,
-      model: resolvedModel,
-      latencyMs,
-      usage: {
-        promptTokens,
-        completionTokens,
-        totalTokens,
-      },
-    };
-  }
-
   private toProviderException(error: unknown, targetModel: string): HttpException {
     if (error instanceof HttpException) {
       return error;
     }
 
-    const causeObj =
-      error instanceof Error && error.cause && typeof error.cause === 'object'
-        ? (error.cause as { responseBody?: unknown; message?: unknown })
-        : undefined;
-    this.logger.error(
-      JSON.stringify({
-        event: 'llm.chat.provider_error',
-        model: targetModel,
-        error: error instanceof Error ? error.message : 'Unknown OpenRouter error',
-        ...(causeObj?.responseBody !== undefined
-          ? { responseBody: causeObj.responseBody }
-          : causeObj?.message !== undefined
-            ? { cause: causeObj.message }
-            : {}),
-      }),
-    );
+    this.logger.error(formatProviderErrorLog(error, targetModel));
     return new BadGatewayException('Failed to generate completion from OpenRouter');
   }
 }

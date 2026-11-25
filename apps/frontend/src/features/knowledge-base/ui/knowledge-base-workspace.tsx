@@ -1,25 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import type { KnowledgeDocumentResponseDto, UserResponseDto } from '@semcache/shared-dtos';
 import { KnowledgeDocumentStatus, QueryCategory } from '@semcache/shared-types';
-import {
-  AlertTriangle,
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  Eye,
-  FileText,
-  Loader2,
-  Plus,
-  RefreshCw,
-  Search,
-  Trash2,
-  UploadCloud,
-} from 'lucide-react';
+import { ArrowLeft, BookOpen, FileText, Loader2, Plus, RefreshCw, Search, UploadCloud } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  CATEGORY_LABELS,
-  FORMAT_LABELS,
   STATUS_LABELS,
   filterKnowledgeDocuments,
 } from '@/features/knowledge-base/model/knowledge-base-helpers';
@@ -29,14 +14,16 @@ import {
   useReprocessKnowledgeDocumentMutation,
 } from '@/features/knowledge-base/model/use-knowledge-base';
 import { KnowledgeBaseDetailDialog } from '@/features/knowledge-base/ui/knowledge-base-detail-dialog';
+import { KnowledgeBaseDocumentRow } from '@/features/knowledge-base/ui/knowledge-base-document-row';
 import { KnowledgeBaseRetrievalTester } from '@/features/knowledge-base/ui/knowledge-base-retrieval-tester';
+import { KnowledgeBaseStats } from '@/features/knowledge-base/ui/knowledge-base-stats';
 import { KnowledgeBaseUploadDialog } from '@/features/knowledge-base/ui/knowledge-base-upload-dialog';
+import { QueryCategorySelect } from '@/features/knowledge-base/ui/query-category-select';
 import { getAuthServerError } from '@/shared/api/api-client';
 import { useFileDropZone } from '@/shared/lib/use-file-drop-zone';
 import { Badge } from '@/shared/ui/badge';
 import { BrandLogo } from '@/shared/ui/brand-logo';
 import { Button } from '@/shared/ui/button';
-import { AppHeader } from '@/widgets/app-header/ui/app-header';
 import { Card } from '@/shared/ui/card';
 import { CardContent } from '@/shared/ui/card-content';
 import {
@@ -48,6 +35,7 @@ import {
   DialogTitle,
 } from '@/shared/ui/dialog';
 import { Input } from '@/shared/ui/input';
+import { AppHeader } from '@/widgets/app-header/ui/app-header';
 
 export interface KnowledgeBaseWorkspaceProps {
   user: UserResponseDto;
@@ -85,28 +73,6 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
       }),
     [documents, searchQuery, categoryFilter, statusFilter],
   );
-
-  const stats = useMemo(() => {
-    let readyCount = 0;
-    let processingCount = 0;
-    let failedCount = 0;
-    let totalChunks = 0;
-
-    for (const doc of documents) {
-      if (doc.status === KnowledgeDocumentStatus.READY) {
-        readyCount += 1;
-        totalChunks += doc.chunkCount;
-      } else if (
-        doc.status === KnowledgeDocumentStatus.PROCESSING ||
-        doc.status === KnowledgeDocumentStatus.PENDING
-      ) {
-        processingCount += 1;
-      } else if (doc.status === KnowledgeDocumentStatus.FAILED) {
-        failedCount += 1;
-      }
-    }
-    return { total: documents.length, readyCount, processingCount, failedCount, totalChunks };
-  }, [documents]);
 
   const handleRetry = async (documentId: string) => {
     try {
@@ -157,6 +123,7 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
           </div>
         </div>
       ) : null}
+
       <AppHeader containerClassName="mx-auto max-w-7xl px-4 sm:px-6">
         <AppHeader.Left>
           <AppHeader.Brand to="/">
@@ -190,40 +157,8 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
             Upload Documents
           </Button>
         </div>
-        <section
-          aria-label="Knowledge Base Processing Summary"
-          className="grid gap-3 sm:grid-cols-4"
-        >
-          <Card className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Total Documents</p>
-            <p className="mt-1 text-2xl font-bold">{stats.total}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Ready & Indexed</p>
-            <div className="mt-1 flex items-baseline gap-2">
-              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                {stats.readyCount}
-              </p>
-              <span className="text-xs text-muted-foreground">({stats.totalChunks} chunks)</span>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Processing Queue</p>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-2xl font-bold text-primary">{stats.processingCount}</p>
-              {stats.processingCount > 0 ? (
-                <Badge variant="teal" className="text-[11px]">
-                  <Loader2 className="size-3 animate-spin" />
-                  Live polling
-                </Badge>
-              ) : null}
-            </div>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Failed Processing</p>
-            <p className="mt-1 text-2xl font-bold text-destructive">{stats.failedCount}</p>
-          </Card>
-        </section>
+
+        <KnowledgeBaseStats documents={documents} />
 
         <div className="grid gap-6 lg:grid-cols-12">
           <section className="space-y-4 lg:col-span-7">
@@ -241,19 +176,13 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
                     />
                   </div>
 
-                  <select
-                    aria-label="Filter by category"
+                  <QueryCategorySelect
+                    ariaLabel="Filter by category"
                     value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value as QueryCategory | 'all')}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-xs"
-                  >
-                    <option value="all">All categories</option>
-                    {Object.values(QueryCategory).map((cat) => (
-                      <option key={cat} value={cat}>
-                        {CATEGORY_LABELS[cat]}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setCategoryFilter}
+                    includeAllOption
+                    className="w-auto text-xs"
+                  />
 
                   <select
                     aria-label="Filter by status"
@@ -307,90 +236,14 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
                 ) : (
                   <div className="space-y-2.5">
                     {filteredDocuments.map((doc) => (
-                      <div
+                      <KnowledgeBaseDocumentRow
                         key={doc.id}
-                        className="flex flex-col justify-between gap-3 rounded-xl border bg-background p-3.5 sm:flex-row sm:items-center"
-                      >
-                        <div className="min-w-0 space-y-1.5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-semibold text-foreground">
-                              {doc.title}
-                            </p>
-                            {doc.status === KnowledgeDocumentStatus.READY ? (
-                              <Badge variant="success">
-                                <CheckCircle2 className="size-3" />
-                                Ready
-                              </Badge>
-                            ) : doc.status === KnowledgeDocumentStatus.FAILED ? (
-                              <Badge
-                                variant="outline"
-                                className="border-destructive/50 text-destructive"
-                              >
-                                <AlertTriangle className="size-3" />
-                                Failed
-                              </Badge>
-                            ) : (
-                              <Badge variant="teal">
-                                <Loader2 className="size-3 animate-spin" />
-                                {STATUS_LABELS[doc.status]}
-                              </Badge>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <Badge variant="secondary" className="text-[11px]">
-                              {CATEGORY_LABELS[doc.category]}
-                            </Badge>
-                            <span>{FORMAT_LABELS[doc.format]}</span>
-                            {doc.fileName ? <span>• {doc.fileName}</span> : null}
-                            <span>• {doc.chunkCount} chunks</span>
-                            <span>• {doc.characterCount.toLocaleString()} chars</span>
-                          </div>
-
-                          {doc.status === KnowledgeDocumentStatus.FAILED && doc.errorMessage ? (
-                            <p className="text-xs text-destructive">{doc.errorMessage}</p>
-                          ) : null}
-                        </div>
-
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedDocId(doc.id)}
-                          >
-                            <Eye className="size-3.5" />
-                            Details
-                          </Button>
-
-                          {doc.status === KnowledgeDocumentStatus.FAILED ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void handleRetry(doc.id)}
-                              disabled={reprocessMutation.isPending}
-                            >
-                              <RefreshCw
-                                className={`size-3.5 ${
-                                  reprocessMutation.isPending ? 'animate-spin' : ''
-                                }`}
-                              />
-                              Retry
-                            </Button>
-                          ) : null}
-
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Delete ${doc.title}`}
-                            onClick={() => setDeleteTarget(doc)}
-                          >
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
+                        doc={doc}
+                        isReprocessing={reprocessMutation.isPending}
+                        onSelect={() => setSelectedDocId(doc.id)}
+                        onRetry={() => void handleRetry(doc.id)}
+                        onDelete={() => setDeleteTarget(doc)}
+                      />
                     ))}
                   </div>
                 )}

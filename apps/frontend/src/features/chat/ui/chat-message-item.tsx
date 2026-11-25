@@ -1,24 +1,17 @@
 import type { DialogMessageResponseDto } from '@semcache/shared-dtos';
 import { ChatMessageRole } from '@semcache/shared-types';
 import { format } from 'date-fns';
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  Headset,
-  Pencil,
-  ThumbsDown,
-  ThumbsUp,
-  User,
-} from 'lucide-react';
-import { useState } from 'react';
+import { Headset, Pencil, User } from 'lucide-react';
+import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  AssistantMessageActions,
+  BranchControls,
+} from '@/features/chat/ui/chat-message-actions';
+import { ChatMessageEditor } from '@/features/chat/ui/chat-message-editor';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { MarkdownContent } from '@/shared/ui/markdown-content';
-import { Textarea } from '@/shared/ui/textarea';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/ui/tooltip';
 
 export interface ChatMessageItemProps {
   message: DialogMessageResponseDto;
@@ -80,17 +73,7 @@ export function ChatMessageItem({
     }
   };
 
-  const handleStartEdit = () => {
-    setEditDraft(message.content);
-    setIsEditing(true);
-  };
-
-  const handleCancelEdit = () => {
-    setEditDraft(message.content);
-    setIsEditing(false);
-  };
-
-  const handleSubmitEdit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmitEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = editDraft.trim();
     if (!trimmed || !onEditMessage) {
@@ -100,36 +83,7 @@ export function ChatMessageItem({
     await onEditMessage(message.id, trimmed);
   };
 
-  const branchControls =
-    siblingCount > 1 && onSelectBranch ? (
-      <div className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Previous branch"
-          disabled={isBusy || siblingIndex <= 0}
-          onClick={() => onSelectBranch('prev')}
-          className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-3.5" />
-        </Button>
-        <span className="min-w-8 text-center font-medium tabular-nums">
-          {siblingIndex + 1} / {siblingCount}
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Next branch"
-          disabled={isBusy || siblingIndex >= siblingCount - 1}
-          onClick={() => onSelectBranch('next')}
-          className="size-6 rounded-md text-muted-foreground hover:text-foreground"
-        >
-          <ChevronRight className="size-3.5" />
-        </Button>
-      </div>
-    ) : null;
+  const branchProps = { siblingIndex, siblingCount, isBusy, onSelectBranch };
 
   return (
     <div className={cn('group flex gap-3', isUser ? 'justify-end' : 'justify-start')}>
@@ -156,43 +110,16 @@ export function ChatMessageItem({
         </div>
 
         {isEditing ? (
-          <form
+          <ChatMessageEditor
+            draft={editDraft}
+            isBusy={isBusy}
+            onDraftChange={setEditDraft}
+            onCancel={() => {
+              setEditDraft(message.content);
+              setIsEditing(false);
+            }}
             onSubmit={(event) => void handleSubmitEdit(event)}
-            className="w-full min-w-[260px] rounded-2xl border bg-card p-3 text-card-foreground shadow-xs sm:min-w-[360px]"
-          >
-            <Textarea
-              rows={3}
-              value={editDraft}
-              onChange={(event) => setEditDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  handleCancelEdit();
-                }
-              }}
-              aria-label="Edit message"
-              autoFocus
-              className="min-h-18 resize-y text-sm"
-            />
-            <div className="mt-2 flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleCancelEdit}
-                className="h-8 rounded-lg px-3 text-xs"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={isBusy || editDraft.trim().length === 0}
-                className="h-8 rounded-lg px-3 text-xs"
-              >
-                Save &amp; Submit
-              </Button>
-            </div>
-          </form>
+          />
         ) : (
           <div
             className={cn(
@@ -212,7 +139,7 @@ export function ChatMessageItem({
 
         {isUser ? (
           <div className="flex items-center gap-1 px-1 pt-0.5">
-            {branchControls}
+            <BranchControls {...branchProps} />
             {canEdit && !isEditing ? (
               <Button
                 type="button"
@@ -220,7 +147,10 @@ export function ChatMessageItem({
                 size="icon"
                 aria-label="Edit message"
                 disabled={isBusy}
-                onClick={handleStartEdit}
+                onClick={() => {
+                  setEditDraft(message.content);
+                  setIsEditing(true);
+                }}
                 className="size-7 rounded-lg text-muted-foreground hover:text-foreground"
               >
                 <Pencil className="size-3.5" />
@@ -228,70 +158,13 @@ export function ChatMessageItem({
             ) : null}
           </div>
         ) : (
-          <TooltipProvider>
-            <div className="flex items-center gap-1 px-1 pt-0.5">
-              {branchControls}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Helpful response"
-                    aria-pressed={feedback === 'up'}
-                    onClick={() => handleFeedback('up')}
-                    className={cn(
-                      'size-7 rounded-lg text-muted-foreground hover:text-foreground',
-                      feedback === 'up' && 'bg-accent text-accent-foreground',
-                    )}
-                  >
-                    <ThumbsUp className="size-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Helpful</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Not helpful response"
-                    aria-pressed={feedback === 'down'}
-                    onClick={() => handleFeedback('down')}
-                    className={cn(
-                      'size-7 rounded-lg text-muted-foreground hover:text-foreground',
-                      feedback === 'down' && 'bg-destructive/10 text-destructive',
-                    )}
-                  >
-                    <ThumbsDown className="size-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Not helpful</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Copy response"
-                    onClick={handleCopy}
-                    className="size-7 rounded-lg text-muted-foreground hover:text-foreground"
-                  >
-                    {copied ? (
-                      <Check className="size-3.5 text-emerald-600" />
-                    ) : (
-                      <Copy className="size-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{copied ? 'Copied' : 'Copy response'}</TooltipContent>
-              </Tooltip>
-            </div>
-          </TooltipProvider>
+          <AssistantMessageActions
+            {...branchProps}
+            feedback={feedback}
+            copied={copied}
+            onFeedback={handleFeedback}
+            onCopy={() => void handleCopy()}
+          />
         )}
       </div>
 

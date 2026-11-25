@@ -104,19 +104,27 @@ describe('ChatWorkspace', () => {
 
     expect(await screen.findByText('Hello! Welcome to SemCache Support.')).toBeVisible();
     expect(screen.getByText('Telecom Assistant')).toBeVisible();
-    expect(screen.getByText('Which mobile plan is right for me?')).toBeVisible();
-    expect(screen.getByText('How much mobile data do I have left?')).toBeVisible();
-    expect(screen.getByText('How can I pay my bill?')).toBeVisible();
-    expect(screen.getByText('How does international roaming work?')).toBeVisible();
-    expect(screen.getByText('How do I activate my eSIM?')).toBeVisible();
-    expect(screen.getByText("My mobile internet isn't working.")).toBeVisible();
+    expect(screen.getByText('What mobile plans, offers and discounts are available?')).toBeVisible();
+    expect(screen.getByText('Can you help me understand my bill or a payment issue?')).toBeVisible();
+    expect(
+      screen.getByText("I'm experiencing problems with my mobile network or internet."),
+    ).toBeVisible();
+    expect(
+      screen.getByText('How can I use my mobile services while travelling abroad?'),
+    ).toBeVisible();
+    expect(screen.getByText('How can I manage, change or cancel my contract?')).toBeVisible();
+    expect(
+      screen.getByText('Is there a network outage or a problem with my connection?'),
+    ).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: /how do i activate my esim\?/i }));
+    await user.click(
+      screen.getByRole('button', { name: /how can i manage, change or cancel my contract\?/i }),
+    );
 
     await waitFor(() => {
       expect(chatClient.streamDialogMessage).toHaveBeenCalledWith(
         createdDialog.id,
-        { content: 'How do I activate my eSIM?' },
+        { content: 'How can I manage, change or cancel my contract?' },
         expect.objectContaining({
           onUserMessage: expect.any(Function),
           onDelta: expect.any(Function),

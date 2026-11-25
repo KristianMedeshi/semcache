@@ -195,3 +195,19 @@ export const databaseOnlyEnvSchema = z.object({
     .trim()
     .min(1, { message: 'Missing required environment variable: DATABASE_URL' }),
 });
+
+/**
+ * Generates standard `<PREFIX>_HOST`, `<PREFIX>_PORT`, and `<PREFIX>_URL` Zod schema fields
+ * for downstream TCP microservice endpoint configuration.
+ */
+export function serviceTcpEnvFields<TPrefix extends string>(prefix: TPrefix) {
+  return {
+    [`${prefix}_HOST`]: optionalString(),
+    [`${prefix}_PORT`]: positiveInt(`${prefix}_PORT`).optional(),
+    [`${prefix}_URL`]: optionalString(),
+  } as Record<
+    `${TPrefix}_HOST` | `${TPrefix}_URL`,
+    ReturnType<typeof optionalString>
+  > &
+    Record<`${TPrefix}_PORT`, z.ZodOptional<ReturnType<typeof positiveInt>>>;
+}

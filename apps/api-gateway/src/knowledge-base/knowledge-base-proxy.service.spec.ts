@@ -1,55 +1,33 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { ClientProxy } from '@nestjs/microservices';
-import { createValidatedConfigService } from '@semcache/shared-config';
 import { INTERNAL_AUTH_HEADERS, SERVICE_TCP_PATTERNS, UserRole } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { of } from 'rxjs';
-import { AuthProxyService } from '../auth/auth-proxy.service';
-import { gatewayEnvSchema } from '../config/gateway.env';
+import {
+  createGatewayAuthProxyMock,
+  createJsonResponseMock,
+  createTestGatewayUser,
+  useTestGatewayEnv,
+} from '../common/proxy-test-helpers';
 import { KnowledgeBaseProxyService } from './knowledge-base-proxy.service';
 
-const TEST_ADMIN = {
-  id: '11111111-1111-4111-8111-111111111111',
-  email: 'admin@example.com',
-  role: UserRole.ADMIN,
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
-};
+const TEST_ADMIN = createTestGatewayUser(UserRole.ADMIN);
 
 function createKbProxyHarness(options?: {
   user?: typeof TEST_ADMIN | null;
   kbSendMock?: jest.Mock;
 }) {
-  const config = createValidatedConfigService(gatewayEnvSchema, { loadEnvFiles: false });
-  const authClient = { send: jest.fn() } as unknown as ClientProxy;
+  const authProxy = createGatewayAuthProxyMock(
+    options?.user === undefined ? TEST_ADMIN : options.user,
+  );
   const kbSendMock = options?.kbSendMock ?? jest.fn();
   const kbClient = { send: kbSendMock } as unknown as ClientProxy;
-  const authProxy = new AuthProxyService(config, authClient);
-  jest
-    .spyOn(authProxy, 'resolveCurrentUser')
-    .mockResolvedValue(options?.user === undefined ? TEST_ADMIN : options.user);
-
   const proxy = new KnowledgeBaseProxyService(authProxy, kbClient);
   return { proxy, kbSendMock };
 }
 
-function createJsonResponseMock() {
-  const json = jest.fn();
-  const status = jest.fn().mockReturnValue({ json });
-  return { res: { status, json } as unknown as Response, status, json };
-}
-
 describe('KnowledgeBaseProxyService', () => {
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    process.env.NODE_ENV = 'test';
-    process.env.INTERNAL_SERVICE_SECRET = 'test-internal-service-secret-32-chars';
-  });
-
-  afterEach(() => {
-    process.env = { ...originalEnv };
-  });
+  useTestGatewayEnv();
 
   it('rejects unauthenticated requests before forwarding to knowledge-base-service', async () => {
     const { proxy } = createKbProxyHarness({ user: null });

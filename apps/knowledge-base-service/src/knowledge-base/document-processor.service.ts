@@ -1,12 +1,21 @@
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { HtmlToTextTransformer } from '@langchain/community/document_transformers/html_to_text';
-import { BaseDocumentLoader } from '@langchain/core/document_loaders/base';
-import { Document } from '@langchain/core/documents';
+import type { Document } from '@langchain/core/documents';
 import { MarkdownTextSplitter, RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { Injectable } from '@nestjs/common';
-import { KNOWLEDGE_BASE_VALIDATION_LIMITS } from '@semcache/shared-dtos';
+import {
+  KNOWLEDGE_BASE_VALIDATION_LIMITS,
+  inferKnowledgeDocumentFormat,
+} from '@semcache/shared-dtos';
 import { KnowledgeDocumentFormat } from '@semcache/shared-types';
+import {
+  JsonDocumentLoader,
+  TextDocumentLoader,
+  decodeContentToBlob,
+  normalizeLoadedDocuments,
+  sanitizeMetadata,
+} from './document-loaders';
 
 export interface ProcessedDocumentResult {
   format: KnowledgeDocumentFormat;
@@ -24,133 +33,10 @@ export interface DocumentChunk {
   metadata: Record<string, string | number | boolean>;
 }
 
-class TextDocumentLoader extends BaseDocumentLoader {
-  constructor(
-    private readonly content: string,
-    private readonly metadata: Record<string, unknown>,
-  ) {
-    super();
-  }
-
-  async load(): Promise<Document[]> {
-    const normalized = this.content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-    if (normalized.length === 0) {
-      return [];
-    }
-    return [new Document({ pageContent: normalized, metadata: { ...this.metadata } })];
-  }
-}
-
-class JsonDocumentLoader extends BaseDocumentLoader {
-  constructor(
-    private readonly rawJson: string,
-    private readonly metadata: Record<string, unknown>,
-  ) {
-    super();
-  }
-
-  async load(): Promise<Document[]> {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(this.rawJson);
-    } catch {
-      throw new Error('Invalid JSON document content');
-    }
-
-    const lines: string[] = [];
-    this.flattenJsonValue(parsed, '', lines);
-    const text = lines.join('\n').trim();
-    if (text.length === 0) {
-      return [];
-    }
-    return [new Document({ pageContent: text, metadata: { ...this.metadata } })];
-  }
-
-  private flattenJsonValue(value: unknown, path: string, lines: string[]): void {
-    if (value === null || value === undefined) {
-      return;
-    }
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      const text = String(value).trim();
-      if (text.length > 0) {
-        lines.push(path ? `${path}: ${text}` : text);
-      }
-      return;
-    }
-    if (Array.isArray(value)) {
-      for (let i = 0; i < value.length; i += 1) {
-        this.flattenJsonValue(value[i], path ? `${path}[${i}]` : `[${i}]`, lines);
-      }
-      return;
-    }
-    if (typeof value === 'object') {
-      for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-        this.flattenJsonValue(entry, path ? `${path}.${key}` : key, lines);
-      }
-    }
-  }
-}
-
-function decodeContentToBlob(rawContent: string, mimeType: string): Blob {
-  const dataUrlPrefix = /^data:[^;]+;base64,/i;
-  const cleaned = rawContent.replace(dataUrlPrefix, '').trim();
-  const isBase64 = /^[A-Za-z0-9+/=\s]+$/.test(cleaned) && cleaned.length >= 4;
-  const buffer = isBase64 ? Buffer.from(cleaned, 'base64') : Buffer.from(rawContent, 'utf-8');
-  return new Blob([buffer], { type: mimeType });
-}
-
-function sanitizeMetadata(
-  metadata: Record<string, unknown>,
-): Record<string, string | number | boolean> {
-  const sanitized: Record<string, string | number | boolean> = {};
-
-  for (const [key, value] of Object.entries(metadata)) {
-    if (key === 'loc' && typeof value === 'object' && value !== null) {
-      const pageNumber = (value as { pageNumber?: unknown }).pageNumber;
-      if (typeof pageNumber === 'number' && Number.isFinite(pageNumber)) {
-        sanitized.pageNumber = pageNumber;
-      }
-      continue;
-    }
-    if (key === 'pdf' && typeof value === 'object' && value !== null) {
-      const totalPages = (value as { totalPages?: unknown }).totalPages;
-      if (typeof totalPages === 'number' && Number.isFinite(totalPages)) {
-        sanitized.totalPages = totalPages;
-      }
-      continue;
-    }
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      sanitized[key] = value;
-    }
-  }
-
-  return sanitized;
-}
-
 @Injectable()
 export class DocumentProcessorService {
   resolveFormat(format?: KnowledgeDocumentFormat, fileName?: string): KnowledgeDocumentFormat {
-    if (format) {
-      return format;
-    }
-
-    const lower = fileName?.trim().toLowerCase() ?? '';
-    if (lower.endsWith('.md') || lower.endsWith('.markdown')) {
-      return KnowledgeDocumentFormat.MARKDOWN;
-    }
-    if (lower.endsWith('.html') || lower.endsWith('.htm')) {
-      return KnowledgeDocumentFormat.HTML;
-    }
-    if (lower.endsWith('.json')) {
-      return KnowledgeDocumentFormat.JSON;
-    }
-    if (lower.endsWith('.pdf')) {
-      return KnowledgeDocumentFormat.PDF;
-    }
-    if (lower.endsWith('.docx')) {
-      return KnowledgeDocumentFormat.DOCX;
-    }
-    return KnowledgeDocumentFormat.TEXT;
+    return format ?? inferKnowledgeDocumentFormat(fileName);
   }
 
   async loadDocuments(input: {
@@ -168,65 +54,46 @@ export class DocumentProcessorService {
       ...(input.fileName ? { fileName: input.fileName } : {}),
     };
 
-    let documents: Document[];
-    switch (resolvedFormat) {
-      case KnowledgeDocumentFormat.PDF: {
-        const blob = decodeContentToBlob(input.rawContent, 'application/pdf');
-        const loader = new PDFLoader(blob, { splitPages: true });
-        documents = (await loader.load()).map(
-          (doc) =>
-            new Document({
-              pageContent: doc.pageContent.trim(),
-              metadata: { ...baseMetadata, ...doc.metadata },
-            }),
-        );
-        break;
-      }
-      case KnowledgeDocumentFormat.DOCX: {
-        const blob = decodeContentToBlob(
-          input.rawContent,
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        );
-        const loader = new DocxLoader(blob, { type: 'docx' });
-        documents = (await loader.load()).map(
-          (doc) =>
-            new Document({
-              pageContent: doc.pageContent.trim(),
-              metadata: { ...baseMetadata, ...doc.metadata },
-            }),
-        );
-        break;
-      }
-      case KnowledgeDocumentFormat.HTML: {
-        const rawDocs = await new TextDocumentLoader(input.rawContent, baseMetadata).load();
-        const transformer = new HtmlToTextTransformer();
-        documents = (await transformer.transformDocuments(rawDocs)).map(
-          (doc) =>
-            new Document({
-              pageContent: doc.pageContent.trim(),
-              metadata: { ...baseMetadata, ...doc.metadata },
-            }),
-        );
-        break;
-      }
-      case KnowledgeDocumentFormat.JSON: {
-        documents = await new JsonDocumentLoader(input.rawContent, baseMetadata).load();
-        break;
-      }
-      case KnowledgeDocumentFormat.MARKDOWN:
-      case KnowledgeDocumentFormat.TEXT:
-      default: {
-        documents = await new TextDocumentLoader(input.rawContent, baseMetadata).load();
-        break;
-      }
-    }
-
-    const nonEmptyDocs = documents.filter((doc) => doc.pageContent.trim().length > 0);
+    const rawDocs = await this.loadByFormat(resolvedFormat, input.rawContent, baseMetadata);
+    const nonEmptyDocs = rawDocs.filter((doc) => doc.pageContent.trim().length > 0);
     if (nonEmptyDocs.length === 0) {
       throw new Error('Document contains no extractable text content after processing');
     }
 
     return { format: resolvedFormat, documents: nonEmptyDocs };
+  }
+
+  private async loadByFormat(
+    format: KnowledgeDocumentFormat,
+    rawContent: string,
+    baseMetadata: Record<string, unknown>,
+  ): Promise<Document[]> {
+    switch (format) {
+      case KnowledgeDocumentFormat.PDF: {
+        const blob = decodeContentToBlob(rawContent, 'application/pdf');
+        const docs = await new PDFLoader(blob, { splitPages: true }).load();
+        return normalizeLoadedDocuments(docs, baseMetadata);
+      }
+      case KnowledgeDocumentFormat.DOCX: {
+        const blob = decodeContentToBlob(
+          rawContent,
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        );
+        const docs = await new DocxLoader(blob, { type: 'docx' }).load();
+        return normalizeLoadedDocuments(docs, baseMetadata);
+      }
+      case KnowledgeDocumentFormat.HTML: {
+        const rawDocs = await new TextDocumentLoader(rawContent, baseMetadata).load();
+        const docs = await new HtmlToTextTransformer().transformDocuments(rawDocs);
+        return normalizeLoadedDocuments(docs, baseMetadata);
+      }
+      case KnowledgeDocumentFormat.JSON:
+        return new JsonDocumentLoader(rawContent, baseMetadata).load();
+      case KnowledgeDocumentFormat.MARKDOWN:
+      case KnowledgeDocumentFormat.TEXT:
+      default:
+        return new TextDocumentLoader(rawContent, baseMetadata).load();
+    }
   }
 
   async splitDocuments(

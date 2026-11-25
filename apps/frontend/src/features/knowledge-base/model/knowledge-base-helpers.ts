@@ -1,4 +1,8 @@
-import type { KnowledgeDocumentResponseDto } from '@semcache/shared-dtos';
+import {
+  type KnowledgeDocumentResponseDto,
+  type UploadKnowledgeDocumentRequestDto,
+  inferKnowledgeDocumentFormat,
+} from '@semcache/shared-dtos';
 import {
   KnowledgeDocumentFormat,
   KnowledgeDocumentStatus,
@@ -30,23 +34,7 @@ export const STATUS_LABELS: Record<KnowledgeDocumentStatus, string> = {
 };
 
 export function inferFormatFromFileName(fileName: string): KnowledgeDocumentFormat {
-  const lower = fileName.trim().toLowerCase();
-  if (lower.endsWith('.md') || lower.endsWith('.markdown')) {
-    return KnowledgeDocumentFormat.MARKDOWN;
-  }
-  if (lower.endsWith('.html') || lower.endsWith('.htm')) {
-    return KnowledgeDocumentFormat.HTML;
-  }
-  if (lower.endsWith('.json')) {
-    return KnowledgeDocumentFormat.JSON;
-  }
-  if (lower.endsWith('.pdf')) {
-    return KnowledgeDocumentFormat.PDF;
-  }
-  if (lower.endsWith('.docx')) {
-    return KnowledgeDocumentFormat.DOCX;
-  }
-  return KnowledgeDocumentFormat.TEXT;
+  return inferKnowledgeDocumentFormat(fileName);
 }
 
 export function deriveTitleFromFileName(fileName: string): string {
@@ -116,4 +104,55 @@ export function filterKnowledgeDocuments(
       .toLowerCase();
     return haystack.includes(q);
   });
+}
+
+export function buildUploadPayloads(params: {
+  mode: 'files' | 'manual';
+  queuedFiles: ParsedUploadFile[];
+  manualTitle: string;
+  manualFileName: string;
+  manualFormat: KnowledgeDocumentFormat;
+  manualContent: string;
+  category: QueryCategory;
+  chunkSize: number;
+  chunkOverlap: number;
+}): { payloads?: UploadKnowledgeDocumentRequestDto[]; error?: string } {
+  if (params.chunkOverlap >= params.chunkSize) {
+    return { error: 'Chunk overlap must be smaller than chunk size.' };
+  }
+
+  if (params.mode === 'files') {
+    if (params.queuedFiles.length === 0) {
+      return { error: 'Select at least one document file to upload.' };
+    }
+    return {
+      payloads: params.queuedFiles.map((file) => ({
+        title: file.title.trim() || file.fileName,
+        fileName: file.fileName,
+        format: file.format,
+        category: params.category,
+        content: file.content,
+        chunkSize: params.chunkSize,
+        chunkOverlap: params.chunkOverlap,
+      })),
+    };
+  }
+
+  if (params.manualTitle.trim().length === 0 || params.manualContent.trim().length === 0) {
+    return { error: 'Document title and content are required.' };
+  }
+
+  return {
+    payloads: [
+      {
+        title: params.manualTitle.trim(),
+        ...(params.manualFileName.trim() ? { fileName: params.manualFileName.trim() } : {}),
+        format: params.manualFormat,
+        category: params.category,
+        content: params.manualContent,
+        chunkSize: params.chunkSize,
+        chunkOverlap: params.chunkOverlap,
+      },
+    ],
+  };
 }

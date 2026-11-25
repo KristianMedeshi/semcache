@@ -86,8 +86,11 @@ export function toSemanticCacheSettingsResponseDto(
 export class SemanticCacheRepository {
   constructor(@Inject(SEMANTIC_CACHE_DRIZZLE) private readonly db: SemanticCacheDatabase) {}
 
-  async getOrCreateSettings(defaults: DefaultSettingsSeed): Promise<SemanticCacheSettingsRecord> {
-    await this.db
+  private async ensureSettingsRow(
+    executor: Pick<SemanticCacheDatabase, 'insert' | 'select'>,
+    defaults: DefaultSettingsSeed,
+  ): Promise<SemanticCacheSettingsRecord> {
+    await executor
       .insert(semanticCacheSettings)
       .values({
         id: DEFAULT_SETTINGS_ID,
@@ -102,7 +105,7 @@ export class SemanticCacheRepository {
       })
       .onConflictDoNothing();
 
-    const rows = await this.db
+    const rows = await executor
       .select()
       .from(semanticCacheSettings)
       .where(eq(semanticCacheSettings.id, DEFAULT_SETTINGS_ID))
@@ -113,6 +116,10 @@ export class SemanticCacheRepository {
       throw new Error('Failed to load semantic cache settings record');
     }
     return record;
+  }
+
+  async getOrCreateSettings(defaults: DefaultSettingsSeed): Promise<SemanticCacheSettingsRecord> {
+    return this.ensureSettingsRow(this.db, defaults);
   }
 
   async updateSettings(
@@ -130,32 +137,7 @@ export class SemanticCacheRepository {
     },
   ): Promise<SemanticCacheSettingsRecord> {
     return this.db.transaction(async (tx) => {
-      await tx
-        .insert(semanticCacheSettings)
-        .values({
-          id: DEFAULT_SETTINGS_ID,
-          mode: defaults.mode,
-          fixedThreshold: defaults.fixedThreshold,
-          adaptiveBaseThreshold: defaults.adaptiveBaseThreshold,
-          minAdaptiveThreshold: defaults.minAdaptiveThreshold,
-          maxAdaptiveThreshold: defaults.maxAdaptiveThreshold,
-          densityWeight: defaults.densityWeight,
-          densityKNeighbors: defaults.densityKNeighbors,
-          categoryWeights: defaults.categoryWeights,
-        })
-        .onConflictDoNothing();
-
-      const existingRows = await tx
-        .select()
-        .from(semanticCacheSettings)
-        .where(eq(semanticCacheSettings.id, DEFAULT_SETTINGS_ID))
-        .limit(1);
-
-      const current = existingRows[0];
-      if (!current) {
-        throw new Error('Failed to load semantic cache settings record');
-      }
-
+      const current = await this.ensureSettingsRow(tx, defaults);
       const nextValues = updater(current);
       const updatedRows = await tx
         .update(semanticCacheSettings)

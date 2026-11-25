@@ -73,7 +73,7 @@ semcache/
 ## Shared Packages (`packages/`)
 
 - **`@semcache/shared-types`** — contains shared immutable enums (`ServiceName`, `QueryCategory`, `CacheHitStatus`), canonical TCP patterns (`SERVICE_TCP_PATTERNS`), and base interfaces for semantic evaluation metadata.
-- **`@semcache/shared-dtos`** — contains exclusively data contracts (DTOs) for HTTP API Gateway endpoints and TCP inter-service communication (`AuthTcpRequestDto`, `AuthTcpResponseDto`, `DialogTcpRequestDto`, `RpcErrorPayloadDto`).
+- **`@semcache/shared-dtos`** — contains exclusively data contracts (DTOs) and format-inference helpers (`inferKnowledgeDocumentFormat`) for HTTP API Gateway endpoints and TCP inter-service communication (`AuthTcpRequestDto`, `AuthTcpResponseDto`, `DialogTcpRequestDto`, `RpcErrorPayloadDto`), plus a backend-only `@semcache/shared-dtos/validation` subpath exporting `class-validator`/`class-transformer` DTO classes shared between `api-gateway` and internal microservices.
 - **`@semcache/shared-config`** — contains helper functions for safely reading environment variables (`getRequiredEnv`, `getOptionalEnv`, `getNumericEnv`) and the default service port mapping.
 - **`@semcache/eslint-config`** — contains shared static code analysis (**Oxlint**) configurations for base packages (`base.json`), NestJS services (`nestjs.json`), and the React application (`react.json`).
 

@@ -8,17 +8,12 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ConfigService,
-  extractRpcErrorPayload,
-  formatRpcErrorMessage,
-} from '@semcache/shared-config';
+import { ConfigService } from '@semcache/shared-config';
 import {
   type CacheInvalidationResponseDto,
   type DeleteKnowledgeDocumentResponseDto,
   type InvalidateCacheBySourcesRequestDto,
   KNOWLEDGE_BASE_VALIDATION_LIMITS,
-  type KnowledgeContextSourceReferenceDto,
   type KnowledgeDocumentDetailResponseDto,
   type KnowledgeDocumentResponseDto,
   type ListKnowledgeDocumentsQueryDto,
@@ -26,7 +21,6 @@ import {
   type LlmGenerateEmbeddingsResponseDto,
   type RetrieveKnowledgeContextRequestDto,
   type RetrieveKnowledgeContextResponseDto,
-  type RetrievedKnowledgeChunkDto,
   type SemanticCacheTcpRequestDto,
   type UploadKnowledgeDocumentRequestDto,
 } from '@semcache/shared-dtos';
@@ -40,6 +34,11 @@ import { firstValueFrom, timeout } from 'rxjs';
 import type { KnowledgeBaseEnv } from '../config/knowledge-base.env';
 import type { KnowledgeDocumentRecord } from '../db/schema';
 import { DocumentProcessorService } from './document-processor.service';
+import {
+  formatEmbeddingRpcError,
+  formatProcessingError,
+  formatRetrievedContext,
+} from './knowledge-base-formatting';
 import {
   KnowledgeBaseRepository,
   toKnowledgeChunkResponseDto,
@@ -69,17 +68,7 @@ export class KnowledgeBaseService {
     uploadedBy?: string,
   ): Promise<KnowledgeDocumentDetailResponseDto> {
     const resolvedFormat = this.processor.resolveFormat(dto.format, dto.fileName);
-    const defaultChunkSize =
-      this.config?.get('KB_CHUNK_SIZE') ?? KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_SIZE;
-    const defaultChunkOverlap =
-      this.config?.get('KB_CHUNK_OVERLAP') ??
-      KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_OVERLAP;
-
-    const chunkSize = dto.chunkSize ?? defaultChunkSize;
-    const chunkOverlap = dto.chunkOverlap ?? defaultChunkOverlap;
-    if (chunkOverlap >= chunkSize) {
-      throw new BadRequestException('chunkOverlap must be strictly less than chunkSize');
-    }
+    const chunking = this.resolveChunkingOptions(dto.chunkSize, dto.chunkOverlap);
 
     const created = await this.repository.createDocument({
       title: dto.title.trim(),
@@ -92,7 +81,7 @@ export class KnowledgeBaseService {
       status: KnowledgeDocumentStatus.PENDING,
     });
 
-    return this.processAndStoreDocument(created, { chunkSize, chunkOverlap });
+    return this.processAndStoreDocument(created, chunking);
   }
 
   async reprocessDocument(
@@ -111,17 +100,7 @@ export class KnowledgeBaseService {
       throw new NotFoundException(`Knowledge document ${documentId} not found`);
     }
 
-    const defaultChunkSize =
-      this.config?.get('KB_CHUNK_SIZE') ?? KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_SIZE;
-    const defaultChunkOverlap =
-      this.config?.get('KB_CHUNK_OVERLAP') ??
-      KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_OVERLAP;
-    const chunkSize = options?.chunkSize ?? defaultChunkSize;
-    const chunkOverlap = options?.chunkOverlap ?? defaultChunkOverlap;
-
-    if (chunkOverlap >= chunkSize) {
-      throw new BadRequestException('chunkOverlap must be strictly less than chunkSize');
-    }
+    const chunking = this.resolveChunkingOptions(options?.chunkSize, options?.chunkOverlap);
 
     if (
       options?.content !== undefined ||
@@ -135,7 +114,7 @@ export class KnowledgeBaseService {
       });
     }
 
-    const result = await this.processAndStoreDocument(existing, { chunkSize, chunkOverlap });
+    const result = await this.processAndStoreDocument(existing, chunking);
     await this.invalidateLinkedCacheEntries(documentId, headers);
     return result;
   }
@@ -212,16 +191,32 @@ export class KnowledgeBaseService {
       category: dto.category,
     });
 
-    const sources = this.extractUniqueSources(results);
-    const formattedContext = this.formatRetrievedContext(results);
-
     return {
       query: trimmedQuery,
       hasRelevantContext: results.length > 0,
-      formattedContext,
+      formattedContext: formatRetrievedContext(results),
       results,
-      sources,
+      sources: results.map((result) => result.source),
     };
+  }
+
+  private resolveChunkingOptions(
+    requestedChunkSize?: number,
+    requestedChunkOverlap?: number,
+  ): { chunkSize: number; chunkOverlap: number } {
+    const defaultChunkSize =
+      this.config?.get('KB_CHUNK_SIZE') ?? KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_SIZE;
+    const defaultChunkOverlap =
+      this.config?.get('KB_CHUNK_OVERLAP') ??
+      KNOWLEDGE_BASE_VALIDATION_LIMITS.DEFAULT_CHUNK_OVERLAP;
+
+    const chunkSize = requestedChunkSize ?? defaultChunkSize;
+    const chunkOverlap = requestedChunkOverlap ?? defaultChunkOverlap;
+    if (chunkOverlap >= chunkSize) {
+      throw new BadRequestException('chunkOverlap must be strictly less than chunkSize');
+    }
+
+    return { chunkSize, chunkOverlap };
   }
 
   private async processAndStoreDocument(
@@ -277,7 +272,7 @@ export class KnowledgeBaseService {
         chunks: storedChunks.map(toKnowledgeChunkResponseDto),
       };
     } catch (error) {
-      const errorMessage = this.formatProcessingError(error);
+      const errorMessage = formatProcessingError(error);
       this.logger.error(
         JSON.stringify({
           event: 'kb.document.processing_failed',
@@ -316,36 +311,11 @@ export class KnowledgeBaseService {
         );
         allEmbeddings.push(...response.embeddings);
       } catch (error) {
-        const rpcError = extractRpcErrorPayload(error);
-        const message = rpcError
-          ? formatRpcErrorMessage(rpcError, 'Embedding service error')
-          : error instanceof Error
-            ? error.message
-            : 'LLM embedding service unavailable';
-        throw new BadGatewayException(message);
+        throw new BadGatewayException(formatEmbeddingRpcError(error));
       }
     }
 
     return allEmbeddings;
-  }
-
-  private extractUniqueSources(
-    results: RetrievedKnowledgeChunkDto[],
-  ): KnowledgeContextSourceReferenceDto[] {
-    return results.map((result) => result.source);
-  }
-
-  private formatRetrievedContext(results: RetrievedKnowledgeChunkDto[]): string {
-    if (results.length === 0) {
-      return '';
-    }
-
-    return results
-      .map(
-        (result, index) =>
-          `[Source ${index + 1}: ${result.documentTitle}${result.fileName ? ` (${result.fileName})` : ''} | Category: ${result.category} | Section Chunk #${result.chunkIndex + 1}]\n${result.content}`,
-      )
-      .join('\n\n---\n\n');
   }
 
   private async invalidateLinkedCacheEntries(
@@ -377,12 +347,5 @@ export class KnowledgeBaseService {
         }),
       );
     }
-  }
-
-  private formatProcessingError(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return 'Unknown document processing error';
   }
 }

@@ -12,19 +12,6 @@ export function Avatar({ className, ...props }: React.ComponentProps<typeof Avat
   );
 }
 
-export function AvatarImage({
-  className,
-  ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Image>) {
-  return (
-    <AvatarPrimitive.Image
-      data-slot="avatar-image"
-      className={cn('aspect-square size-full', className)}
-      {...props}
-    />
-  );
-}
-
 export function AvatarFallback({
   className,
   ...props

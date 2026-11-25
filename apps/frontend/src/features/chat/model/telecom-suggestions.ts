@@ -16,14 +16,6 @@ export interface TelecomSuggestion {
   icon: LucideIcon;
 }
 
-export interface TelecomSuggestion {
-  id: string;
-  category: string;
-  prompt: string;
-  subtitle: string;
-  icon: LucideIcon;
-}
-
 export const TELECOM_SUGGESTIONS: TelecomSuggestion[] = [
   {
     id: 'plans',

@@ -1,63 +1,34 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { ClientProxy } from '@nestjs/microservices';
-import { createValidatedConfigService } from '@semcache/shared-config';
 import { INTERNAL_AUTH_HEADERS, SERVICE_TCP_PATTERNS, UserRole } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { Observable, of } from 'rxjs';
-import { AuthProxyService } from '../auth/auth-proxy.service';
-import { gatewayEnvSchema } from '../config/gateway.env';
+import {
+  createGatewayAuthProxyMock,
+  createJsonResponseMock,
+  createStreamResponseMock,
+  createTestGatewayUser,
+  useTestGatewayEnv,
+} from '../common/proxy-test-helpers';
 import { DialogProxyService } from './dialog-proxy.service';
 
-const TEST_USER = {
-  id: '11111111-1111-4111-8111-111111111111',
-  email: 'alice@example.com',
-  role: UserRole.CUSTOMER,
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
-};
+const TEST_USER = createTestGatewayUser(UserRole.CUSTOMER);
 
 function createDialogProxyHarness(options?: {
   user?: typeof TEST_USER | null;
   dialogSendMock?: jest.Mock;
 }) {
-  const config = createValidatedConfigService(gatewayEnvSchema, { loadEnvFiles: false });
-  const authClient = { send: jest.fn() } as unknown as ClientProxy;
+  const authProxy = createGatewayAuthProxyMock(
+    options?.user === undefined ? TEST_USER : options.user,
+  );
   const dialogSendMock = options?.dialogSendMock ?? jest.fn();
   const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
-  const authProxy = new AuthProxyService(config, authClient);
-  jest
-    .spyOn(authProxy, 'resolveCurrentUser')
-    .mockResolvedValue(options?.user === undefined ? TEST_USER : options.user);
-
   const proxy = new DialogProxyService(authProxy, dialogClient);
   return { proxy, dialogSendMock };
 }
 
-function createJsonResponseMock() {
-  const json = jest.fn();
-  const status = jest.fn().mockReturnValue({ json });
-  return { res: { status, json } as unknown as Response, status, json };
-}
-
-function createStreamResponseMock() {
-  const writeHead = jest.fn();
-  const write = jest.fn();
-  const end = jest.fn();
-  const on = jest.fn();
-  return { res: { writeHead, write, end, on } as unknown as Response, writeHead, write, end };
-}
-
 describe('DialogProxyService', () => {
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    process.env.NODE_ENV = 'test';
-    process.env.INTERNAL_SERVICE_SECRET = 'test-internal-service-secret-32-chars';
-  });
-
-  afterEach(() => {
-    process.env = { ...originalEnv };
-  });
+  useTestGatewayEnv();
 
   it('rejects unauthenticated callers before calling dialog-service', async () => {
     const { proxy } = createDialogProxyHarness({ user: null });

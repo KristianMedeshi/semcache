@@ -7,14 +7,6 @@ export function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
-export function DialogTrigger({ ...props }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
-}
-
-export function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
-}
-
 function DialogOverlay({
   className,
   ...props

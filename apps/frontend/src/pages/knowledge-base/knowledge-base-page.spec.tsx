@@ -118,6 +118,14 @@ function renderKnowledgeBasePage() {
   );
 }
 
+function setupAdminKnowledgeBaseTest(docs: KnowledgeDocumentResponseDto[] = []) {
+  vi.mocked(authHooks.useCurrentUserQuery).mockReturnValue({
+    data: adminUser,
+    isPending: false,
+  } as ReturnType<typeof authHooks.useCurrentUserQuery>);
+  vi.mocked(kbClient.listKnowledgeDocuments).mockResolvedValue(docs);
+}
+
 describe('KnowledgeBasePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -138,11 +146,7 @@ describe('KnowledgeBasePage', () => {
   it('renders documents, supports search/filtering, retrying failed docs, deleting, and testing RAG retrieval', async () => {
     const user = userEvent.setup();
 
-    vi.mocked(authHooks.useCurrentUserQuery).mockReturnValue({
-      data: adminUser,
-      isPending: false,
-    } as ReturnType<typeof authHooks.useCurrentUserQuery>);
-    vi.mocked(kbClient.listKnowledgeDocuments).mockResolvedValue(sampleDocs);
+    setupAdminKnowledgeBaseTest(sampleDocs);
 
     const reprocessedDoc: KnowledgeDocumentDetailResponseDto = {
       ...sampleDocs[1],
@@ -235,11 +239,7 @@ describe('KnowledgeBasePage', () => {
 
   it('uploads multiple documents via the Upload Documents dialog', async () => {
     const user = userEvent.setup();
-    vi.mocked(authHooks.useCurrentUserQuery).mockReturnValue({
-      data: adminUser,
-      isPending: false,
-    } as ReturnType<typeof authHooks.useCurrentUserQuery>);
-    vi.mocked(kbClient.listKnowledgeDocuments).mockResolvedValue([]);
+    setupAdminKnowledgeBaseTest();
     vi.mocked(kbClient.uploadMultipleKnowledgeDocuments).mockResolvedValueOnce([
       {
         ...sampleDocs[0],
@@ -297,11 +297,7 @@ describe('KnowledgeBasePage', () => {
 
   it('opens Upload Documents dialog with queued files when dropping files onto the page', async () => {
     const user = userEvent.setup();
-    vi.mocked(authHooks.useCurrentUserQuery).mockReturnValue({
-      data: adminUser,
-      isPending: false,
-    } as ReturnType<typeof authHooks.useCurrentUserQuery>);
-    vi.mocked(kbClient.listKnowledgeDocuments).mockResolvedValue([]);
+    setupAdminKnowledgeBaseTest();
     vi.mocked(kbClient.uploadMultipleKnowledgeDocuments).mockResolvedValueOnce([
       {
         ...sampleDocs[0],
@@ -354,11 +350,7 @@ describe('KnowledgeBasePage', () => {
 
   it('queues files dropped onto the Upload Documents dialog dropzone', async () => {
     const user = userEvent.setup();
-    vi.mocked(authHooks.useCurrentUserQuery).mockReturnValue({
-      data: adminUser,
-      isPending: false,
-    } as ReturnType<typeof authHooks.useCurrentUserQuery>);
-    vi.mocked(kbClient.listKnowledgeDocuments).mockResolvedValue([]);
+    setupAdminKnowledgeBaseTest();
 
     renderKnowledgeBasePage();
 

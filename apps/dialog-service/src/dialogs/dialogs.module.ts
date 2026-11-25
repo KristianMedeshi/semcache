@@ -1,9 +1,8 @@
 import { Inject, Module, type OnModuleDestroy } from '@nestjs/common';
-import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
-import { ConfigService, resolveServiceTcpEndpoint } from '@semcache/shared-config';
+import type { ClientProxy } from '@nestjs/microservices';
+import { createTcpClientProvider } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
 import { InternalIdentityAuth } from '../auth/internal-identity.provider';
-import type { DialogEnv } from '../config/dialog.env';
 import { DatabaseModule } from '../db/database.module';
 import {
   DialogGraphService,
@@ -20,59 +19,9 @@ import { DialogPolicy } from './policies/dialog.policy';
   imports: [DatabaseModule],
   controllers: [DialogsController],
   providers: [
-    {
-      provide: LLM_SERVICE_CLIENT,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<DialogEnv, true>): ClientProxy => {
-        const { host, port } = resolveServiceTcpEndpoint(config, ServiceName.LLM_SERVICE, {
-          hostKey: 'LLM_SERVICE_HOST',
-          portKey: 'LLM_SERVICE_PORT',
-          urlKey: 'LLM_SERVICE_URL',
-        });
-        return ClientProxyFactory.create({
-          transport: Transport.TCP,
-          options: { host, port },
-        });
-      },
-    },
-    {
-      provide: KNOWLEDGE_BASE_SERVICE_CLIENT,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<DialogEnv, true>): ClientProxy => {
-        const { host, port } = resolveServiceTcpEndpoint(
-          config,
-          ServiceName.KNOWLEDGE_BASE_SERVICE,
-          {
-            hostKey: 'KNOWLEDGE_BASE_SERVICE_HOST',
-            portKey: 'KNOWLEDGE_BASE_SERVICE_PORT',
-            urlKey: 'KNOWLEDGE_BASE_SERVICE_URL',
-          },
-        );
-        return ClientProxyFactory.create({
-          transport: Transport.TCP,
-          options: { host, port },
-        });
-      },
-    },
-    {
-      provide: SEMANTIC_CACHE_SERVICE_CLIENT,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<DialogEnv, true>): ClientProxy => {
-        const { host, port } = resolveServiceTcpEndpoint(
-          config,
-          ServiceName.SEMANTIC_CACHE_SERVICE,
-          {
-            hostKey: 'SEMANTIC_CACHE_SERVICE_HOST',
-            portKey: 'SEMANTIC_CACHE_SERVICE_PORT',
-            urlKey: 'SEMANTIC_CACHE_SERVICE_URL',
-          },
-        );
-        return ClientProxyFactory.create({
-          transport: Transport.TCP,
-          options: { host, port },
-        });
-      },
-    },
+    createTcpClientProvider(LLM_SERVICE_CLIENT, ServiceName.LLM_SERVICE),
+    createTcpClientProvider(KNOWLEDGE_BASE_SERVICE_CLIENT, ServiceName.KNOWLEDGE_BASE_SERVICE),
+    createTcpClientProvider(SEMANTIC_CACHE_SERVICE_CLIENT, ServiceName.SEMANTIC_CACHE_SERVICE),
     InternalIdentityAuth,
     DialogPolicy,
     DialogsRepository,

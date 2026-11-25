@@ -1,14 +1,9 @@
-import type { AddressInfo, Server } from 'node:net';
 import type { INestMicroservice } from '@nestjs/common';
 import { FakeModel, overrideModels } from '@nestjs/ai/testing';
-import {
-  ClientProxy,
-  ClientProxyFactory,
-  type MicroserviceOptions,
-  Transport,
-} from '@nestjs/microservices';
+import type { ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { extractRpcErrorPayload } from '@semcache/shared-config';
+import { createTcpMicroserviceTestClient } from '@semcache/shared-config/testing';
 import type { LlmChatStreamEventDto } from '@semcache/shared-dtos';
 import { ChatMessageRole, SERVICE_TCP_PATTERNS, ServiceName } from '@semcache/shared-types';
 import { firstValueFrom, toArray } from 'rxjs';
@@ -36,18 +31,7 @@ describe('LLM Service (TCP e2e)', () => {
       },
     ).compile();
 
-    app = moduleFixture.createNestMicroservice<MicroserviceOptions>({
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: 0 },
-    });
-    await app.listen();
-
-    const address = app.unwrap<Server>().address() as AddressInfo;
-    client = ClientProxyFactory.create({
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: address.port },
-    });
-    await client.connect();
+    ({ app, client } = await createTcpMicroserviceTestClient(moduleFixture));
   });
 
   afterEach(async () => {
