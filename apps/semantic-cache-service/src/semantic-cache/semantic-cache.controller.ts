@@ -57,6 +57,12 @@ export class SemanticCacheController {
   }
 
   @Can(SemanticCachePolicy, 'invalidate')
+  @MessagePattern(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED)
+  async invalidateUnlinked(): Promise<CacheInvalidationResponseDto> {
+    return this.semanticCacheService.invalidateUnlinked();
+  }
+
+  @Can(SemanticCachePolicy, 'invalidate')
   @MessagePattern(SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL)
   async clearAll(): Promise<CacheInvalidationResponseDto> {
     return this.semanticCacheService.clearAll();

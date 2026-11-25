@@ -147,4 +147,37 @@ describe('SemanticCacheService', () => {
       scope: 'all',
     });
   });
+
+  it('invalidates only unlinked cache entries while preserving KB-linked entries', async () => {
+    const { service, entries } = createServiceHarness();
+    const docId = '11111111-1111-4111-8111-111111111111';
+
+    const linked = await service.store({
+      query: 'Linked billing question',
+      response: 'Linked billing answer',
+      embedding: makeUnitVector(1),
+      category: QueryCategory.BILLING,
+      knowledgeSourceIds: [docId],
+    });
+    await service.store({
+      query: 'Unlinked general question',
+      response: 'Unlinked general answer',
+      embedding: makeUnitVector(2),
+      category: QueryCategory.GENERAL,
+    });
+    await service.store({
+      query: 'Unlinked tech question',
+      response: 'Unlinked tech answer',
+      embedding: makeUnitVector(3),
+      category: QueryCategory.TECHNICAL_SUPPORT,
+    });
+
+    const result = await service.invalidateUnlinked();
+    expect(result).toEqual({
+      invalidatedCount: 2,
+      scope: 'unlinked',
+    });
+    expect(entries.size).toBe(1);
+    expect(entries.has(linked.id)).toBe(true);
+  });
 });

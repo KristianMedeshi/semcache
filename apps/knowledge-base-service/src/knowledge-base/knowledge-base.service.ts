@@ -66,6 +66,7 @@ export class KnowledgeBaseService {
   async uploadDocument(
     dto: UploadKnowledgeDocumentRequestDto,
     uploadedBy?: string,
+    headers?: Record<string, string>,
   ): Promise<KnowledgeDocumentDetailResponseDto> {
     const resolvedFormat = this.processor.resolveFormat(dto.format, dto.fileName);
     const chunking = this.resolveChunkingOptions(dto.chunkSize, dto.chunkOverlap);
@@ -81,7 +82,11 @@ export class KnowledgeBaseService {
       status: KnowledgeDocumentStatus.PENDING,
     });
 
-    return this.processAndStoreDocument(created, chunking);
+    const result = await this.processAndStoreDocument(created, chunking);
+    if (result.status === KnowledgeDocumentStatus.READY) {
+      await this.invalidateUnlinkedCacheEntries(headers);
+    }
+    return result;
   }
 
   async reprocessDocument(
@@ -116,6 +121,9 @@ export class KnowledgeBaseService {
 
     const result = await this.processAndStoreDocument(existing, chunking);
     await this.invalidateLinkedCacheEntries(documentId, headers);
+    if (result.status === KnowledgeDocumentStatus.READY) {
+      await this.invalidateUnlinkedCacheEntries(headers);
+    }
     return result;
   }
 
@@ -318,9 +326,10 @@ export class KnowledgeBaseService {
     return allEmbeddings;
   }
 
-  private async invalidateLinkedCacheEntries(
-    documentId: string,
-    headers?: Record<string, string>,
+  private async sendCacheInvalidation<TBody = undefined>(
+    pattern: string,
+    payload: SemanticCacheTcpRequestDto<TBody>,
+    logContext: Record<string, unknown>,
   ): Promise<void> {
     if (!this.semanticCacheClient) {
       return;
@@ -329,23 +338,41 @@ export class KnowledgeBaseService {
     try {
       await firstValueFrom(
         this.semanticCacheClient
-          .send<
-            CacheInvalidationResponseDto,
-            SemanticCacheTcpRequestDto<InvalidateCacheBySourcesRequestDto>
-          >(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES, {
-            ...(headers ? { headers } : {}),
-            body: { documentIds: [documentId] },
-          })
+          .send<CacheInvalidationResponseDto, SemanticCacheTcpRequestDto<TBody>>(pattern, payload)
           .pipe(timeout(CACHE_INVALIDATION_TIMEOUT_MS)),
       );
     } catch (error) {
       this.logger.warn(
         JSON.stringify({
           event: 'kb.semantic_cache.invalidation_failed',
-          documentId,
+          ...logContext,
           error: error instanceof Error ? error.message : 'Unknown cache TCP error',
         }),
       );
     }
+  }
+
+  private async invalidateLinkedCacheEntries(
+    documentId: string,
+    headers?: Record<string, string>,
+  ): Promise<void> {
+    await this.sendCacheInvalidation<InvalidateCacheBySourcesRequestDto>(
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES,
+      {
+        ...(headers ? { headers } : {}),
+        body: { documentIds: [documentId] },
+      },
+      { scope: 'sources', documentId },
+    );
+  }
+
+  private async invalidateUnlinkedCacheEntries(headers?: Record<string, string>): Promise<void> {
+    await this.sendCacheInvalidation(
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED,
+      {
+        ...(headers ? { headers } : {}),
+      },
+      { scope: 'unlinked' },
+    );
   }
 }

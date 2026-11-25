@@ -7,7 +7,7 @@ import type {
   SemanticCacheSettingsResponseDto,
 } from '@semcache/shared-dtos';
 import { CacheMode, QueryCategory } from '@semcache/shared-types';
-import { asc, cosineDistance, eq, inArray, sql } from 'drizzle-orm';
+import { asc, cosineDistance, eq, inArray, notExists, sql } from 'drizzle-orm';
 import { SEMANTIC_CACHE_DRIZZLE, type SemanticCacheDatabase } from '../db/database.module';
 import {
   type SemanticCacheEntryRecord,
@@ -277,6 +277,22 @@ export class SemanticCacheRepository {
     const deleted = await this.db
       .delete(semanticCacheEntries)
       .where(eq(semanticCacheEntries.category, category))
+      .returning({ id: semanticCacheEntries.id });
+
+    return deleted.length;
+  }
+
+  async invalidateUnlinked(): Promise<number> {
+    const deleted = await this.db
+      .delete(semanticCacheEntries)
+      .where(
+        notExists(
+          this.db
+            .select({ one: sql`1` })
+            .from(semanticCacheEntrySources)
+            .where(eq(semanticCacheEntrySources.entryId, semanticCacheEntries.id)),
+        ),
+      )
       .returning({ id: semanticCacheEntries.id });
 
     return deleted.length;

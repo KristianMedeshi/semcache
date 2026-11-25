@@ -8,7 +8,7 @@ import {
 import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
 import type { KnowledgeBaseTcpRequestDto } from '@semcache/shared-dtos';
-import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
+import { KnowledgeDocumentStatus, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { AuthProxyService } from '../auth/auth-proxy.service';
 import { BaseTcpProxyService } from '../common/base-tcp-proxy.service';
@@ -51,12 +51,23 @@ export class KnowledgeBaseProxyService extends BaseTcpProxyService {
       'Knowledge Base service unavailable',
     );
 
-    if (
-      this.metricsService &&
-      (pattern === SERVICE_TCP_PATTERNS.KB_DOCUMENTS_REPROCESS ||
-        pattern === SERVICE_TCP_PATTERNS.KB_DOCUMENTS_DELETE)
-    ) {
-      this.metricsService.recordKbInvalidation('sources');
+    if (this.metricsService) {
+      const isReadyDocument =
+        typeof result === 'object' &&
+        result !== null &&
+        'status' in result &&
+        (result as { status?: unknown }).status === KnowledgeDocumentStatus.READY;
+
+      if (pattern === SERVICE_TCP_PATTERNS.KB_DOCUMENTS_UPLOAD && isReadyDocument) {
+        this.metricsService.recordKbInvalidation('unlinked');
+      } else if (pattern === SERVICE_TCP_PATTERNS.KB_DOCUMENTS_REPROCESS) {
+        this.metricsService.recordKbInvalidation('sources');
+        if (isReadyDocument) {
+          this.metricsService.recordKbInvalidation('unlinked');
+        }
+      } else if (pattern === SERVICE_TCP_PATTERNS.KB_DOCUMENTS_DELETE) {
+        this.metricsService.recordKbInvalidation('sources');
+      }
     }
 
     res.status(options?.statusCode ?? HttpStatus.OK).json(result);

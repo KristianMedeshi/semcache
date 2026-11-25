@@ -118,6 +118,15 @@ export class SemanticCacheService {
     };
   }
 
+  async invalidateUnlinked(): Promise<CacheInvalidationResponseDto> {
+    const invalidatedCount = await this.repository.invalidateUnlinked();
+
+    return {
+      invalidatedCount,
+      scope: 'unlinked',
+    };
+  }
+
   async clearAll(): Promise<CacheInvalidationResponseDto> {
     const invalidatedCount = await this.repository.clearAll();
 

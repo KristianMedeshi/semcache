@@ -177,26 +177,70 @@ describe('KnowledgeBaseService', () => {
     await expect(service.retrieveContext({ query: '   ' })).rejects.toThrow(BadRequestException);
   });
 
-  it('notifies semantic-cache-service on reprocess and delete, and tolerates cache errors', async () => {
+  it('notifies semantic-cache-service on upload, reprocess, and delete, and tolerates cache errors', async () => {
     const cacheSendMock = jest
       .fn()
+      .mockReturnValueOnce(of({ invalidatedCount: 2, scope: 'unlinked' }))
       .mockReturnValueOnce(of({ invalidatedCount: 1, scope: 'sources' }))
+      .mockReturnValueOnce(of({ invalidatedCount: 0, scope: 'unlinked' }))
       .mockReturnValueOnce(throwError(() => new Error('Cache TCP unavailable')));
 
     const { service } = createKnowledgeBaseHarness({ cacheSendImpl: cacheSendMock });
-    const doc = await service.uploadDocument({
-      title: 'Roaming Guide',
-      content: '25 GB EU roaming included.',
+    const adminHeaders = { 'x-internal-user-id': 'admin-1' };
+
+    const doc = await service.uploadDocument(
+      {
+        title: 'Roaming Guide',
+        content: '25 GB EU roaming included.',
+      },
+      'admin-1',
+      adminHeaders,
+    );
+    expect(cacheSendMock).toHaveBeenNthCalledWith(1, SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED, {
+      headers: adminHeaders,
     });
 
-    await service.reprocessDocument(doc.id, undefined, { 'x-internal-user-id': 'admin-1' });
-    expect(cacheSendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES, {
-      headers: { 'x-internal-user-id': 'admin-1' },
-      body: { documentIds: [doc.id] },
+    await service.reprocessDocument(doc.id, undefined, adminHeaders);
+    expect(cacheSendMock).toHaveBeenNthCalledWith(
+      2,
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES,
+      {
+        headers: adminHeaders,
+        body: { documentIds: [doc.id] },
+      },
+    );
+    expect(cacheSendMock).toHaveBeenNthCalledWith(3, SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED, {
+      headers: adminHeaders,
     });
 
-    const deleted = await service.deleteDocument(doc.id);
+    const deleted = await service.deleteDocument(doc.id, adminHeaders);
     expect(deleted.deleted).toBe(true);
-    expect(cacheSendMock).toHaveBeenCalledTimes(2);
+    expect(cacheSendMock).toHaveBeenNthCalledWith(
+      4,
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES,
+      {
+        headers: adminHeaders,
+        body: { documentIds: [doc.id] },
+      },
+    );
+    expect(cacheSendMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('skips unlinked cache invalidation when upload processing fails', async () => {
+    const llmSendMock = jest.fn().mockReturnValueOnce(throwError(() => new Error('LLM offline')));
+    const cacheSendMock = jest.fn();
+
+    const { service } = createKnowledgeBaseHarness({
+      llmSendImpl: llmSendMock,
+      cacheSendImpl: cacheSendMock,
+    });
+
+    const doc = await service.uploadDocument({
+      title: 'Broken Doc',
+      content: 'Content that fails embedding.',
+    });
+
+    expect(doc.status).toBe(KnowledgeDocumentStatus.FAILED);
+    expect(cacheSendMock).not.toHaveBeenCalled();
   });
 });

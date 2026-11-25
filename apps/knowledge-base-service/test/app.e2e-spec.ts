@@ -27,10 +27,11 @@ import {
   ServiceName,
   UserRole,
 } from '@semcache/shared-types';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 import { AppModule } from '../src/app.module';
 import { KB_PG_POOL } from '../src/db/database.module';
 import { KnowledgeBaseRepository } from '../src/knowledge-base/knowledge-base.repository';
+import { SEMANTIC_CACHE_SERVICE_CLIENT } from '../src/knowledge-base/knowledge-base.service';
 import {
   InMemoryKnowledgeBaseRepository,
   embedTextDeterministic,
@@ -59,6 +60,7 @@ describe('Knowledge Base Service (TCP e2e)', () => {
   let app: INestMicroservice;
   let client: ClientProxy;
   let mockLlmApp: INestMicroservice;
+  let cacheSendMock: jest.Mock;
   const originalEnv = { ...process.env };
   const secret = 'test-internal-service-secret-32-chars';
 
@@ -76,6 +78,8 @@ describe('Knowledge Base Service (TCP e2e)', () => {
     process.env.LLM_SERVICE_HOST = '127.0.0.1';
     process.env.LLM_SERVICE_PORT = String(llmAddress.port);
 
+    cacheSendMock = jest.fn(() => of({ invalidatedCount: 0, scope: 'unlinked' }));
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -83,6 +87,8 @@ describe('Knowledge Base Service (TCP e2e)', () => {
       .useClass(InMemoryKnowledgeBaseRepository)
       .overrideProvider(KB_PG_POOL)
       .useValue({ end: jest.fn().mockResolvedValue(undefined) })
+      .overrideProvider(SEMANTIC_CACHE_SERVICE_CLIENT)
+      .useValue({ send: cacheSendMock, close: jest.fn().mockResolvedValue(undefined) })
       .compile();
 
     ({ app, client } = await createTcpMicroserviceTestClient(moduleFixture));
@@ -149,6 +155,9 @@ describe('Knowledge Base Service (TCP e2e)', () => {
 
     expect(uploaded.status).toBe(KnowledgeDocumentStatus.READY);
     expect(uploaded.chunkCount).toBe(1);
+    expect(cacheSendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED, {
+      headers: adminHeaders,
+    });
 
     const searchResult = await firstValueFrom(
       client.send<RetrieveKnowledgeContextResponseDto>(SERVICE_TCP_PATTERNS.KB_CONTEXT_RETRIEVE, {
@@ -173,6 +182,10 @@ describe('Knowledge Base Service (TCP e2e)', () => {
       id: uploaded.id,
       deleted: true,
       deletedChunksCount: 1,
+    });
+    expect(cacheSendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES, {
+      headers: adminHeaders,
+      body: { documentIds: [uploaded.id] },
     });
   });
 });

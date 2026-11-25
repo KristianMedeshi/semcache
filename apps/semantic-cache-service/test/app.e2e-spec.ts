@@ -96,6 +96,18 @@ describe('Semantic Cache Service (TCP e2e)', () => {
       customerErr = error;
     }
     expect(extractRpcErrorPayload(customerErr)?.statusCode).toBe(403);
+
+    let customerUnlinkedErr: unknown;
+    try {
+      await firstValueFrom(
+        client.send(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED, {
+          headers: createHeaders(UserRole.CUSTOMER),
+        }),
+      );
+    } catch (error) {
+      customerUnlinkedErr = error;
+    }
+    expect(extractRpcErrorPayload(customerUnlinkedErr)?.statusCode).toBe(403);
   });
 
   it('stores entries, switches modes with overrides, reports stats, and invalidates by source, category, and all', async () => {
@@ -180,6 +192,16 @@ describe('Semantic Cache Service (TCP e2e)', () => {
     expect(stats.totalEntries).toBe(2);
     expect(stats.totalHits).toBe(2);
 
+    const invUnlinked = await firstValueFrom(
+      client.send<CacheInvalidationResponseDto>(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED, {
+        headers: adminHeaders,
+      }),
+    );
+    expect(invUnlinked).toEqual({
+      invalidatedCount: 1,
+      scope: 'unlinked',
+    });
+
     const invSources = await firstValueFrom(
       client.send<CacheInvalidationResponseDto>(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES, {
         headers: adminHeaders,
@@ -194,7 +216,7 @@ describe('Semantic Cache Service (TCP e2e)', () => {
         body: { category: QueryCategory.TECHNICAL_SUPPORT },
       }),
     );
-    expect(invCategory.invalidatedCount).toBe(1);
+    expect(invCategory.invalidatedCount).toBe(0);
 
     const cleared = await firstValueFrom(
       client.send<CacheInvalidationResponseDto>(SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL, {

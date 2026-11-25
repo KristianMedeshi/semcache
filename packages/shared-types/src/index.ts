@@ -176,6 +176,7 @@ export const SERVICE_TCP_PATTERNS = {
   CACHE_STORE: 'cache.store',
   CACHE_INVALIDATE_BY_SOURCES: 'cache.invalidate.bySources',
   CACHE_INVALIDATE_BY_CATEGORY: 'cache.invalidate.byCategory',
+  CACHE_INVALIDATE_UNLINKED: 'cache.invalidate.unlinked',
   CACHE_CLEAR_ALL: 'cache.clear.all',
   CACHE_SETTINGS_GET: 'cache.settings.get',
   CACHE_SETTINGS_UPDATE: 'cache.settings.update',

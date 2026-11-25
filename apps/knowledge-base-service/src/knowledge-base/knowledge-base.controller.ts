@@ -27,8 +27,9 @@ export class KnowledgeBaseController {
   async uploadDocument(
     @CurrentUser() user: AuthenticatedUser,
     @Payload('body') dto: UploadKnowledgeDocumentDto,
+    @Payload('headers') headers?: Record<string, string>,
   ): Promise<KnowledgeDocumentDetailResponseDto> {
-    return this.knowledgeBaseService.uploadDocument(dto, user.id);
+    return this.knowledgeBaseService.uploadDocument(dto, user.id, headers);
   }
 
   @Can(KnowledgeBasePolicy, 'readDocument')

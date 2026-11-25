@@ -165,7 +165,7 @@ export interface InvalidateCacheByCategoryRequestDto {
   category: QueryCategory;
 }
 
-export type CacheInvalidationScope = 'sources' | 'category' | 'all';
+export type CacheInvalidationScope = 'sources' | 'category' | 'unlinked' | 'all';
 
 /**
  * DTO returned after invalidating or clearing semantic cache entries.

@@ -139,6 +139,19 @@ export class InMemorySemanticCacheRepository {
     return count;
   }
 
+  async invalidateUnlinked(): Promise<number> {
+    let count = 0;
+    for (const entryId of [...this.entries.keys()]) {
+      const sources = this.sourcesByEntry.get(entryId) ?? [];
+      if (sources.length === 0) {
+        this.entries.delete(entryId);
+        this.sourcesByEntry.delete(entryId);
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   async clearAll(): Promise<number> {
     const count = this.entries.size;
     this.entries.clear();
