@@ -2,7 +2,8 @@
   "version": 1,
   "agents": [
     "codex",
-    "antigravity"
+    "antigravity",
+    "gemini-cli"
   ],
   "skills": {
     "nestjs-best-practices": {
@@ -198,8 +199,40 @@
       "sourceSkillPath": "skills/dry-refactoring/SKILL.md",
       "sourceBranch": "master",
       "sourceCommitSha": "a5ac161f1574565f4c632af6ff3acc089f152466"
+    },
+    "codebase-refactoring": {
+      "version": "1.0.0",
+      "sha": "5eab466b683f1710f3dcb0aedb59acb399c5d1a8fc04c4082609c3715466fe45",
+      "tier": "VERIFIED",
+      "installedAt": "2026-11-25T09:15:19.381Z",
+      "source": "github:kucherenko/jscpd",
+      "scope": "project",
+      "files": [
+        "SKILL.md"
+      ],
+      "sourceType": "github",
+      "sourceRepoUrl": "https://github.com/kucherenko/jscpd",
+      "sourceSkillPath": "skills/codebase-refactoring/SKILL.md",
+      "sourceBranch": "master",
+      "sourceCommitSha": "28d2236026990badcabbd3ae3f73171b78cf77b1"
+    },
+    "jscpd": {
+      "version": "1.0.0",
+      "sha": "f52d35538532f45e5b8aac5271ba27e88753eb3e2188ba987ab8ca86b0c10562",
+      "tier": "UNSCANNED",
+      "installedAt": "2026-11-25T09:16:29.092Z",
+      "source": "github:kucherenko/jscpd",
+      "scope": "project",
+      "files": [
+        "SKILL.md"
+      ],
+      "sourceType": "github",
+      "sourceRepoUrl": "https://github.com/kucherenko/jscpd",
+      "sourceSkillPath": "skills/jscpd/SKILL.md",
+      "sourceBranch": "master",
+      "sourceCommitSha": "28d2236026990badcabbd3ae3f73171b78cf77b1"
     }
   },
   "createdAt": "2026-11-18T10:12:44.125Z",
-  "updatedAt": "2026-11-21T14:32:21.418Z"
+  "updatedAt": "2026-11-25T09:16:29.092Z"
 }
