@@ -13,15 +13,17 @@ import {
   IsEnum,
   IsInt,
   IsNumber,
-  IsOptional,
   IsString,
   Matches,
   Max,
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
+
+const isDefined = (_: unknown, value: unknown): boolean => value !== undefined;
 
 export class ChatMessageItemDto implements LlmChatMessageDto {
   @IsEnum(ChatMessageRole)
@@ -40,19 +42,19 @@ export class ChatCompletionRequestDto implements LlmChatCompletionRequestDto {
   @Type(() => ChatMessageItemDto)
   messages!: ChatMessageItemDto[];
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsString()
   @MaxLength(DIALOG_VALIDATION_LIMITS.MODEL_MAX_LENGTH)
   @Matches(ALLOWED_LLM_MODEL_REGEX, { message: ALLOWED_LLM_MODEL_MESSAGE })
   model?: string;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsNumber()
   @Min(0)
   @Max(2)
   temperature?: number;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsInt()
   @Min(1)
   @Max(4096)

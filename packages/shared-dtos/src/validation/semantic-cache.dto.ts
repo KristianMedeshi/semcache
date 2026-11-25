@@ -18,8 +18,7 @@ import {
   SEMANTIC_CACHE_VALIDATION_LIMITS,
   type UpdateSemanticCacheSettingsRequestDto,
 } from '../index';
-
-const isDefined = (_: unknown, value: unknown): boolean => value !== undefined;
+import { isDefined } from './dialogs.dto';
 
 export class SemanticCacheCategoryWeightsInputDto {
   @ValidateIf(isDefined)

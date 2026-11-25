@@ -6,10 +6,10 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class GenerateEmbeddingsRequestDto implements LlmGenerateEmbeddingsRequestDto {
@@ -20,7 +20,7 @@ export class GenerateEmbeddingsRequestDto implements LlmGenerateEmbeddingsReques
   @MinLength(1, { each: true })
   texts!: string[];
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @MaxLength(120)
   model?: string;

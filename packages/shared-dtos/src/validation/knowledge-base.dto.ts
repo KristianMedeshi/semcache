@@ -10,12 +10,12 @@ import {
   IsInt,
   IsNumber,
   IsObject,
-  IsOptional,
   IsString,
   Max,
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import {
   KNOWLEDGE_BASE_VALIDATION_LIMITS,
@@ -24,20 +24,20 @@ import {
   type RetrieveKnowledgeContextRequestDto,
   type UploadKnowledgeDocumentRequestDto,
 } from '../index';
-import { trimString } from './dialogs.dto';
+import { isDefined, trimString } from './dialogs.dto';
 
 export class BaseChunkingDto {
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsObject()
   metadata?: Record<string, string | number | boolean>;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsInt()
   @Min(KNOWLEDGE_BASE_VALIDATION_LIMITS.MIN_CHUNK_SIZE)
   @Max(KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_CHUNK_SIZE)
   chunkSize?: number;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsInt()
   @Min(0)
   @Max(KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_CHUNK_OVERLAP)
@@ -59,27 +59,27 @@ export class UploadKnowledgeDocumentDto
   @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.CONTENT_MAX_LENGTH)
   content!: string;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @Transform(trimString)
   @IsString()
   @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.FILENAME_MAX_LENGTH)
   fileName?: string;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsEnum(KnowledgeDocumentFormat)
   format?: KnowledgeDocumentFormat;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsEnum(QueryCategory)
   category?: QueryCategory;
 }
 
 export class ListKnowledgeDocumentsDto implements ListKnowledgeDocumentsQueryDto {
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsEnum(QueryCategory)
   category?: QueryCategory;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsEnum(KnowledgeDocumentStatus)
   status?: KnowledgeDocumentStatus;
 }
@@ -91,19 +91,19 @@ export class RetrieveKnowledgeContextDto implements RetrieveKnowledgeContextRequ
   @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.QUERY_MAX_LENGTH)
   query!: string;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsInt()
   @Min(KNOWLEDGE_BASE_VALIDATION_LIMITS.MIN_TOP_K)
   @Max(KNOWLEDGE_BASE_VALIDATION_LIMITS.MAX_TOP_K)
   topK?: number;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsNumber()
   @Min(0)
   @Max(1)
   minSimilarity?: number;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsEnum(QueryCategory)
   category?: QueryCategory;
 }
@@ -112,20 +112,20 @@ export class ReprocessKnowledgeDocumentDto
   extends BaseChunkingDto
   implements ReprocessKnowledgeDocumentRequestDto
 {
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsString()
   @MinLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.CONTENT_MIN_LENGTH)
   @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.CONTENT_MAX_LENGTH)
   content?: string;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @Transform(trimString)
   @IsString()
   @MinLength(1)
   @MaxLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.TITLE_MAX_LENGTH)
   title?: string;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsBoolean()
   includeChunks?: boolean;
 }

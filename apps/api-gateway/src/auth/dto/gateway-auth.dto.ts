@@ -7,7 +7,9 @@ import {
   type UpdateUserProfileRequestDto,
 } from '@semcache/shared-dtos';
 import { Transform } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+
+const isDefined = (_: unknown, value: unknown): boolean => value !== undefined;
 
 const normalizeGatewayEmail = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim().normalize('NFC').toLowerCase() : value;
@@ -35,13 +37,13 @@ export class GatewayLoginDto extends GatewayEmailBodyDto implements LoginRequest
 }
 
 export class GatewayUpdateProfileDto implements UpdateUserProfileRequestDto {
-  @IsOptional()
+  @ValidateIf(isDefined)
   @Transform(normalizeGatewayEmail)
   @IsEmail()
   @MaxLength(AUTH_VALIDATION_LIMITS.EMAIL_MAX_LENGTH)
   email?: string;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsString()
   @MinLength(AUTH_VALIDATION_LIMITS.PASSWORD_MIN_LENGTH)
   @MaxLength(AUTH_VALIDATION_LIMITS.PASSWORD_MAX_LENGTH)

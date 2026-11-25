@@ -11,6 +11,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import {
   ALLOWED_LLM_MODEL_MESSAGE,
@@ -24,6 +25,8 @@ import {
 
 export const trimString = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim() : value;
+
+export const isDefined = (_: unknown, value: unknown): boolean => value !== undefined;
 
 const CATEGORY_ALIASES: Record<string, QueryCategory> = {
   roaming: QueryCategory.PRODUCT_INQUIRY,
@@ -50,7 +53,7 @@ export const normalizeCacheMode = ({ value }: { value: unknown }): unknown => {
 };
 
 export class CreateDialogDto implements CreateDialogRequestDto {
-  @IsOptional()
+  @ValidateIf(isDefined)
   @Transform(trimString)
   @IsString()
   @MinLength(1)
@@ -73,7 +76,7 @@ export class EditMessageDto implements EditMessageRequestDto {
   @MaxLength(DIALOG_VALIDATION_LIMITS.MESSAGE_MAX_LENGTH)
   content!: string;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @Transform(trimString)
   @IsString()
   @MaxLength(DIALOG_VALIDATION_LIMITS.MODEL_MAX_LENGTH)
@@ -86,17 +89,17 @@ export class SendMessageDto extends EditMessageDto implements SendMessageRequest
   @IsUUID()
   parentMessageId?: string | null;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @Transform(normalizeCategory)
   @IsEnum(QueryCategory)
   category?: QueryCategory;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @Transform(normalizeCacheMode)
   @IsEnum(CacheMode)
   cacheMode?: CacheMode;
 
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsNumber({ allowNaN: false, allowInfinity: false })
   @Min(0)
   @Max(1)

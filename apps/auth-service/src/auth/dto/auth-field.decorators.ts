@@ -5,8 +5,10 @@ import {
   PASSWORD_COMPLEXITY_REGEX,
 } from '@semcache/shared-dtos';
 import { Transform } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { normalizeEmail } from '../../users/users.repository';
+
+const isDefined = (_: unknown, value: unknown): boolean => value !== undefined;
 
 /**
  * Normalizes and validates an email field on auth-service request DTOs.
@@ -20,7 +22,7 @@ export function IsNormalizedEmail(options?: { optional?: boolean }): PropertyDec
     MaxLength(AUTH_VALIDATION_LIMITS.EMAIL_MAX_LENGTH),
   ];
   if (options?.optional) {
-    decorators.unshift(IsOptional());
+    decorators.unshift(ValidateIf(isDefined));
   }
   return applyDecorators(...decorators);
 }
@@ -36,7 +38,7 @@ export function IsStrongPassword(options?: { optional?: boolean }): PropertyDeco
     Matches(PASSWORD_COMPLEXITY_REGEX, { message: PASSWORD_COMPLEXITY_MESSAGE }),
   ];
   if (options?.optional) {
-    decorators.unshift(IsOptional());
+    decorators.unshift(ValidateIf(isDefined));
   }
   return applyDecorators(...decorators);
 }

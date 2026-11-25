@@ -464,6 +464,32 @@ describe('API Gateway (e2e)', () => {
     expect(capturedDialogRequests[0]?.payload.headers['x-internal-auth-signature']).toBeDefined();
   });
 
+  it('rejects null on non-nullable optional fields while allowing explicit null on parentMessageId', async () => {
+    await request(app.getHttpServer())
+      .post('/dialogs/11111111-1111-4111-8111-111111111111/messages/stream')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .send({ content: 'Hello', model: null })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .patch('/admin/semantic-cache/settings')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .send({ fixedThreshold: null })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .patch('/admin/semantic-cache/settings')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .send({})
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/dialogs/11111111-1111-4111-8111-111111111111/messages/stream')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .send({ content: 'Hello', parentMessageId: null })
+      .expect(200);
+  });
+
   it('rejects non-free model selection at gateway ValidationPipe', () => {
     return request(app.getHttpServer())
       .post('/dialogs/11111111-1111-4111-8111-111111111111/messages')
