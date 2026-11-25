@@ -10,11 +10,6 @@ import { AppService } from './app.service';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  @MessagePattern(SERVICE_TCP_PATTERNS.APP_HELLO)
-  getHello(): string {
-    return this.appService.getHello();
-  }
-
   @MessagePattern(SERVICE_TCP_PATTERNS.APP_HEALTH)
   getHealth(): HealthCheckResponseDto {
     return this.appService.getHealth();

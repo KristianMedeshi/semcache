@@ -246,12 +246,7 @@ describe('AuthService Authentication & Authorization (TCP e2e)', () => {
     await app.close();
   });
 
-  describe('public health & root patterns', () => {
-    it('app.hello returns Hello World!', async () => {
-      const res = await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.APP_HELLO, {}));
-      expect(res).toBe('Hello World!');
-    });
-
+  describe('public health pattern', () => {
     it('app.health returns ServiceName.AUTH_SERVICE health status', async () => {
       const res = await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.APP_HEALTH, {}));
       expect(res).toEqual({

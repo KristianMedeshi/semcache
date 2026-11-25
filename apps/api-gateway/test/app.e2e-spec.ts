@@ -390,10 +390,6 @@ describe('API Gateway (e2e)', () => {
     process.env = { ...originalEnv };
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/').expect(200).expect('Hello World!');
-  });
-
   it('/health (GET)', () => {
     return request(app.getHttpServer())
       .get('/health')

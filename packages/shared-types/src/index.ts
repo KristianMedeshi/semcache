@@ -143,7 +143,6 @@ export interface HealthCheckStatus {
  * over NestJS `Transport.TCP`.
  */
 export const SERVICE_TCP_PATTERNS = {
-  APP_HELLO: 'app.hello',
   APP_HEALTH: 'app.health',
   AUTH_REGISTER: 'auth.register',
   AUTH_LOGIN: 'auth.login',

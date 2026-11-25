@@ -64,10 +64,7 @@ describe('Semantic Cache Service (TCP e2e)', () => {
     return createE2eSignedHeaders(role, 'sess-cache-e2e', secret);
   }
 
-  it('app.hello and app.health return expected payloads', async () => {
-    const hello = await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.APP_HELLO, {}));
-    expect(hello).toBe('Hello World!');
-
+  it('app.health returns expected payload', async () => {
     const health = await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.APP_HEALTH, {}));
     expect(health).toEqual({
       service: ServiceName.SEMANTIC_CACHE_SERVICE,

@@ -102,12 +102,11 @@ export function createE2eSignedHeaders(
 }
 
 export interface HealthControllerLike {
-  getHello(): string;
   getHealth(): { service: string; status: string; timestamp: string };
 }
 
 /**
- * Shared Jest suite verifying a microservice's `AppController` hello & health endpoints.
+ * Shared Jest suite verifying a microservice's `AppController` health endpoint.
  */
 export function describeServiceHealthController<TController extends HealthControllerLike>(
   controllerClass: Type<TController>,
@@ -124,12 +123,6 @@ export function describeServiceHealthController<TController extends HealthContro
       }).compile();
 
       appController = app.get<TController>(controllerClass);
-    });
-
-    describe('root', () => {
-      it('should return "Hello World!"', () => {
-        expect(appController.getHello()).toBe('Hello World!');
-      });
     });
 
     describe('health', () => {
