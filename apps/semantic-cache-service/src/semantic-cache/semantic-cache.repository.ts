@@ -21,6 +21,16 @@ import type { NearestCacheCandidate } from './threshold-calculator.service';
 
 export const DEFAULT_SETTINGS_ID = 'default';
 
+export interface CreateCacheEntryInput {
+  query: string;
+  response: string;
+  embedding: number[];
+  category: QueryCategory;
+  model?: string;
+  metadata?: Record<string, string | number | boolean>;
+  sources: CacheKnowledgeSourceReferenceDto[];
+}
+
 export interface DefaultSettingsSeed {
   mode: CacheMode;
   fixedThreshold: number;
@@ -195,15 +205,9 @@ export class SemanticCacheRepository {
     }));
   }
 
-  async createEntry(input: {
-    query: string;
-    response: string;
-    embedding: number[];
-    category: QueryCategory;
-    model?: string;
-    metadata?: Record<string, string | number | boolean>;
-    sources: CacheKnowledgeSourceReferenceDto[];
-  }): Promise<{ entry: SemanticCacheEntryRecord; sources: CacheKnowledgeSourceReferenceDto[] }> {
+  async createEntry(
+    input: CreateCacheEntryInput,
+  ): Promise<{ entry: SemanticCacheEntryRecord; sources: CacheKnowledgeSourceReferenceDto[] }> {
     return this.db.transaction(async (tx) => {
       const insertedRows = await tx
         .insert(semanticCacheEntries)

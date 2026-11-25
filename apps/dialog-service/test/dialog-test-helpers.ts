@@ -3,11 +3,31 @@ import type { DialogMessageResponseDto, DialogResponseDto } from '@semcache/shar
 import { ChatMessageRole } from '@semcache/shared-types';
 import { of } from 'rxjs';
 import { DialogGraphService } from '../src/dialogs/dialog-graph.service';
-import type { DialogsRepository } from '../src/dialogs/dialogs.repository';
+import type {
+  DialogsRepository,
+  InsertDialogMessageInput,
+} from '../src/dialogs/dialogs.repository';
 import { DialogsService } from '../src/dialogs/dialogs.service';
 
 export const TEST_USER_ID = '11111111-1111-4111-8111-111111111111';
 export const TEST_DIALOG_ID = '22222222-2222-4222-8222-222222222222';
+
+export function createMockDialogMessage(
+  id: string,
+  input: InsertDialogMessageInput,
+): DialogMessageResponseDto {
+  return {
+    id,
+    dialogId: input.dialogId,
+    parentMessageId: input.parentMessageId ?? null,
+    role: input.role,
+    content: input.content,
+    model: input.model ?? null,
+    latencyMs: input.latencyMs ?? null,
+    usage: input.usage ?? null,
+    createdAt: '2026-01-01T00:00:01.000Z',
+  };
+}
 
 export function createInMemoryDialogHarness(options?: {
   initialMessages?: DialogMessageResponseDto[];
@@ -32,17 +52,7 @@ export function createInMemoryDialogHarness(options?: {
       async (_dId, mId) => storedMessages.find((m) => m.id === mId) ?? null,
     ),
     insertMessage: jest.fn(async (input) => {
-      const msg: DialogMessageResponseDto = {
-        id: `msg-${storedMessages.length + 1}`,
-        dialogId: input.dialogId,
-        parentMessageId: input.parentMessageId ?? null,
-        role: input.role,
-        content: input.content,
-        model: input.model ?? null,
-        latencyMs: input.latencyMs ?? null,
-        usage: input.usage ?? null,
-        createdAt: '2026-01-01T00:00:01.000Z',
-      };
+      const msg = createMockDialogMessage(`msg-${storedMessages.length + 1}`, input);
       storedMessages.push(msg);
       return msg;
     }),

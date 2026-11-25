@@ -54,6 +54,15 @@ export function toKnowledgeChunkResponseDto(
   };
 }
 
+export interface ReplaceDocumentChunkInput {
+  chunkIndex: number;
+  content: string;
+  tokenCount: number;
+  characterCount: number;
+  embedding: number[];
+  metadata: Record<string, string | number | boolean>;
+}
+
 @Injectable()
 export class KnowledgeBaseRepository {
   constructor(@Inject(KB_DRIZZLE) private readonly db: KnowledgeBaseDatabase) {}
@@ -150,14 +159,7 @@ export class KnowledgeBaseRepository {
 
   async replaceDocumentChunks(
     documentId: string,
-    chunks: Array<{
-      chunkIndex: number;
-      content: string;
-      tokenCount: number;
-      characterCount: number;
-      embedding: number[];
-      metadata: Record<string, string | number | boolean>;
-    }>,
+    chunks: ReplaceDocumentChunkInput[],
   ): Promise<KnowledgeChunkRecord[]> {
     return this.db.transaction(async (tx) => {
       await tx.delete(knowledgeChunks).where(eq(knowledgeChunks.documentId, documentId));

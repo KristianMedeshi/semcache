@@ -14,11 +14,12 @@ import {
   BaseRpcExceptionFilter,
   type ClientProxy,
   ClientProxyFactory,
+  MessagePattern,
   type MicroserviceOptions,
   RpcException,
   Transport,
 } from '@nestjs/microservices';
-import { ServiceName } from '@semcache/shared-types';
+import { type HealthCheckStatus, SERVICE_TCP_PATTERNS, ServiceName } from '@semcache/shared-types';
 import type { Observable } from 'rxjs';
 import type { z } from 'zod';
 import { resolveMicroserviceTcpOptions, resolveServiceTcpEndpoint } from './shared-config.module';
@@ -186,4 +187,16 @@ export function createHealthCheckResponse(service: ServiceName): {
     status: 'ok',
     timestamp: new Date().toISOString(),
   };
+}
+
+/**
+ * Shared base controller for TCP microservices exposing the `app.health` message pattern.
+ */
+export abstract class BaseTcpHealthController {
+  protected constructor(private readonly healthService: { getHealth(): HealthCheckStatus }) {}
+
+  @MessagePattern(SERVICE_TCP_PATTERNS.APP_HEALTH)
+  getHealth(): HealthCheckStatus {
+    return this.healthService.getHealth();
+  }
 }

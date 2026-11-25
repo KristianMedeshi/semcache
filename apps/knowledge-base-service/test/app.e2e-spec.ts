@@ -1,18 +1,11 @@
-import type { AddressInfo, Server } from 'node:net';
 import { Controller, type INestMicroservice, Module } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import {
-  type ClientProxy,
-  MessagePattern,
-  type MicroserviceOptions,
-  Payload,
-  Transport,
-} from '@nestjs/microservices';
+import { type ClientProxy, MessagePattern, Payload } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { extractRpcErrorPayload } from '@semcache/shared-config';
 import {
   createE2eSignedHeaders,
   createTcpMicroserviceTestClient,
+  expectRpcErrorStatus,
+  startMockTcpMicroservice,
 } from '@semcache/shared-config/testing';
 import type {
   DeleteKnowledgeDocumentResponseDto,
@@ -65,18 +58,13 @@ describe('Knowledge Base Service (TCP e2e)', () => {
   const secret = 'test-internal-service-secret-32-chars';
 
   beforeAll(async () => {
-    mockLlmApp = await NestFactory.createMicroservice<MicroserviceOptions>(MockLlmEmbeddingModule, {
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: 0 },
-      logger: false,
-    });
-    await mockLlmApp.listen();
-    const llmAddress = mockLlmApp.unwrap<Server>().address() as AddressInfo;
+    let llmPort: number;
+    ({ app: mockLlmApp, port: llmPort } = await startMockTcpMicroservice(MockLlmEmbeddingModule));
 
     process.env.NODE_ENV = 'test';
     process.env.INTERNAL_SERVICE_SECRET = secret;
     process.env.LLM_SERVICE_HOST = '127.0.0.1';
-    process.env.LLM_SERVICE_PORT = String(llmAddress.port);
+    process.env.LLM_SERVICE_PORT = String(llmPort);
 
     cacheSendMock = jest.fn(() => of({ invalidatedCount: 0, scope: 'unlinked' }));
 
@@ -115,26 +103,16 @@ describe('Knowledge Base Service (TCP e2e)', () => {
   });
 
   it('enforces RBAC: rejects unauthenticated and customer document uploads, allows admin', async () => {
-    let unauthErr: unknown;
-    try {
-      await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.KB_DOCUMENTS_LIST, { headers: {} }));
-    } catch (error) {
-      unauthErr = error;
-    }
-    expect(extractRpcErrorPayload(unauthErr)?.statusCode).toBe(401);
-
-    let customerErr: unknown;
-    try {
-      await firstValueFrom(
-        client.send(SERVICE_TCP_PATTERNS.KB_DOCUMENTS_UPLOAD, {
-          headers: createHeaders(UserRole.CUSTOMER),
-          body: { title: 'Test', content: 'Content' },
-        }),
-      );
-    } catch (error) {
-      customerErr = error;
-    }
-    expect(extractRpcErrorPayload(customerErr)?.statusCode).toBe(403);
+    await expectRpcErrorStatus(client, SERVICE_TCP_PATTERNS.KB_DOCUMENTS_LIST, { headers: {} }, 401);
+    await expectRpcErrorStatus(
+      client,
+      SERVICE_TCP_PATTERNS.KB_DOCUMENTS_UPLOAD,
+      {
+        headers: createHeaders(UserRole.CUSTOMER),
+        body: { title: 'Test', content: 'Content' },
+      },
+      403,
+    );
   });
 
   it('uploads, chunks, embeds, searches, and deletes knowledge base documents over TCP', async () => {

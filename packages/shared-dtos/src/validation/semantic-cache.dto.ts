@@ -20,35 +20,46 @@ import {
 } from '../index';
 import { isDefined } from './dialogs.dto';
 
+function composePropertyDecorators(...decorators: PropertyDecorator[]): PropertyDecorator {
+  return (target: object, propertyKey: string | symbol): void => {
+    for (const decorator of decorators) {
+      decorator(target, propertyKey);
+    }
+  };
+}
+
+function IsCategoryWeight(): PropertyDecorator {
+  return composePropertyDecorators(
+    ValidateIf(isDefined),
+    IsNumber({ allowNaN: false, allowInfinity: false }),
+    Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_CATEGORY_WEIGHT),
+    Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_CATEGORY_WEIGHT),
+  );
+}
+
+function IsThresholdValue(): PropertyDecorator {
+  return composePropertyDecorators(
+    ValidateIf(isDefined),
+    IsNumber({ allowNaN: false, allowInfinity: false }),
+    Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_THRESHOLD),
+    Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_THRESHOLD),
+  );
+}
+
 export class SemanticCacheCategoryWeightsInputDto {
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_CATEGORY_WEIGHT)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_CATEGORY_WEIGHT)
+  @IsCategoryWeight()
   [QueryCategory.BILLING]?: number;
 
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_CATEGORY_WEIGHT)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_CATEGORY_WEIGHT)
+  @IsCategoryWeight()
   [QueryCategory.TECHNICAL_SUPPORT]?: number;
 
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_CATEGORY_WEIGHT)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_CATEGORY_WEIGHT)
+  @IsCategoryWeight()
   [QueryCategory.ACCOUNT_MANAGEMENT]?: number;
 
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_CATEGORY_WEIGHT)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_CATEGORY_WEIGHT)
+  @IsCategoryWeight()
   [QueryCategory.PRODUCT_INQUIRY]?: number;
 
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_CATEGORY_WEIGHT)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_CATEGORY_WEIGHT)
+  @IsCategoryWeight()
   [QueryCategory.GENERAL]?: number;
 }
 
@@ -57,28 +68,16 @@ export class UpdateSemanticCacheSettingsDto implements UpdateSemanticCacheSettin
   @IsEnum(CacheMode)
   mode?: CacheMode;
 
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_THRESHOLD)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_THRESHOLD)
+  @IsThresholdValue()
   fixedThreshold?: number;
 
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_THRESHOLD)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_THRESHOLD)
+  @IsThresholdValue()
   adaptiveBaseThreshold?: number;
 
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_THRESHOLD)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_THRESHOLD)
+  @IsThresholdValue()
   minAdaptiveThreshold?: number;
 
-  @ValidateIf(isDefined)
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(SEMANTIC_CACHE_VALIDATION_LIMITS.MIN_THRESHOLD)
-  @Max(SEMANTIC_CACHE_VALIDATION_LIMITS.MAX_THRESHOLD)
+  @IsThresholdValue()
   maxAdaptiveThreshold?: number;
 
   @ValidateIf(isDefined)

@@ -1,6 +1,7 @@
 import { type AddressInfo, type Server } from 'node:net';
 import { resolve } from 'node:path';
-import type { INestMicroservice, Type } from '@nestjs/common';
+import { type INestMicroservice, type Type } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import {
   ClientProxy,
   ClientProxyFactory,
@@ -8,11 +9,16 @@ import {
   Transport,
 } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ServiceName, UserRole } from '@semcache/shared-types';
+import { type AuthenticatedUser, ServiceName, UserRole } from '@semcache/shared-types';
 import type { Config } from 'jest';
+import { firstValueFrom } from 'rxjs';
 import { pathsToModuleNameMapper } from 'ts-jest';
 import ts from 'typescript';
-import { createSignedInternalHeaders } from './constants';
+import {
+  type ExtractedRpcErrorPayload,
+  createSignedInternalHeaders,
+  extractRpcErrorPayload,
+} from './constants';
 
 /**
  * Builds a Jest configuration for NestJS backend services using path aliases
@@ -78,6 +84,50 @@ export async function createTcpMicroserviceTestClient(
       await client.close();
       await app.close();
     },
+  };
+}
+
+export async function startMockTcpMicroservice(
+  moduleClass: Type<unknown>,
+): Promise<{ app: INestMicroservice; port: number }> {
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(moduleClass, {
+    transport: Transport.TCP,
+    options: { host: '127.0.0.1', port: 0 },
+    logger: false,
+  });
+  await app.listen();
+  const address = app.unwrap<Server>().address() as AddressInfo;
+  return { app, port: address.port };
+}
+
+export async function expectRpcErrorStatus(
+  client: ClientProxy,
+  pattern: string,
+  payload: unknown,
+  expectedStatus: number,
+): Promise<ExtractedRpcErrorPayload | null> {
+  let caughtError: unknown;
+  try {
+    await firstValueFrom(client.send(pattern, payload));
+  } catch (error) {
+    caughtError = error;
+  }
+  const rpcError = extractRpcErrorPayload(caughtError);
+  expect(rpcError?.statusCode).toBe(expectedStatus);
+  return rpcError;
+}
+
+export function createTestAuthenticatedUser(
+  role: UserRole,
+  overrides?: Partial<AuthenticatedUser>,
+): AuthenticatedUser {
+  const isAdmin = role === UserRole.ADMIN;
+  return {
+    id: isAdmin ? '22222222-2222-4222-8222-222222222222' : '11111111-1111-4111-8111-111111111111',
+    email: isAdmin ? 'admin@example.com' : 'customer@example.com',
+    role,
+    sessionId: isAdmin ? 'sess-2' : 'sess-1',
+    ...overrides,
   };
 }
 

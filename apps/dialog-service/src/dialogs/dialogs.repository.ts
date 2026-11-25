@@ -11,6 +11,16 @@ import { type DialogMessageRecord, type DialogRecord, dialogMessages, dialogs } 
 
 export const DEFAULT_DIALOG_TITLE = 'New Conversation';
 
+export interface InsertDialogMessageInput {
+  dialogId: string;
+  parentMessageId?: string | null;
+  role: ChatMessageRole;
+  content: string;
+  model?: string;
+  latencyMs?: number;
+  usage?: LlmTokenUsageDto;
+}
+
 export function toDialogResponseDto(record: DialogRecord): DialogResponseDto {
   return {
     id: record.id,
@@ -104,15 +114,7 @@ export class DialogsRepository {
     return record ? toDialogMessageResponseDto(record) : null;
   }
 
-  async insertMessage(input: {
-    dialogId: string;
-    parentMessageId?: string | null;
-    role: ChatMessageRole;
-    content: string;
-    model?: string;
-    latencyMs?: number;
-    usage?: LlmTokenUsageDto;
-  }): Promise<DialogMessageResponseDto> {
+  async insertMessage(input: InsertDialogMessageInput): Promise<DialogMessageResponseDto> {
     const rows = await this.db
       .insert(dialogMessages)
       .values({

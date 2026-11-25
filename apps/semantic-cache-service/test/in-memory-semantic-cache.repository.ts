@@ -6,7 +6,10 @@ import type {
 } from '@semcache/shared-dtos';
 import { QueryCategory } from '@semcache/shared-types';
 import type { SemanticCacheEntryRecord, SemanticCacheSettingsRecord } from '../src/db/schema';
-import type { DefaultSettingsSeed } from '../src/semantic-cache/semantic-cache.repository';
+import type {
+  CreateCacheEntryInput,
+  DefaultSettingsSeed,
+} from '../src/semantic-cache/semantic-cache.repository';
 
 export function makeUnitVector(seed: number, floor = 0.01): number[] {
   const vec = Array.from({ length: 384 }, (_, idx) => (idx === seed % 384 ? 1 : floor));
@@ -78,15 +81,9 @@ export class InMemorySemanticCacheRepository {
       .slice(0, params.limit);
   }
 
-  async createEntry(input: {
-    query: string;
-    response: string;
-    embedding: number[];
-    category: QueryCategory;
-    model?: string;
-    metadata?: Record<string, string | number | boolean>;
-    sources: CacheKnowledgeSourceReferenceDto[];
-  }): Promise<{ entry: SemanticCacheEntryRecord; sources: CacheKnowledgeSourceReferenceDto[] }> {
+  async createEntry(
+    input: CreateCacheEntryInput,
+  ): Promise<{ entry: SemanticCacheEntryRecord; sources: CacheKnowledgeSourceReferenceDto[] }> {
     const now = new Date();
     const entry: SemanticCacheEntryRecord = {
       id: randomUUID(),

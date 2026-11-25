@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import type { RetrievedKnowledgeChunkDto } from '@semcache/shared-dtos';
 import { KnowledgeDocumentStatus, QueryCategory } from '@semcache/shared-types';
 import type { KnowledgeChunkRecord, KnowledgeDocumentRecord } from '../src/db/schema';
+import type { ReplaceDocumentChunkInput } from '../src/knowledge-base/knowledge-base.repository';
 
 export function embedTextDeterministic(text: string): number[] {
   const vector = Array.from({ length: 384 }, () => 0);
@@ -125,14 +126,7 @@ export class InMemoryKnowledgeBaseRepository {
 
   async replaceDocumentChunks(
     documentId: string,
-    chunks: Array<{
-      chunkIndex: number;
-      content: string;
-      tokenCount: number;
-      characterCount: number;
-      embedding: number[];
-      metadata: Record<string, string | number | boolean>;
-    }>,
+    chunks: ReplaceDocumentChunkInput[],
   ): Promise<KnowledgeChunkRecord[]> {
     const now = new Date();
     const records: KnowledgeChunkRecord[] = chunks.map((chunk) => ({

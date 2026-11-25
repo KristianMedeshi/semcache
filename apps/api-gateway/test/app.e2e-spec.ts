@@ -1,14 +1,7 @@
-import type { AddressInfo, Server } from 'node:net';
 import { Controller, type INestApplication, type INestMicroservice, Module } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import {
-  MessagePattern,
-  type MicroserviceOptions,
-  Payload,
-  RpcException,
-  Transport,
-} from '@nestjs/microservices';
+import { MessagePattern, Payload, RpcException } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { startMockTcpMicroservice } from '@semcache/shared-config/testing';
 import type {
   AuthTcpRequestDto,
   DialogMessageStreamEventDto,
@@ -315,55 +308,25 @@ describe('API Gateway (e2e)', () => {
   const originalEnv = { ...process.env };
 
   beforeAll(async () => {
-    mockAuthMicroservice = await NestFactory.createMicroservice<MicroserviceOptions>(
-      MockAuthModule,
-      {
-        transport: Transport.TCP,
-        options: { host: '127.0.0.1', port: 0 },
-        logger: false,
-      },
-    );
-    await mockAuthMicroservice.listen();
+    let authPort: number;
+    let dialogPort: number;
+    let kbPort: number;
+    let cachePort: number;
+    ({ app: mockAuthMicroservice, port: authPort } = await startMockTcpMicroservice(MockAuthModule));
+    ({ app: mockDialogMicroservice, port: dialogPort } =
+      await startMockTcpMicroservice(MockDialogModule));
+    ({ app: mockKbMicroservice, port: kbPort } = await startMockTcpMicroservice(MockKbModule));
+    ({ app: mockSemanticCacheMicroservice, port: cachePort } =
+      await startMockTcpMicroservice(MockSemanticCacheModule));
 
-    mockDialogMicroservice = await NestFactory.createMicroservice<MicroserviceOptions>(
-      MockDialogModule,
-      {
-        transport: Transport.TCP,
-        options: { host: '127.0.0.1', port: 0 },
-        logger: false,
-      },
-    );
-    await mockDialogMicroservice.listen();
-
-    mockKbMicroservice = await NestFactory.createMicroservice<MicroserviceOptions>(MockKbModule, {
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: 0 },
-      logger: false,
-    });
-    await mockKbMicroservice.listen();
-
-    mockSemanticCacheMicroservice = await NestFactory.createMicroservice<MicroserviceOptions>(
-      MockSemanticCacheModule,
-      {
-        transport: Transport.TCP,
-        options: { host: '127.0.0.1', port: 0 },
-        logger: false,
-      },
-    );
-    await mockSemanticCacheMicroservice.listen();
-
-    const authAddress = mockAuthMicroservice.unwrap<Server>().address() as AddressInfo;
-    const dialogAddress = mockDialogMicroservice.unwrap<Server>().address() as AddressInfo;
-    const kbAddress = mockKbMicroservice.unwrap<Server>().address() as AddressInfo;
-    const cacheAddress = mockSemanticCacheMicroservice.unwrap<Server>().address() as AddressInfo;
     process.env.AUTH_SERVICE_HOST = '127.0.0.1';
-    process.env.AUTH_SERVICE_PORT = String(authAddress.port);
+    process.env.AUTH_SERVICE_PORT = String(authPort);
     process.env.DIALOG_SERVICE_HOST = '127.0.0.1';
-    process.env.DIALOG_SERVICE_PORT = String(dialogAddress.port);
+    process.env.DIALOG_SERVICE_PORT = String(dialogPort);
     process.env.KNOWLEDGE_BASE_SERVICE_HOST = '127.0.0.1';
-    process.env.KNOWLEDGE_BASE_SERVICE_PORT = String(kbAddress.port);
+    process.env.KNOWLEDGE_BASE_SERVICE_PORT = String(kbPort);
     process.env.SEMANTIC_CACHE_SERVICE_HOST = '127.0.0.1';
-    process.env.SEMANTIC_CACHE_SERVICE_PORT = String(cacheAddress.port);
+    process.env.SEMANTIC_CACHE_SERVICE_PORT = String(cachePort);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],

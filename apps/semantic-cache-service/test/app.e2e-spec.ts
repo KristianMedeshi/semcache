@@ -1,10 +1,10 @@
 import { type INestMicroservice } from '@nestjs/common';
 import type { ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { extractRpcErrorPayload } from '@semcache/shared-config';
 import {
   createE2eSignedHeaders,
   createTcpMicroserviceTestClient,
+  expectRpcErrorStatus,
 } from '@semcache/shared-config/testing';
 import type {
   CacheInvalidationResponseDto,
@@ -74,37 +74,20 @@ describe('Semantic Cache Service (TCP e2e)', () => {
   });
 
   it('enforces RBAC on admin endpoints while allowing internal lookup/store', async () => {
-    let unauthErr: unknown;
-    try {
-      await firstValueFrom(client.send(SERVICE_TCP_PATTERNS.CACHE_SETTINGS_GET, { headers: {} }));
-    } catch (error) {
-      unauthErr = error;
-    }
-    expect(extractRpcErrorPayload(unauthErr)?.statusCode).toBe(401);
+    await expectRpcErrorStatus(client, SERVICE_TCP_PATTERNS.CACHE_SETTINGS_GET, { headers: {} }, 401);
+    await expectRpcErrorStatus(
+      client,
+      SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL,
+      { headers: createHeaders(UserRole.CUSTOMER) },
+      403,
+    );
 
-    let customerErr: unknown;
-    try {
-      await firstValueFrom(
-        client.send(SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL, {
-          headers: createHeaders(UserRole.CUSTOMER),
-        }),
-      );
-    } catch (error) {
-      customerErr = error;
-    }
-    expect(extractRpcErrorPayload(customerErr)?.statusCode).toBe(403);
-
-    let customerUnlinkedErr: unknown;
-    try {
-      await firstValueFrom(
-        client.send(SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED, {
-          headers: createHeaders(UserRole.CUSTOMER),
-        }),
-      );
-    } catch (error) {
-      customerUnlinkedErr = error;
-    }
-    expect(extractRpcErrorPayload(customerUnlinkedErr)?.statusCode).toBe(403);
+    await expectRpcErrorStatus(
+      client,
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED,
+      { headers: createHeaders(UserRole.CUSTOMER) },
+      403,
+    );
   });
 
   it('stores entries, switches modes with overrides, reports stats, and invalidates by source, category, and all', async () => {

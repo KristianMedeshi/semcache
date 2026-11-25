@@ -11,7 +11,7 @@ import {
 } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createSignedInternalHeaders, extractRpcErrorPayload } from '@semcache/shared-config';
-import { createTcpMicroserviceTestClient } from '@semcache/shared-config/testing';
+import { createTcpMicroserviceTestClient, startMockTcpMicroservice } from '@semcache/shared-config/testing';
 import type {
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
@@ -32,7 +32,12 @@ import {
 import { type Observable, firstValueFrom, of, toArray } from 'rxjs';
 import { AppModule } from '../src/app.module';
 import { DIALOG_PG_POOL } from '../src/db/database.module';
-import { DEFAULT_DIALOG_TITLE, DialogsRepository } from '../src/dialogs/dialogs.repository';
+import {
+  DEFAULT_DIALOG_TITLE,
+  DialogsRepository,
+  type InsertDialogMessageInput,
+} from '../src/dialogs/dialogs.repository';
+import { createMockDialogMessage } from './dialog-test-helpers';
 
 @Controller()
 class MockLlmController {
@@ -142,26 +147,8 @@ class InMemoryDialogsRepository {
     return messages.find((m) => m.id === messageId) ?? null;
   }
 
-  async insertMessage(input: {
-    dialogId: string;
-    parentMessageId?: string | null;
-    role: ChatMessageRole;
-    content: string;
-    model?: string;
-    latencyMs?: number;
-    usage?: LlmTokenUsageDto;
-  }): Promise<DialogMessageResponseDto> {
-    const msg: DialogMessageResponseDto = {
-      id: randomUUID(),
-      dialogId: input.dialogId,
-      parentMessageId: input.parentMessageId ?? null,
-      role: input.role,
-      content: input.content,
-      model: input.model ?? null,
-      latencyMs: input.latencyMs ?? null,
-      usage: input.usage ?? null,
-      createdAt: new Date().toISOString(),
-    };
+  async insertMessage(input: InsertDialogMessageInput): Promise<DialogMessageResponseDto> {
+    const msg = createMockDialogMessage(randomUUID(), input);
     const existing = this.messageRows.get(input.dialogId) ?? [];
     existing.push(msg);
     this.messageRows.set(input.dialogId, existing);
@@ -231,28 +218,17 @@ describe('Dialog Service (TCP e2e)', () => {
   const secret = 'test-internal-service-secret-32-chars';
 
   beforeAll(async () => {
-    mockLlmApp = await NestFactory.createMicroservice<MicroserviceOptions>(MockLlmModule, {
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: 0 },
-      logger: false,
-    });
-    await mockLlmApp.listen();
-    const llmAddress = mockLlmApp.unwrap<Server>().address() as AddressInfo;
-
-    mockKbApp = await NestFactory.createMicroservice<MicroserviceOptions>(MockKbModule, {
-      transport: Transport.TCP,
-      options: { host: '127.0.0.1', port: 0 },
-      logger: false,
-    });
-    await mockKbApp.listen();
-    const kbAddress = mockKbApp.unwrap<Server>().address() as AddressInfo;
+    let llmPort: number;
+    ({ app: mockLlmApp, port: llmPort } = await startMockTcpMicroservice(MockLlmModule));
+    let kbPort: number;
+    ({ app: mockKbApp, port: kbPort } = await startMockTcpMicroservice(MockKbModule));
 
     process.env.NODE_ENV = 'test';
     process.env.INTERNAL_SERVICE_SECRET = secret;
     process.env.LLM_SERVICE_HOST = '127.0.0.1';
-    process.env.LLM_SERVICE_PORT = String(llmAddress.port);
+    process.env.LLM_SERVICE_PORT = String(llmPort);
     process.env.KNOWLEDGE_BASE_SERVICE_HOST = '127.0.0.1';
-    process.env.KNOWLEDGE_BASE_SERVICE_PORT = String(kbAddress.port);
+    process.env.KNOWLEDGE_BASE_SERVICE_PORT = String(kbPort);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
