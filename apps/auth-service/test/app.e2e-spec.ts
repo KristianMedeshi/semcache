@@ -8,7 +8,11 @@ import {
 } from '@nestjs/authentication';
 import type { ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { extractRpcErrorPayload } from '@semcache/shared-config';
+import {
+  ConfigService,
+  durationToMs,
+  extractRpcErrorPayload,
+} from '@semcache/shared-config';
 import { createTcpMicroserviceTestClient } from '@semcache/shared-config/testing';
 import type {
   AuthTcpResponseDto,
@@ -20,6 +24,7 @@ import { SERVICE_TCP_PATTERNS, ServiceName, UserRole } from '@semcache/shared-ty
 import { firstValueFrom } from 'rxjs';
 import { AppModule } from '../src/app.module';
 import { DrizzleSessionStore } from '../src/auth/drizzle-session.store';
+import type { AuthEnv } from '../src/config/auth.env';
 import { UsersRepository, normalizeEmail } from '../src/users/users.repository';
 
 interface InMemoryUserRow {
@@ -474,13 +479,18 @@ describe('AuthService Authentication & Authorization (TCP e2e)', () => {
       );
       const secondCookie = extractCookiePair(secondLogin.setCookie);
 
-      sessionStore.idleExpireSessionsForUser(user.id, 30 * 60 * 1000);
-      await sendRpcExpectingError(
-        client,
-        SERVICE_TCP_PATTERNS.AUTH_ME,
-        { headers: { cookie: secondCookie }, method: 'GET' },
-        401,
+      const idleTimeoutMs = durationToMs(
+        app.get<ConfigService<AuthEnv, true>>(ConfigService).getOrThrow('SESSION_IDLE_TIMEOUT'),
       );
+      if (idleTimeoutMs > 0) {
+        sessionStore.idleExpireSessionsForUser(user.id, idleTimeoutMs);
+        await sendRpcExpectingError(
+          client,
+          SERVICE_TCP_PATTERNS.AUTH_ME,
+          { headers: { cookie: secondCookie }, method: 'GET' },
+          401,
+        );
+      }
     });
   });
 

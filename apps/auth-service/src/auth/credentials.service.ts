@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { PasswordHasher } from '@nestjs/authentication';
 import type { UserResponseDto } from '@semcache/shared-dtos';
 import { UserRole } from '@semcache/shared-types';
+import { isPgUniqueViolation } from '../db/pg-error.util';
 import { UsersRepository } from '../users/users.repository';
 
 @Injectable()
@@ -30,10 +31,24 @@ export class CredentialsService {
     }
 
     const passwordHash = await this.passwordHasher.hash(password);
-    const user = await this.usersRepository.create(email, {
-      passwordHash,
-      role,
-    });
+    let user: UserResponseDto;
+    try {
+      user = await this.usersRepository.create(email, {
+        passwordHash,
+        role,
+      });
+    } catch (error) {
+      if (isPgUniqueViolation(error)) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'auth.register.conflict',
+            reason: 'duplicate_email',
+          }),
+        );
+        throw new ConflictException('Unable to complete registration with provided credentials');
+      }
+      throw error;
+    }
 
     this.logger.log(
       JSON.stringify({

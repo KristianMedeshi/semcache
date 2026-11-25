@@ -45,6 +45,17 @@ describe('CredentialsService', () => {
     ).rejects.toThrow(ConflictException);
   });
 
+  it('maps concurrent PostgreSQL unique violation (23505) on create to ConflictException', async () => {
+    const createSpy = jest
+      .spyOn(usersRepositoryMock, 'create')
+      .mockRejectedValueOnce(new Error('Failed query', { cause: { code: '23505' } }));
+
+    await expect(
+      credentialsService.register('race@example.com', 'StrongPass123!'),
+    ).rejects.toThrow(ConflictException);
+    expect(createSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('verifies valid credentials and rejects wrong password or unknown email', async () => {
     await credentialsService.register('bob@example.com', 'StrongPass123!');
 

@@ -1,8 +1,8 @@
-import { type ExecutionContext, Injectable, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
-import { ThrottlerGuard, ThrottlerModule, minutes, normalizeIp } from '@nestjs/throttler';
+import { ThrottlerModule, minutes, normalizeIp } from '@nestjs/throttler';
 import {
   ConfigService,
   SharedConfigModule,
@@ -15,31 +15,10 @@ import { AppService } from './app.service';
 import './auth/auth-types';
 import { accountEmail } from './auth/account-email';
 import { AuthModule } from './auth/auth.module';
+import { RpcThrottlerGuard } from './auth/rpc-throttler.guard';
 import { type AuthEnv, authEnvSchema } from './config/auth.env';
 import { DatabaseModule } from './db/database.module';
 import { UsersModule } from './users/users.module';
-
-@Injectable()
-class RpcThrottlerGuard extends ThrottlerGuard {
-  protected override getRequestResponse(context: ExecutionContext): {
-    req: Record<string, unknown>;
-    res: Record<string, unknown>;
-  } {
-    if (context.getType() === 'rpc') {
-      const data = context.switchToRpc().getData<unknown>();
-      return {
-        req: typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {},
-        res: {},
-      };
-    }
-    return super.getRequestResponse(context);
-  }
-
-  protected override async getTracker(req: Record<string, unknown>): Promise<string> {
-    const ip = typeof req.ip === 'string' && req.ip.length > 0 ? req.ip : '127.0.0.1';
-    return normalizeIp(ip, this.ipv6SubnetPrefix);
-  }
-}
 
 @Module({
   imports: [
@@ -122,9 +101,10 @@ class RpcThrottlerGuard extends ThrottlerGuard {
   providers: [
     AppService,
     ...createRpcGlobalProviders(),
+    RpcThrottlerGuard,
     {
       provide: APP_GUARD,
-      useClass: RpcThrottlerGuard,
+      useExisting: RpcThrottlerGuard,
     },
   ],
 })

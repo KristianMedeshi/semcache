@@ -13,6 +13,7 @@ import type {
 } from '@semcache/shared-dtos';
 import type { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 import { UserPolicy } from '../auth/policies/user.policy';
+import { isPgUniqueViolation } from '../db/pg-error.util';
 import { UsersRepository, normalizeEmail } from './users.repository';
 
 function isSessionRecord(value: unknown): value is SessionRecord {
@@ -90,10 +91,18 @@ export class UsersService {
       return { data: existingUser };
     }
 
-    const updatedUser = await this.usersRepository.updateProfile(targetUserId, {
-      email: normalizedEmail,
-      passwordHash,
-    });
+    let updatedUser: UserResponseDto | null;
+    try {
+      updatedUser = await this.usersRepository.updateProfile(targetUserId, {
+        email: normalizedEmail,
+        passwordHash,
+      });
+    } catch (error) {
+      if (isPgUniqueViolation(error)) {
+        throw new ConflictException('Unable to update email address');
+      }
+      throw error;
+    }
     if (!updatedUser) {
       throw new NotFoundException('User not found');
     }
