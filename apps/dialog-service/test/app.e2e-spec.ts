@@ -11,7 +11,10 @@ import {
 } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createSignedInternalHeaders, extractRpcErrorPayload } from '@semcache/shared-config';
-import { createTcpMicroserviceTestClient, startMockTcpMicroservice } from '@semcache/shared-config/testing';
+import {
+  createTcpMicroserviceTestClient,
+  startMockTcpMicroservice,
+} from '@semcache/shared-config/testing';
 import type {
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,

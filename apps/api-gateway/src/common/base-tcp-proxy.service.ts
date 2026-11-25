@@ -1,9 +1,4 @@
-import {
-  BadGatewayException,
-  HttpException,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadGatewayException, HttpException, Logger, UnauthorizedException } from '@nestjs/common';
 import type { AuthenticationContext } from '@nestjs/authentication';
 import type { ClientProxy } from '@nestjs/microservices';
 import { extractRpcErrorPayload } from '@semcache/shared-config';

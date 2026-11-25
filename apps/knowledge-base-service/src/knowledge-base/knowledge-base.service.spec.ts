@@ -196,9 +196,13 @@ describe('KnowledgeBaseService', () => {
       'admin-1',
       adminHeaders,
     );
-    expect(cacheSendMock).toHaveBeenNthCalledWith(1, SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED, {
-      headers: adminHeaders,
-    });
+    expect(cacheSendMock).toHaveBeenNthCalledWith(
+      1,
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED,
+      {
+        headers: adminHeaders,
+      },
+    );
 
     await service.reprocessDocument(doc.id, undefined, adminHeaders);
     expect(cacheSendMock).toHaveBeenNthCalledWith(
@@ -209,9 +213,13 @@ describe('KnowledgeBaseService', () => {
         body: { documentIds: [doc.id] },
       },
     );
-    expect(cacheSendMock).toHaveBeenNthCalledWith(3, SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED, {
-      headers: adminHeaders,
-    });
+    expect(cacheSendMock).toHaveBeenNthCalledWith(
+      3,
+      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_UNLINKED,
+      {
+        headers: adminHeaders,
+      },
+    );
 
     const deleted = await service.deleteDocument(doc.id, adminHeaders);
     expect(deleted.deleted).toBe(true);

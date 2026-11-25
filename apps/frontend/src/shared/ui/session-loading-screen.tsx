@@ -11,11 +11,7 @@ export interface SessionLoadingScreenProps {
   description: string;
 }
 
-export function SessionLoadingScreen({
-  subtitle,
-  title,
-  description,
-}: SessionLoadingScreenProps) {
+export function SessionLoadingScreen({ subtitle, title, description }: SessionLoadingScreenProps) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md shadow-sm">

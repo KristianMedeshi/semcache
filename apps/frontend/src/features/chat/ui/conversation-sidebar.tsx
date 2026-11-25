@@ -5,12 +5,7 @@ import { useState } from 'react';
 import { ConversationActionDialogs } from '@/features/chat/ui/conversation-action-dialogs';
 import { ConversationListItem } from '@/features/chat/ui/conversation-list-item';
 import { Button } from '@/shared/ui/button';
-import {
-  Dialog,
-  DialogDescription,
-  DialogTitle,
-  SheetContent,
-} from '@/shared/ui/dialog';
+import { Dialog, DialogDescription, DialogTitle, SheetContent } from '@/shared/ui/dialog';
 import { Input } from '@/shared/ui/input';
 
 export interface ConversationSidebarProps {

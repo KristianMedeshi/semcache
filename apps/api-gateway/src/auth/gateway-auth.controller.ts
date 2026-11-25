@@ -59,7 +59,9 @@ export class GatewayAuthController {
   @ApiCreatedResponse({
     description: 'Customer registered and session cookie set',
     type: UserResponseSwaggerDto,
-    headers: { 'Set-Cookie': { description: 'HttpOnly session cookie', schema: { type: 'string' } } },
+    headers: {
+      'Set-Cookie': { description: 'HttpOnly session cookie', schema: { type: 'string' } },
+    },
   })
   @ApiStandardErrors({ badRequest: true, forbidden: true, conflict: true, tooManyRequests: true })
   async register(
@@ -82,7 +84,9 @@ export class GatewayAuthController {
   @ApiOkResponse({
     description: 'Authenticated user profile with Set-Cookie header',
     type: UserResponseSwaggerDto,
-    headers: { 'Set-Cookie': { description: 'HttpOnly session cookie', schema: { type: 'string' } } },
+    headers: {
+      'Set-Cookie': { description: 'HttpOnly session cookie', schema: { type: 'string' } },
+    },
   })
   @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, tooManyRequests: true })
   async login(
@@ -107,7 +111,9 @@ export class GatewayAuthController {
   @ApiOkResponse({
     description: 'Session terminated',
     type: LogoutResponseSwaggerDto,
-    headers: { 'Set-Cookie': { description: 'Cleared session cookie', schema: { type: 'string' } } },
+    headers: {
+      'Set-Cookie': { description: 'Cleared session cookie', schema: { type: 'string' } },
+    },
   })
   @ApiStandardErrors({ auth: true, forbidden: true })
   async logout(

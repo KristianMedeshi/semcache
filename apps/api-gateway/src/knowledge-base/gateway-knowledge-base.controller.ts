@@ -107,7 +107,8 @@ export class GatewayKnowledgeBaseController {
   @Post('documents/:id/reprocess')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Update/re-chunk/re-embed a knowledge base document and invalidate linked cache (admin only)',
+    summary:
+      'Update/re-chunk/re-embed a knowledge base document and invalidate linked cache (admin only)',
   })
   @ApiUuidParam('id', 'Knowledge document UUID')
   @ApiOkResponse({
@@ -128,7 +129,9 @@ export class GatewayKnowledgeBaseController {
 
   @Can(GatewayAccessPolicy, 'manageKnowledgeBase')
   @Delete('documents/:id')
-  @ApiOperation({ summary: 'Delete a knowledge base document and invalidate linked cache (admin only)' })
+  @ApiOperation({
+    summary: 'Delete a knowledge base document and invalidate linked cache (admin only)',
+  })
   @ApiUuidParam('id', 'Knowledge document UUID')
   @ApiOkResponse({
     description: 'Deleted document and chunk count',

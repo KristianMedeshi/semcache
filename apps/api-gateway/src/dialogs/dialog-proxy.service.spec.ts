@@ -86,9 +86,7 @@ describe('DialogProxyService', () => {
   });
 
   it('maps pre-header TCP stream errors to HttpException', async () => {
-    const dialogSendMock = jest.fn(() =>
-      throwError(() => new Error('ECONNREFUSED')),
-    );
+    const dialogSendMock = jest.fn(() => throwError(() => new Error('ECONNREFUSED')));
     const { proxy } = createDialogProxyHarness({ dialogSendMock });
 
     const stream$ = await proxy.createDialogStream(

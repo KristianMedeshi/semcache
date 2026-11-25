@@ -55,7 +55,10 @@ import {
 } from './dto/gateway-dialogs.dto';
 
 const CACHE_TURN_HEADERS = {
-  'X-Cache-Status': { description: 'Semantic cache outcome (HIT | MISS | BYPASS)', schema: { type: 'string' } },
+  'X-Cache-Status': {
+    description: 'Semantic cache outcome (HIT | MISS | BYPASS)',
+    schema: { type: 'string' },
+  },
   'X-Cache-Mode': { description: 'Active semantic cache mode', schema: { type: 'string' } },
 } as const;
 
@@ -121,9 +124,7 @@ export class GatewayDialogsController {
   @ApiOperation({ summary: 'Delete all dialogs owned by the authenticated user' })
   @ApiOkResponse({ description: 'Deleted dialog count', type: DeleteAllDialogsResponseSwaggerDto })
   @ApiStandardErrors({ auth: true, forbidden: true })
-  async deleteAllDialogs(
-    @Headers('cookie') cookie?: string,
-  ): Promise<DeleteAllDialogsResponseDto> {
+  async deleteAllDialogs(@Headers('cookie') cookie?: string): Promise<DeleteAllDialogsResponseDto> {
     const result = await this.dialogProxyService.forwardDialogRequest<DeleteAllDialogsResponseDto>(
       cookie,
       SERVICE_TCP_PATTERNS.DIALOGS_DELETE_ALL,
@@ -151,7 +152,10 @@ export class GatewayDialogsController {
   @Get(':id/messages')
   @ApiOperation({ summary: 'List all messages in a dialog thread' })
   @ApiUuidParam('id', 'Dialog UUID')
-  @ApiOkResponse({ description: 'Ordered dialog messages', type: [DialogMessageResponseSwaggerDto] })
+  @ApiOkResponse({
+    description: 'Ordered dialog messages',
+    type: [DialogMessageResponseSwaggerDto],
+  })
   @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, notFound: true })
   async getMessages(
     @Param('id', ParseUUIDPipe) id: string,
@@ -167,7 +171,9 @@ export class GatewayDialogsController {
 
   @Post(':id/messages')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send a user message and receive an assistant turn (with semantic cache & RAG)' })
+  @ApiOperation({
+    summary: 'Send a user message and receive an assistant turn (with semantic cache & RAG)',
+  })
   @ApiUuidParam('id', 'Dialog UUID')
   @ApiOkResponse({
     description: 'Completed dialog turn',
@@ -257,11 +263,10 @@ export class GatewayDialogsController {
     cookie: string | undefined,
     options: { dialogId: string; messageId?: string; body: TBody },
   ): Promise<SendMessageResponseDto> {
-    const result = await this.dialogProxyService.forwardDialogRequest<SendMessageResponseDto, TBody>(
-      cookie,
-      pattern,
-      options,
-    );
+    const result = await this.dialogProxyService.forwardDialogRequest<
+      SendMessageResponseDto,
+      TBody
+    >(cookie, pattern, options);
     this.applyCacheHeaders(res, result.cacheHeaders);
     return result.data;
   }

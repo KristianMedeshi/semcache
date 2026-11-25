@@ -1,7 +1,16 @@
 import { Link } from '@tanstack/react-router';
 import type { KnowledgeDocumentResponseDto, UserResponseDto } from '@semcache/shared-dtos';
 import { KnowledgeDocumentStatus, QueryCategory } from '@semcache/shared-types';
-import { ArrowLeft, BookOpen, FileText, Loader2, Plus, RefreshCw, Search, UploadCloud } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  FileText,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  UploadCloud,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {

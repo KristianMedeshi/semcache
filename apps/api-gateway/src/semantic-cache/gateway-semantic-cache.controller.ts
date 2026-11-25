@@ -39,7 +39,9 @@ export class GatewaySemanticCacheController {
   constructor(private readonly semanticCacheProxyService: SemanticCacheProxyService) {}
 
   @Get('settings')
-  @ApiOperation({ summary: 'Get current semantic cache regime and adaptive threshold settings (admin only)' })
+  @ApiOperation({
+    summary: 'Get current semantic cache regime and adaptive threshold settings (admin only)',
+  })
   @ApiOkResponse({
     description: 'Semantic cache settings',
     type: SemanticCacheSettingsResponseSwaggerDto,
@@ -53,7 +55,9 @@ export class GatewaySemanticCacheController {
   }
 
   @Patch('settings')
-  @ApiOperation({ summary: 'Update semantic cache regime and adaptive threshold parameters (admin only)' })
+  @ApiOperation({
+    summary: 'Update semantic cache regime and adaptive threshold parameters (admin only)',
+  })
   @ApiOkResponse({
     description: 'Updated semantic cache settings',
     type: SemanticCacheSettingsResponseSwaggerDto,
@@ -85,7 +89,9 @@ export class GatewaySemanticCacheController {
 
   @Post('invalidate/sources')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Invalidate cached responses linked to specific knowledge document IDs (admin only)' })
+  @ApiOperation({
+    summary: 'Invalidate cached responses linked to specific knowledge document IDs (admin only)',
+  })
   @ApiOkResponse({
     description: 'Cache invalidation result',
     type: CacheInvalidationResponseSwaggerDto,
@@ -102,7 +108,9 @@ export class GatewaySemanticCacheController {
   }
 
   @Delete('entries/category/:category')
-  @ApiOperation({ summary: 'Invalidate cached responses for a specific query category (admin only)' })
+  @ApiOperation({
+    summary: 'Invalidate cached responses for a specific query category (admin only)',
+  })
   @ApiParam({ name: 'category', enum: QueryCategory, description: 'Target query category' })
   @ApiOkResponse({
     description: 'Cache invalidation result',

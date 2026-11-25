@@ -37,8 +37,6 @@ import { GatewaySemanticCacheModule } from './semantic-cache/gateway-semantic-ca
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(RequestIdMiddleware, StripInternalHeadersMiddleware)
-      .forRoutes('{*path}');
+    consumer.apply(RequestIdMiddleware, StripInternalHeadersMiddleware).forRoutes('{*path}');
   }
 }

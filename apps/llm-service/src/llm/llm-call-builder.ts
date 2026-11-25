@@ -127,9 +127,7 @@ export function buildLlmCompletionResponse(
   const completionTokens = result.usage.outputTokens ?? 0;
   const totalTokens = result.usage.totalTokens ?? promptTokens + completionTokens;
   const resolvedModel =
-    result.model?.provider !== 'fake' && result.model?.modelId
-      ? result.model.modelId
-      : targetModel;
+    result.model?.provider !== 'fake' && result.model?.modelId ? result.model.modelId : targetModel;
 
   return {
     content: result.text,

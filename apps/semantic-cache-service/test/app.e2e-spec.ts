@@ -74,7 +74,12 @@ describe('Semantic Cache Service (TCP e2e)', () => {
   });
 
   it('enforces RBAC on admin endpoints while allowing internal lookup/store', async () => {
-    await expectRpcErrorStatus(client, SERVICE_TCP_PATTERNS.CACHE_SETTINGS_GET, { headers: {} }, 401);
+    await expectRpcErrorStatus(
+      client,
+      SERVICE_TCP_PATTERNS.CACHE_SETTINGS_GET,
+      { headers: {} },
+      401,
+    );
     await expectRpcErrorStatus(
       client,
       SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL,

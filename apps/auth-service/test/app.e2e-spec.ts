@@ -8,11 +8,7 @@ import {
 } from '@nestjs/authentication';
 import type { ClientProxy } from '@nestjs/microservices';
 import { Test, type TestingModule } from '@nestjs/testing';
-import {
-  ConfigService,
-  durationToMs,
-  extractRpcErrorPayload,
-} from '@semcache/shared-config';
+import { ConfigService, durationToMs, extractRpcErrorPayload } from '@semcache/shared-config';
 import { createTcpMicroserviceTestClient } from '@semcache/shared-config/testing';
 import type {
   AuthTcpResponseDto,

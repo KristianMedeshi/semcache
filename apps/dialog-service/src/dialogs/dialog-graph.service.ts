@@ -1,11 +1,5 @@
 import { END, START, StateGraph } from '@langchain/langgraph';
-import {
-  BadGatewayException,
-  Inject,
-  Injectable,
-  Logger,
-  Optional,
-} from '@nestjs/common';
+import { BadGatewayException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ConfigService } from '@semcache/shared-config';
 import type {
@@ -40,7 +34,11 @@ import {
 } from './dialog-turn.helpers';
 import { DEFAULT_DIALOG_TITLE, DialogsRepository } from './dialogs.repository';
 
-export { buildBranchHistory, buildSystemPromptWithKnowledge, classifyQueryCategory } from './dialog-turn.helpers';
+export {
+  buildBranchHistory,
+  buildSystemPromptWithKnowledge,
+  classifyQueryCategory,
+} from './dialog-turn.helpers';
 
 export const LLM_SERVICE_CLIENT = Symbol('LLM_SERVICE_CLIENT');
 export const KNOWLEDGE_BASE_SERVICE_CLIENT = Symbol('KNOWLEDGE_BASE_SERVICE_CLIENT');
@@ -149,7 +147,13 @@ export class DialogGraphService {
         llmSubscription = this.streamFromLlm({
           input,
           messagesForLlm,
-          baseState: { ...initialState, ...lookupState, ...kbState, history: messagesForLlm, userMessage },
+          baseState: {
+            ...initialState,
+            ...lookupState,
+            ...kbState,
+            history: messagesForLlm,
+            userMessage,
+          },
           userMessage,
           cacheMeta,
           subscriber,

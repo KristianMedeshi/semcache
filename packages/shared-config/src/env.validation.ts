@@ -205,9 +205,6 @@ export function serviceTcpEnvFields<TPrefix extends string>(prefix: TPrefix) {
     [`${prefix}_HOST`]: optionalString(),
     [`${prefix}_PORT`]: positiveInt(`${prefix}_PORT`).optional(),
     [`${prefix}_URL`]: optionalString(),
-  } as Record<
-    `${TPrefix}_HOST` | `${TPrefix}_URL`,
-    ReturnType<typeof optionalString>
-  > &
+  } as Record<`${TPrefix}_HOST` | `${TPrefix}_URL`, ReturnType<typeof optionalString>> &
     Record<`${TPrefix}_PORT`, z.ZodOptional<ReturnType<typeof positiveInt>>>;
 }

@@ -50,9 +50,9 @@ describe('CredentialsService', () => {
       .spyOn(usersRepositoryMock, 'create')
       .mockRejectedValueOnce(new Error('Failed query', { cause: { code: '23505' } }));
 
-    await expect(
-      credentialsService.register('race@example.com', 'StrongPass123!'),
-    ).rejects.toThrow(ConflictException);
+    await expect(credentialsService.register('race@example.com', 'StrongPass123!')).rejects.toThrow(
+      ConflictException,
+    );
     expect(createSpy).toHaveBeenCalledTimes(1);
   });
 

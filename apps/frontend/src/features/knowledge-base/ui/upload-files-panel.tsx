@@ -1,6 +1,9 @@
 import { FileText, Trash2, UploadCloud } from 'lucide-react';
 import type { ChangeEvent, DragEvent } from 'react';
-import { FORMAT_LABELS, type ParsedUploadFile } from '@/features/knowledge-base/model/knowledge-base-helpers';
+import {
+  FORMAT_LABELS,
+  type ParsedUploadFile,
+} from '@/features/knowledge-base/model/knowledge-base-helpers';
 import { cn } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';

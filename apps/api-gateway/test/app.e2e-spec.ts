@@ -312,7 +312,8 @@ describe('API Gateway (e2e)', () => {
     let dialogPort: number;
     let kbPort: number;
     let cachePort: number;
-    ({ app: mockAuthMicroservice, port: authPort } = await startMockTcpMicroservice(MockAuthModule));
+    ({ app: mockAuthMicroservice, port: authPort } =
+      await startMockTcpMicroservice(MockAuthModule));
     ({ app: mockDialogMicroservice, port: dialogPort } =
       await startMockTcpMicroservice(MockDialogModule));
     ({ app: mockKbMicroservice, port: kbPort } = await startMockTcpMicroservice(MockKbModule));

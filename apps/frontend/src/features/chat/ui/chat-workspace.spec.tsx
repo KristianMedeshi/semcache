@@ -104,8 +104,12 @@ describe('ChatWorkspace', () => {
 
     expect(await screen.findByText('Hello! Welcome to SemCache Support.')).toBeVisible();
     expect(screen.getByText('Telecom Assistant')).toBeVisible();
-    expect(screen.getByText('What mobile plans, offers and discounts are available?')).toBeVisible();
-    expect(screen.getByText('Can you help me understand my bill or a payment issue?')).toBeVisible();
+    expect(
+      screen.getByText('What mobile plans, offers and discounts are available?'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Can you help me understand my bill or a payment issue?'),
+    ).toBeVisible();
     expect(
       screen.getByText("I'm experiencing problems with my mobile network or internet."),
     ).toBeVisible();

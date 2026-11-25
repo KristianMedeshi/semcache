@@ -4,10 +4,7 @@ import { format } from 'date-fns';
 import { Headset, Pencil, User } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  AssistantMessageActions,
-  BranchControls,
-} from '@/features/chat/ui/chat-message-actions';
+import { AssistantMessageActions, BranchControls } from '@/features/chat/ui/chat-message-actions';
 import { ChatMessageEditor } from '@/features/chat/ui/chat-message-editor';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';

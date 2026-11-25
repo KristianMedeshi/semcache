@@ -5,7 +5,11 @@ const MAX_CAUSE_DEPTH = 5;
  */
 export function isPgUniqueViolation(error: unknown): boolean {
   let current: unknown = error;
-  for (let depth = 0; depth < MAX_CAUSE_DEPTH && current !== null && current !== undefined; depth++) {
+  for (
+    let depth = 0;
+    depth < MAX_CAUSE_DEPTH && current !== null && current !== undefined;
+    depth++
+  ) {
     if (typeof current !== 'object') {
       return false;
     }

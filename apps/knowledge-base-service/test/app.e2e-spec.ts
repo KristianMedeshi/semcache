@@ -103,7 +103,12 @@ describe('Knowledge Base Service (TCP e2e)', () => {
   });
 
   it('enforces RBAC: rejects unauthenticated and customer document uploads, allows admin', async () => {
-    await expectRpcErrorStatus(client, SERVICE_TCP_PATTERNS.KB_DOCUMENTS_LIST, { headers: {} }, 401);
+    await expectRpcErrorStatus(
+      client,
+      SERVICE_TCP_PATTERNS.KB_DOCUMENTS_LIST,
+      { headers: {} },
+      401,
+    );
     await expectRpcErrorStatus(
       client,
       SERVICE_TCP_PATTERNS.KB_DOCUMENTS_UPLOAD,

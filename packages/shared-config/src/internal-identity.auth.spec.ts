@@ -5,7 +5,9 @@ import { INTERNAL_AUTH_HEADERS, UserRole } from '@semcache/shared-types';
 import { createSignedInternalHeaders } from './constants';
 import { BaseInternalIdentityAuth } from './internal-identity.auth';
 
-function createRpcContext(headers?: Record<string, string | string[] | undefined>): ExecutionContext {
+function createRpcContext(
+  headers?: Record<string, string | string[] | undefined>,
+): ExecutionContext {
   return {
     switchToRpc: () => ({
       getData: () => (headers !== undefined ? { headers } : undefined),
@@ -22,7 +24,10 @@ describe('BaseInternalIdentityAuth', () => {
       INTERNAL_SERVICE_SECRET: secret,
     });
     const registry = new AuthenticationRegistry();
-    return { provider: new BaseInternalIdentityAuth(config, registry, 'TestIdentityAuth'), registry };
+    return {
+      provider: new BaseInternalIdentityAuth(config, registry, 'TestIdentityAuth'),
+      registry,
+    };
   }
 
   it('registers itself on the AuthenticationRegistry', () => {

@@ -143,7 +143,12 @@ export function useChatWorkspace() {
         parentMessageId: targetMessage.parentMessageId ?? null,
         dto: { content: newContent },
         onBranchCreated: (parentKey, createdMessageId) =>
-          setBranchSelection(setSelectedBranchesByDialog, activeDialogId, parentKey, createdMessageId),
+          setBranchSelection(
+            setSelectedBranchesByDialog,
+            activeDialogId,
+            parentKey,
+            createdMessageId,
+          ),
       });
     }, 'Unable to edit message. Please try again.');
   };
