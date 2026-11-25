@@ -1,11 +1,4 @@
-import {
-  BadGatewayException,
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadGatewayException, HttpException, Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
   ConfigService,
@@ -14,12 +7,22 @@ import {
 } from '@semcache/shared-config';
 import type { AuthTcpRequestDto, AuthTcpResponseDto, UserResponseDto } from '@semcache/shared-dtos';
 import { type AuthenticatedUser, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
-import type { Request, Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import type { GatewayEnv } from '../config/gateway.env';
 import { createSignedInternalHeaders, stripForgedInternalHeaders } from './internal-identity.util';
 
 export const AUTH_SERVICE_CLIENT = Symbol('AUTH_SERVICE_CLIENT');
+
+export interface AuthForwardContext {
+  headers: Record<string, string | string[] | undefined>;
+  method: string;
+  ip?: string;
+}
+
+export interface AuthProxyResult<T = unknown> {
+  data: T;
+  setCookie?: string;
+}
 
 const FORWARDED_HEADERS = [
   'cookie',
@@ -51,13 +54,12 @@ export class AuthProxyService {
     );
   }
 
-  async forwardRequest(
-    req: Request,
-    res: Response,
+  async forwardRequest<T = unknown>(
+    ctx: AuthForwardContext,
     pattern: string,
-    options?: { id?: string; body?: unknown; statusCode?: number },
-  ): Promise<void> {
-    const sanitizedIncoming = stripForgedInternalHeaders(req.headers);
+    options?: { id?: string; body?: unknown },
+  ): Promise<AuthProxyResult<T>> {
+    const sanitizedIncoming = stripForgedInternalHeaders(ctx.headers);
     const forwardHeaders: Record<string, string> = {};
 
     for (const headerName of FORWARDED_HEADERS) {
@@ -71,8 +73,8 @@ export class AuthProxyService {
 
     const requestPayload: AuthTcpRequestDto<unknown> = {
       headers: forwardHeaders,
-      method: req.method,
-      ...(req.ip ? { ip: req.ip } : {}),
+      method: ctx.method,
+      ...(ctx.ip ? { ip: ctx.ip } : {}),
       ...(options?.id !== undefined ? { id: options.id } : {}),
       ...(options?.body !== undefined ? { body: options.body } : {}),
     };
@@ -96,16 +98,14 @@ export class AuthProxyService {
       throw new BadGatewayException('Authentication service unavailable');
     }
 
-    const statusCode = options?.statusCode ?? HttpStatus.OK;
     if (isAuthTcpResponse(result)) {
-      if (result.setCookie) {
-        res.setHeader('set-cookie', [result.setCookie]);
-      }
-      res.status(statusCode).json(result.data);
-      return;
+      return {
+        data: result.data as T,
+        ...(result.setCookie ? { setCookie: result.setCookie } : {}),
+      };
     }
 
-    res.status(statusCode).json(result);
+    return { data: result as T };
   }
 
   async resolveCurrentUser(cookieHeader?: string): Promise<UserResponseDto | null> {

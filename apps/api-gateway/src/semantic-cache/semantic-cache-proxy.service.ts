@@ -1,15 +1,8 @@
-import {
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger,
-  Optional,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
 import type { SemanticCacheTcpRequestDto } from '@semcache/shared-dtos';
 import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
-import type { Request, Response } from 'express';
 import { AuthProxyService } from '../auth/auth-proxy.service';
 import { BaseTcpProxyService } from '../common/base-tcp-proxy.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -35,20 +28,22 @@ export class SemanticCacheProxyService extends BaseTcpProxyService {
     super(authProxyService, authContext);
   }
 
-  async forwardSemanticCacheRequest<TBody = undefined>(
-    req: Request,
-    res: Response,
+  async forwardSemanticCacheRequest<TResult = unknown, TBody = undefined>(
+    cookieHeader: string | undefined,
     pattern: string,
-    options?: { body?: TBody; statusCode?: number },
-  ): Promise<void> {
-    const identityHeaders = await this.buildIdentityHeaders(req, 'gateway-semantic-cache-proxy');
+    options?: { body?: TBody },
+  ): Promise<TResult> {
+    const identityHeaders = await this.buildIdentityHeaders(
+      cookieHeader,
+      'gateway-semantic-cache-proxy',
+    );
 
     const payload: SemanticCacheTcpRequestDto<TBody> = {
       headers: identityHeaders,
       ...(options?.body !== undefined ? { body: options.body } : {}),
     };
 
-    const result = await this.sendTcp<unknown>(
+    const result = await this.sendTcp<TResult>(
       this.semanticCacheClient,
       pattern,
       payload,
@@ -61,6 +56,6 @@ export class SemanticCacheProxyService extends BaseTcpProxyService {
       this.metricsService.recordKbInvalidation(invalidationKind);
     }
 
-    res.status(options?.statusCode ?? HttpStatus.OK).json(result);
+    return result;
   }
 }

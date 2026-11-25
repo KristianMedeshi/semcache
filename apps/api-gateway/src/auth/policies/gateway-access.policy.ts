@@ -27,14 +27,14 @@ export class GatewayAccessPolicy implements PolicyBefore<
   }
 
   viewProfile(user: UserResponseDto | null, targetUserId: string): boolean {
-    return (
-      user !== null &&
-      (user.role === UserRole.ADMIN ||
-        (user.role === UserRole.CUSTOMER && user.id === targetUserId))
-    );
+    return this.canAccessProfile(user, targetUserId);
   }
 
   updateProfile(user: UserResponseDto | null, targetUserId: string): boolean {
+    return this.canAccessProfile(user, targetUserId);
+  }
+
+  private canAccessProfile(user: UserResponseDto | null, targetUserId: string): boolean {
     return (
       user !== null &&
       (user.role === UserRole.ADMIN ||

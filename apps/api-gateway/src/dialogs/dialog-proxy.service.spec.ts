@@ -1,13 +1,11 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BadGatewayException, UnauthorizedException } from '@nestjs/common';
 import type { ClientProxy } from '@nestjs/microservices';
-import { INTERNAL_AUTH_HEADERS, SERVICE_TCP_PATTERNS, UserRole } from '@semcache/shared-types';
-import type { Request, Response } from 'express';
-import { Observable, of } from 'rxjs';
+import { SERVICE_TCP_PATTERNS, UserRole } from '@semcache/shared-types';
+import { Subject, firstValueFrom, of, throwError, toArray } from 'rxjs';
 import {
   createGatewayAuthProxyMock,
-  createJsonResponseMock,
-  createStreamResponseMock,
   createTestGatewayUser,
+  expectSignedInternalHeaders,
   useTestGatewayEnv,
 } from '../common/proxy-test-helpers';
 import { DialogProxyService } from './dialog-proxy.service';
@@ -32,94 +30,89 @@ describe('DialogProxyService', () => {
 
   it('rejects unauthenticated callers before calling dialog-service', async () => {
     const { proxy } = createDialogProxyHarness({ user: null });
-    const req = { method: 'GET', headers: {} } as Request;
-    const res = {} as Response;
 
     await expect(
-      proxy.forwardDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_LIST),
+      proxy.forwardDialogRequest(undefined, SERVICE_TCP_PATTERNS.DIALOGS_LIST),
     ).rejects.toThrow(UnauthorizedException);
   });
 
   it('forwards authenticated requests over TCP with signed internal identity headers', async () => {
     const dialogSendMock = jest.fn(() => of([{ id: 'dialog-1' }]));
     const { proxy } = createDialogProxyHarness({ dialogSendMock });
-    const req = { method: 'GET', headers: { cookie: 'semcache_sid=abc' } } as Request;
-    const { res, status, json } = createJsonResponseMock();
 
-    await proxy.forwardDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_LIST);
+    const result = await proxy.forwardDialogRequest(
+      'semcache_sid=abc',
+      SERVICE_TCP_PATTERNS.DIALOGS_LIST,
+    );
 
-    expect(dialogSendMock).toHaveBeenCalledTimes(1);
-    const [pattern, payload] = dialogSendMock.mock.calls[0] as unknown as [
-      string,
-      { headers: Record<string, string> },
-    ];
-    expect(pattern).toBe(SERVICE_TCP_PATTERNS.DIALOGS_LIST);
-    expect(payload.headers[INTERNAL_AUTH_HEADERS.USER_ID]).toBe(
+    expectSignedInternalHeaders(
+      dialogSendMock,
+      SERVICE_TCP_PATTERNS.DIALOGS_LIST,
       '11111111-1111-4111-8111-111111111111',
     );
-    expect(payload.headers[INTERNAL_AUTH_HEADERS.SIGNATURE]).toMatch(/^[a-f0-9]{64}$/);
-    expect(status).toHaveBeenCalledWith(200);
-    expect(json).toHaveBeenCalledWith([{ id: 'dialog-1' }]);
+    expect(result).toEqual({ data: [{ id: 'dialog-1' }] });
   });
 
-  it('streams SSE events over HTTP when streamDialogRequest receives TCP stream events', async () => {
+  it('streams events as an Observable and completes open streams on shutdown', async () => {
     const dialogSendMock = jest.fn(() =>
       of({ type: 'delta', delta: 'Hello ' }, { type: 'delta', delta: 'world' }),
     );
     const { proxy } = createDialogProxyHarness({ dialogSendMock });
-    const req = { method: 'POST', headers: { cookie: 'semcache_sid=abc' } } as Request;
-    const { res, writeHead, write, end } = createStreamResponseMock();
 
-    await proxy.streamDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM, {
-      dialogId: 'dialog-1',
-      body: { content: 'Hi' },
-    });
-
-    expect(writeHead).toHaveBeenCalledWith(
-      200,
-      expect.objectContaining({ 'Content-Type': 'text/event-stream; charset=utf-8' }),
+    const stream$ = await proxy.createDialogStream(
+      'semcache_sid=abc',
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM,
+      { dialogId: 'dialog-1', body: { content: 'Hi' } },
     );
-    expect(write).toHaveBeenNthCalledWith(1, 'data: {"type":"delta","delta":"Hello "}\n\n');
-    expect(write).toHaveBeenNthCalledWith(2, 'data: {"type":"delta","delta":"world"}\n\n');
-    expect(end).toHaveBeenCalledTimes(1);
+    const events = await firstValueFrom(stream$.pipe(toArray()));
+    expect(events).toEqual([
+      { type: 'delta', delta: 'Hello ' },
+      { type: 'delta', delta: 'world' },
+    ]);
+
+    const openSubject = new Subject<{ type: 'delta'; delta: string }>();
+    const longLivedProxy = createDialogProxyHarness({
+      dialogSendMock: jest.fn(() => openSubject.asObservable()),
+    }).proxy;
+    const liveStream$ = await longLivedProxy.createDialogStream(
+      'semcache_sid=abc',
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM,
+      { dialogId: 'dialog-1', body: { content: 'Hi' } },
+    );
+    let completed = false;
+    liveStream$.subscribe({ complete: () => (completed = true) });
+    longLivedProxy.beforeApplicationShutdown();
+    expect(completed).toBe(true);
   });
 
-  it('emits an SSE error event if TCP stream fails after headers are sent', async () => {
-    const dialogSendMock = jest.fn(
-      () =>
-        new Observable((subscriber) => {
-          subscriber.next({ type: 'delta', delta: 'Partial' });
-          subscriber.error({ statusCode: 502, message: 'Provider failed mid-stream' });
-        }),
+  it('maps pre-header TCP stream errors to HttpException', async () => {
+    const dialogSendMock = jest.fn(() =>
+      throwError(() => new Error('ECONNREFUSED')),
     );
     const { proxy } = createDialogProxyHarness({ dialogSendMock });
-    const req = { method: 'POST', headers: { cookie: 'semcache_sid=abc' } } as Request;
-    const { res, write, end } = createStreamResponseMock();
 
-    await proxy.streamDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM, {
-      dialogId: 'dialog-1',
-      body: { content: 'Hi' },
-    });
-
-    expect(write).toHaveBeenNthCalledWith(1, 'data: {"type":"delta","delta":"Partial"}\n\n');
-    expect(write).toHaveBeenNthCalledWith(
-      2,
-      'data: {"type":"error","statusCode":502,"message":"Provider failed mid-stream"}\n\n',
+    const stream$ = await proxy.createDialogStream(
+      'semcache_sid=abc',
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM,
+      { dialogId: 'dialog-1', body: { content: 'Hi' } },
     );
-    expect(end).toHaveBeenCalledTimes(1);
+
+    await expect(firstValueFrom(stream$)).rejects.toThrow(BadGatewayException);
   });
 
   it('forwards dialogId and messageId in DialogTcpRequestDto when provided', async () => {
     const dialogSendMock = jest.fn(() => of({ ok: true }));
     const { proxy } = createDialogProxyHarness({ dialogSendMock });
-    const req = { method: 'POST', headers: { cookie: 'semcache_sid=abc' } } as Request;
-    const { res } = createJsonResponseMock();
 
-    await proxy.forwardDialogRequest(req, res, SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT, {
-      dialogId: 'dialog-1',
-      messageId: 'msg-1',
-      body: { content: 'Edited' },
-    });
+    await proxy.forwardDialogRequest(
+      'semcache_sid=abc',
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT,
+      {
+        dialogId: 'dialog-1',
+        messageId: 'msg-1',
+        body: { content: 'Edited' },
+      },
+    );
 
     expect(dialogSendMock).toHaveBeenCalledWith(
       SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT,

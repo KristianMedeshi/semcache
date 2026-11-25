@@ -7,7 +7,6 @@ import {
 import type { AuthenticationContext } from '@nestjs/authentication';
 import type { ClientProxy } from '@nestjs/microservices';
 import { extractRpcErrorPayload } from '@semcache/shared-config';
-import type { Request } from 'express';
 import { firstValueFrom } from 'rxjs';
 import type { AuthProxyService } from '../auth/auth-proxy.service';
 
@@ -20,12 +19,11 @@ export abstract class BaseTcpProxyService {
   ) {}
 
   protected async buildIdentityHeaders(
-    req: Request,
+    cookieHeader: string | undefined,
     sessionId: string,
   ): Promise<Record<string, string>> {
     const user =
-      this.authContext?.user ??
-      (await this.authProxyService.resolveCurrentUser(req.headers.cookie));
+      this.authContext?.user ?? (await this.authProxyService.resolveCurrentUser(cookieHeader));
     if (!user) {
       throw new UnauthorizedException('Authentication required');
     }

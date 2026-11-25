@@ -3,17 +3,21 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
+  HttpCode,
   HttpStatus,
   Param,
   ParseEnumPipe,
   Patch,
   Post,
-  Req,
-  Res,
 } from '@nestjs/common';
 import { Can } from '@nestjs/authorization';
+import type {
+  CacheInvalidationResponseDto,
+  SemanticCacheSettingsResponseDto,
+  SemanticCacheStatsResponseDto,
+} from '@semcache/shared-dtos';
 import { QueryCategory, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
-import type { Request, Response } from 'express';
 import { GatewayAccessPolicy } from '../auth/policies/gateway-access.policy';
 import {
   GatewayInvalidateCacheBySourcesDto,
@@ -27,74 +31,60 @@ export class GatewaySemanticCacheController {
   constructor(private readonly semanticCacheProxyService: SemanticCacheProxyService) {}
 
   @Get('settings')
-  async getSettings(@Req() req: Request, @Res() res: Response): Promise<void> {
-    await this.semanticCacheProxyService.forwardSemanticCacheRequest(
-      req,
-      res,
+  async getSettings(@Headers('cookie') cookie?: string): Promise<SemanticCacheSettingsResponseDto> {
+    return this.semanticCacheProxyService.forwardSemanticCacheRequest<SemanticCacheSettingsResponseDto>(
+      cookie,
       SERVICE_TCP_PATTERNS.CACHE_SETTINGS_GET,
-      { statusCode: HttpStatus.OK },
     );
   }
 
   @Patch('settings')
   async updateSettings(
     @Body() body: GatewayUpdateSemanticCacheSettingsDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
-    await this.semanticCacheProxyService.forwardSemanticCacheRequest(
-      req,
-      res,
-      SERVICE_TCP_PATTERNS.CACHE_SETTINGS_UPDATE,
-      { body, statusCode: HttpStatus.OK },
-    );
+    @Headers('cookie') cookie?: string,
+  ): Promise<SemanticCacheSettingsResponseDto> {
+    return this.semanticCacheProxyService.forwardSemanticCacheRequest<
+      SemanticCacheSettingsResponseDto,
+      GatewayUpdateSemanticCacheSettingsDto
+    >(cookie, SERVICE_TCP_PATTERNS.CACHE_SETTINGS_UPDATE, { body });
   }
 
   @Get('stats')
-  async getStats(@Req() req: Request, @Res() res: Response): Promise<void> {
-    await this.semanticCacheProxyService.forwardSemanticCacheRequest(
-      req,
-      res,
+  async getStats(@Headers('cookie') cookie?: string): Promise<SemanticCacheStatsResponseDto> {
+    return this.semanticCacheProxyService.forwardSemanticCacheRequest<SemanticCacheStatsResponseDto>(
+      cookie,
       SERVICE_TCP_PATTERNS.CACHE_STATS_GET,
-      { statusCode: HttpStatus.OK },
     );
   }
 
   @Post('invalidate/sources')
+  @HttpCode(HttpStatus.OK)
   async invalidateBySources(
     @Body() body: GatewayInvalidateCacheBySourcesDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
-    await this.semanticCacheProxyService.forwardSemanticCacheRequest(
-      req,
-      res,
-      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES,
-      { body, statusCode: HttpStatus.OK },
-    );
+    @Headers('cookie') cookie?: string,
+  ): Promise<CacheInvalidationResponseDto> {
+    return this.semanticCacheProxyService.forwardSemanticCacheRequest<
+      CacheInvalidationResponseDto,
+      GatewayInvalidateCacheBySourcesDto
+    >(cookie, SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_SOURCES, { body });
   }
 
   @Delete('entries/category/:category')
   async invalidateByCategory(
     @Param('category', new ParseEnumPipe(QueryCategory)) category: QueryCategory,
-    @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
-    await this.semanticCacheProxyService.forwardSemanticCacheRequest(
-      req,
-      res,
-      SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_CATEGORY,
-      { body: { category }, statusCode: HttpStatus.OK },
-    );
+    @Headers('cookie') cookie?: string,
+  ): Promise<CacheInvalidationResponseDto> {
+    return this.semanticCacheProxyService.forwardSemanticCacheRequest<
+      CacheInvalidationResponseDto,
+      { category: QueryCategory }
+    >(cookie, SERVICE_TCP_PATTERNS.CACHE_INVALIDATE_BY_CATEGORY, { body: { category } });
   }
 
   @Delete('entries')
-  async clearAll(@Req() req: Request, @Res() res: Response): Promise<void> {
-    await this.semanticCacheProxyService.forwardSemanticCacheRequest(
-      req,
-      res,
+  async clearAll(@Headers('cookie') cookie?: string): Promise<CacheInvalidationResponseDto> {
+    return this.semanticCacheProxyService.forwardSemanticCacheRequest<CacheInvalidationResponseDto>(
+      cookie,
       SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL,
-      { statusCode: HttpStatus.OK },
     );
   }
 }

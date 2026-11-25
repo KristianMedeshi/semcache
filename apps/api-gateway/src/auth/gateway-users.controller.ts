@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -12,10 +11,12 @@ import {
 } from '@nestjs/common';
 import { Public } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
+import type { RevokeUserSessionsResponseDto, UserResponseDto } from '@semcache/shared-dtos';
 import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Request, Response } from 'express';
 import { AuthProxyService } from './auth-proxy.service';
 import { GatewayUpdateProfileDto } from './dto/gateway-auth.dto';
+import { forwardAuthWithCookie, toAuthForwardContext } from './gateway-auth.controller';
 import { GatewayAccessPolicy } from './policies/gateway-access.policy';
 
 @Public()
@@ -28,12 +29,13 @@ export class GatewayUsersController {
   async getUser(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
-    await this.authProxyService.forwardRequest(req, res, SERVICE_TCP_PATTERNS.USERS_GET, {
-      id,
-      statusCode: HttpStatus.OK,
-    });
+  ): Promise<UserResponseDto> {
+    const result = await this.authProxyService.forwardRequest<UserResponseDto>(
+      toAuthForwardContext(req),
+      SERVICE_TCP_PATTERNS.USERS_GET,
+      { id },
+    );
+    return result.data;
   }
 
   @Patch(':id')
@@ -41,13 +43,15 @@ export class GatewayUsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: GatewayUpdateProfileDto,
     @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
-    await this.authProxyService.forwardRequest(req, res, SERVICE_TCP_PATTERNS.USERS_UPDATE, {
-      id,
-      body,
-      statusCode: HttpStatus.OK,
-    });
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<UserResponseDto> {
+    return forwardAuthWithCookie<UserResponseDto>(
+      this.authProxyService,
+      req,
+      res,
+      SERVICE_TCP_PATTERNS.USERS_UPDATE,
+      { id, body },
+    );
   }
 }
 
@@ -58,26 +62,24 @@ export class GatewayAdminUsersController {
   constructor(private readonly authProxyService: AuthProxyService) {}
 
   @Get()
-  async listUsers(@Req() req: Request, @Res() res: Response): Promise<void> {
-    await this.authProxyService.forwardRequest(req, res, SERVICE_TCP_PATTERNS.ADMIN_USERS_LIST, {
-      statusCode: HttpStatus.OK,
-    });
+  async listUsers(@Req() req: Request): Promise<UserResponseDto[]> {
+    const result = await this.authProxyService.forwardRequest<UserResponseDto[]>(
+      toAuthForwardContext(req),
+      SERVICE_TCP_PATTERNS.ADMIN_USERS_LIST,
+    );
+    return result.data;
   }
 
   @Delete(':id/sessions')
   async revokeUserSessions(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
-    await this.authProxyService.forwardRequest(
-      req,
-      res,
+  ): Promise<RevokeUserSessionsResponseDto> {
+    const result = await this.authProxyService.forwardRequest<RevokeUserSessionsResponseDto>(
+      toAuthForwardContext(req),
       SERVICE_TCP_PATTERNS.ADMIN_USERS_REVOKE_SESSIONS,
-      {
-        id,
-        statusCode: HttpStatus.OK,
-      },
+      { id },
     );
+    return result.data;
   }
 }

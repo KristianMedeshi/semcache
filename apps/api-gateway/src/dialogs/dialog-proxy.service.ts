@@ -1,5 +1,5 @@
 import {
-  HttpStatus,
+  type BeforeApplicationShutdown,
   Inject,
   Injectable,
   Logger,
@@ -7,29 +7,26 @@ import {
 } from '@nestjs/common';
 import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
-import { formatRpcErrorMessage } from '@semcache/shared-config';
-import type {
-  DialogMessageStreamErrorEventDto,
-  DialogMessageStreamEventDto,
-  DialogTcpRequestDto,
-} from '@semcache/shared-dtos';
-import type { Request, Response } from 'express';
+import type { DialogMessageStreamEventDto, DialogTcpRequestDto } from '@semcache/shared-dtos';
+import { type Observable, Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { AuthProxyService } from '../auth/auth-proxy.service';
 import { BaseTcpProxyService } from '../common/base-tcp-proxy.service';
 import { MetricsService } from '../metrics/metrics.service';
 
 export const DIALOG_SERVICE_CLIENT = Symbol('DIALOG_SERVICE_CLIENT');
 
-const SSE_HEADERS = {
-  'Content-Type': 'text/event-stream; charset=utf-8',
-  'Cache-Control': 'no-cache, no-transform',
-  Connection: 'keep-alive',
-  'X-Accel-Buffering': 'no',
-} as const;
+export interface DialogProxyResult<T = unknown> {
+  data: T;
+  cacheHeaders?: {
+    status?: string;
+    mode?: string;
+  };
+}
 
 @Injectable()
-export class DialogProxyService extends BaseTcpProxyService {
+export class DialogProxyService extends BaseTcpProxyService implements BeforeApplicationShutdown {
   protected readonly logger = new Logger(DialogProxyService.name);
+  private readonly shutdown$ = new Subject<void>();
 
   constructor(
     authProxyService: AuthProxyService,
@@ -40,16 +37,20 @@ export class DialogProxyService extends BaseTcpProxyService {
     super(authProxyService, authContext);
   }
 
-  async forwardDialogRequest<TBody = undefined>(
-    req: Request,
-    res: Response,
+  beforeApplicationShutdown(): void {
+    this.shutdown$.next();
+    this.shutdown$.complete();
+  }
+
+  async forwardDialogRequest<TResult = unknown, TBody = undefined>(
+    cookieHeader: string | undefined,
     pattern: string,
-    options?: { dialogId?: string; messageId?: string; body?: TBody; statusCode?: number },
-  ): Promise<void> {
-    const payload = await this.buildAuthenticatedDialogPayload(req, options);
+    options?: { dialogId?: string; messageId?: string; body?: TBody },
+  ): Promise<DialogProxyResult<TResult>> {
+    const payload = await this.buildAuthenticatedDialogPayload(cookieHeader, options);
     const startedAt = performance.now();
 
-    const result = await this.sendTcp<unknown>(
+    const result = await this.sendTcp<TResult>(
       this.dialogClient,
       pattern,
       payload,
@@ -57,13 +58,14 @@ export class DialogProxyService extends BaseTcpProxyService {
       'Dialog service unavailable',
     );
 
+    let cacheHeaders: DialogProxyResult['cacheHeaders'];
     if (result && typeof result === 'object' && 'cache' in result && result.cache) {
       const cache = result.cache as { status?: string; mode?: string; category?: string };
-      if (cache.status && typeof res.setHeader === 'function') {
-        res.setHeader('X-Cache-Status', cache.status);
-      }
-      if (cache.mode && typeof res.setHeader === 'function') {
-        res.setHeader('X-Cache-Mode', cache.mode);
+      if (cache.status || cache.mode) {
+        cacheHeaders = {
+          ...(cache.status ? { status: cache.status } : {}),
+          ...(cache.mode ? { mode: cache.mode } : {}),
+        };
       }
       if (cache.status && this.metricsService) {
         const assistant =
@@ -86,89 +88,39 @@ export class DialogProxyService extends BaseTcpProxyService {
       }
     }
 
-    res.status(options?.statusCode ?? HttpStatus.OK).json(result);
+    return {
+      data: result,
+      ...(cacheHeaders ? { cacheHeaders } : {}),
+    };
   }
 
-  async streamDialogRequest<TBody = undefined>(
-    req: Request,
-    res: Response,
+  async createDialogStream<TBody = undefined>(
+    cookieHeader: string | undefined,
     pattern: string,
     options?: { dialogId?: string; messageId?: string; body?: TBody },
-  ): Promise<void> {
-    const payload = await this.buildAuthenticatedDialogPayload(req, options);
+  ): Promise<Observable<DialogMessageStreamEventDto>> {
+    const payload = await this.buildAuthenticatedDialogPayload(cookieHeader, options);
 
-    await new Promise<void>((resolve, reject) => {
-      let headersSent = false;
-      let settled = false;
-
-      const subscription = this.dialogClient
-        .send<DialogMessageStreamEventDto>(pattern, payload)
-        .subscribe({
-          next: (event) => {
-            if (!headersSent) {
-              headersSent = true;
-              res.writeHead(HttpStatus.OK, SSE_HEADERS);
-            }
-            res.write(`data: ${JSON.stringify(event)}\n\n`);
-          },
-          error: (error: unknown) => {
-            const mapped = this.mapRpcError(
-              error,
-              pattern,
-              'gateway.dialog_proxy.network_error',
-              'Dialog service unavailable',
-            );
-            if (!headersSent) {
-              if (!settled) {
-                settled = true;
-                reject(mapped);
-              }
-              return;
-            }
-
-            const errorEvent: DialogMessageStreamErrorEventDto = {
-              type: 'error',
-              statusCode: mapped.getStatus(),
-              message: formatRpcErrorMessage(
-                { statusCode: mapped.getStatus(), message: mapped.message },
-                'Streaming error',
-              ),
-            };
-            res.write(`data: ${JSON.stringify(errorEvent)}\n\n`);
-            res.end();
-            if (!settled) {
-              settled = true;
-              resolve();
-            }
-          },
-          complete: () => {
-            if (!headersSent) {
-              headersSent = true;
-              res.writeHead(HttpStatus.OK, SSE_HEADERS);
-            }
-            res.end();
-            if (!settled) {
-              settled = true;
-              resolve();
-            }
-          },
-        });
-
-      res.on('close', () => {
-        subscription.unsubscribe();
-        if (!settled) {
-          settled = true;
-          resolve();
-        }
-      });
-    });
+    return this.dialogClient.send<DialogMessageStreamEventDto>(pattern, payload).pipe(
+      takeUntil(this.shutdown$),
+      catchError((error: unknown) =>
+        throwError(() =>
+          this.mapRpcError(
+            error,
+            pattern,
+            'gateway.dialog_proxy.network_error',
+            'Dialog service unavailable',
+          ),
+        ),
+      ),
+    );
   }
 
   private async buildAuthenticatedDialogPayload<TBody>(
-    req: Request,
+    cookieHeader: string | undefined,
     options?: { dialogId?: string; messageId?: string; body?: TBody },
   ): Promise<DialogTcpRequestDto<TBody>> {
-    const identityHeaders = await this.buildIdentityHeaders(req, 'gateway-dialog-proxy');
+    const identityHeaders = await this.buildIdentityHeaders(cookieHeader, 'gateway-dialog-proxy');
 
     return {
       headers: identityHeaders,

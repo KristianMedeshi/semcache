@@ -1,7 +1,6 @@
 import type { ClientProxy } from '@nestjs/microservices';
 import { createValidatedConfigService } from '@semcache/shared-config';
-import { UserRole } from '@semcache/shared-types';
-import type { Response } from 'express';
+import { INTERNAL_AUTH_HEADERS, UserRole } from '@semcache/shared-types';
 import { AuthProxyService } from '../auth/auth-proxy.service';
 import { gatewayEnvSchema } from '../config/gateway.env';
 
@@ -31,18 +30,19 @@ export function createGatewayAuthProxyMock(user: MockGatewayUser | null): AuthPr
   return authProxy;
 }
 
-export function createJsonResponseMock() {
-  const json = jest.fn();
-  const status = jest.fn().mockReturnValue({ json });
-  return { res: { status, json } as unknown as Response, status, json };
-}
-
-export function createStreamResponseMock() {
-  const writeHead = jest.fn();
-  const write = jest.fn();
-  const end = jest.fn();
-  const on = jest.fn();
-  return { res: { writeHead, write, end, on } as unknown as Response, writeHead, write, end };
+export function expectSignedInternalHeaders(
+  sendMock: jest.Mock,
+  expectedPattern: string,
+  expectedUserId: string,
+): void {
+  expect(sendMock).toHaveBeenCalledTimes(1);
+  const [pattern, payload] = sendMock.mock.calls[0] as unknown as [
+    string,
+    { headers: Record<string, string> },
+  ];
+  expect(pattern).toBe(expectedPattern);
+  expect(payload.headers[INTERNAL_AUTH_HEADERS.USER_ID]).toBe(expectedUserId);
+  expect(payload.headers[INTERNAL_AUTH_HEADERS.SIGNATURE]).toMatch(/^[a-f0-9]{64}$/);
 }
 
 export function useTestGatewayEnv(): void {

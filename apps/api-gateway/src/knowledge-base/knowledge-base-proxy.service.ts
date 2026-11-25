@@ -1,15 +1,8 @@
-import {
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger,
-  Optional,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
 import type { KnowledgeBaseTcpRequestDto } from '@semcache/shared-dtos';
 import { KnowledgeDocumentStatus, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
-import type { Request, Response } from 'express';
 import { AuthProxyService } from '../auth/auth-proxy.service';
 import { BaseTcpProxyService } from '../common/base-tcp-proxy.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -29,13 +22,15 @@ export class KnowledgeBaseProxyService extends BaseTcpProxyService {
     super(authProxyService, authContext);
   }
 
-  async forwardKnowledgeBaseRequest<TBody = undefined>(
-    req: Request,
-    res: Response,
+  async forwardKnowledgeBaseRequest<TResult = unknown, TBody = undefined>(
+    cookieHeader: string | undefined,
     pattern: string,
-    options?: { documentId?: string; body?: TBody; statusCode?: number },
-  ): Promise<void> {
-    const identityHeaders = await this.buildIdentityHeaders(req, 'gateway-knowledge-base-proxy');
+    options?: { documentId?: string; body?: TBody },
+  ): Promise<TResult> {
+    const identityHeaders = await this.buildIdentityHeaders(
+      cookieHeader,
+      'gateway-knowledge-base-proxy',
+    );
 
     const payload: KnowledgeBaseTcpRequestDto<TBody> = {
       headers: identityHeaders,
@@ -43,7 +38,7 @@ export class KnowledgeBaseProxyService extends BaseTcpProxyService {
       ...(options?.body !== undefined ? { body: options.body } : {}),
     };
 
-    const result = await this.sendTcp<unknown>(
+    const result = await this.sendTcp<TResult>(
       this.kbClient,
       pattern,
       payload,
@@ -70,6 +65,6 @@ export class KnowledgeBaseProxyService extends BaseTcpProxyService {
       }
     }
 
-    res.status(options?.statusCode ?? HttpStatus.OK).json(result);
+    return result;
   }
 }
