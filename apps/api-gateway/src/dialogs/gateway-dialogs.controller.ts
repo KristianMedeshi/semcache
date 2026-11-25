@@ -14,6 +14,13 @@ import {
   Res,
 } from '@nestjs/common';
 import { Can } from '@nestjs/authorization';
+import {
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { formatRpcErrorMessage } from '@semcache/shared-config';
 import type {
   DeleteAllDialogsResponseDto,
@@ -28,13 +35,29 @@ import { SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
 import type { Response } from 'express';
 import type { Observable } from 'rxjs';
 import { GatewayAccessPolicy } from '../auth/policies/gateway-access.policy';
+import {
+  ApiSseStreamResponse,
+  ApiStandardErrors,
+  ApiUuidParam,
+} from '../common/swagger/api-responses.decorator';
+import { SWAGGER_COOKIE_AUTH_NAME } from '../swagger';
 import { DialogProxyService } from './dialog-proxy.service';
 import {
+  DeleteAllDialogsResponseSwaggerDto,
+  DeleteDialogResponseSwaggerDto,
+  DialogMessageResponseSwaggerDto,
+  DialogResponseSwaggerDto,
   GatewayCreateDialogDto,
   GatewayEditMessageDto,
   GatewaySendMessageDto,
   GatewayUpdateDialogDto,
+  SendMessageResponseSwaggerDto,
 } from './dto/gateway-dialogs.dto';
+
+const CACHE_TURN_HEADERS = {
+  'X-Cache-Status': { description: 'Semantic cache outcome (HIT | MISS | BYPASS)', schema: { type: 'string' } },
+  'X-Cache-Mode': { description: 'Active semantic cache mode', schema: { type: 'string' } },
+} as const;
 
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream; charset=utf-8',
@@ -43,12 +66,17 @@ const SSE_HEADERS = {
   'X-Accel-Buffering': 'no',
 } as const;
 
+@ApiTags('Dialogs')
+@ApiCookieAuth(SWAGGER_COOKIE_AUTH_NAME)
 @Can(GatewayAccessPolicy, 'accessDialogs')
 @Controller('dialogs')
 export class GatewayDialogsController {
   constructor(private readonly dialogProxyService: DialogProxyService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create a new dialog conversation' })
+  @ApiCreatedResponse({ description: 'Dialog created', type: DialogResponseSwaggerDto })
+  @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true })
   async createDialog(
     @Body() body: GatewayCreateDialogDto,
     @Headers('cookie') cookie?: string,
@@ -61,6 +89,9 @@ export class GatewayDialogsController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List all dialogs for the authenticated user' })
+  @ApiOkResponse({ description: 'User dialog threads', type: [DialogResponseSwaggerDto] })
+  @ApiStandardErrors({ auth: true, forbidden: true })
   async listDialogs(@Headers('cookie') cookie?: string): Promise<DialogResponseDto[]> {
     const result = await this.dialogProxyService.forwardDialogRequest<DialogResponseDto[]>(
       cookie,
@@ -70,6 +101,10 @@ export class GatewayDialogsController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Rename an existing dialog conversation' })
+  @ApiUuidParam('id', 'Dialog UUID')
+  @ApiOkResponse({ description: 'Updated dialog', type: DialogResponseSwaggerDto })
+  @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, notFound: true })
   async updateDialog(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: GatewayUpdateDialogDto,
@@ -83,6 +118,9 @@ export class GatewayDialogsController {
   }
 
   @Delete()
+  @ApiOperation({ summary: 'Delete all dialogs owned by the authenticated user' })
+  @ApiOkResponse({ description: 'Deleted dialog count', type: DeleteAllDialogsResponseSwaggerDto })
+  @ApiStandardErrors({ auth: true, forbidden: true })
   async deleteAllDialogs(
     @Headers('cookie') cookie?: string,
   ): Promise<DeleteAllDialogsResponseDto> {
@@ -94,6 +132,10 @@ export class GatewayDialogsController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a dialog and all its messages' })
+  @ApiUuidParam('id', 'Dialog UUID')
+  @ApiOkResponse({ description: 'Dialog deleted', type: DeleteDialogResponseSwaggerDto })
+  @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, notFound: true })
   async deleteDialog(
     @Param('id', ParseUUIDPipe) id: string,
     @Headers('cookie') cookie?: string,
@@ -107,6 +149,10 @@ export class GatewayDialogsController {
   }
 
   @Get(':id/messages')
+  @ApiOperation({ summary: 'List all messages in a dialog thread' })
+  @ApiUuidParam('id', 'Dialog UUID')
+  @ApiOkResponse({ description: 'Ordered dialog messages', type: [DialogMessageResponseSwaggerDto] })
+  @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, notFound: true })
   async getMessages(
     @Param('id', ParseUUIDPipe) id: string,
     @Headers('cookie') cookie?: string,
@@ -121,6 +167,14 @@ export class GatewayDialogsController {
 
   @Post(':id/messages')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a user message and receive an assistant turn (with semantic cache & RAG)' })
+  @ApiUuidParam('id', 'Dialog UUID')
+  @ApiOkResponse({
+    description: 'Completed dialog turn',
+    type: SendMessageResponseSwaggerDto,
+    headers: CACHE_TURN_HEADERS,
+  })
+  @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, notFound: true })
   async sendMessage(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: GatewaySendMessageDto,
@@ -135,6 +189,10 @@ export class GatewayDialogsController {
 
   @Post(':id/messages/stream')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a user message and stream the assistant reply over SSE' })
+  @ApiUuidParam('id', 'Dialog UUID')
+  @ApiSseStreamResponse('Server-Sent Events stream of user_message, delta, done, and error events')
+  @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, notFound: true })
   async streamMessage(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: GatewaySendMessageDto,
@@ -149,6 +207,15 @@ export class GatewayDialogsController {
 
   @Post(':id/messages/:messageId/edit')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Edit a user message to create a sibling conversation branch' })
+  @ApiUuidParam('id', 'Dialog UUID')
+  @ApiUuidParam('messageId', 'Target user message UUID')
+  @ApiOkResponse({
+    description: 'Completed branched turn',
+    type: SendMessageResponseSwaggerDto,
+    headers: CACHE_TURN_HEADERS,
+  })
+  @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, notFound: true })
   async editMessage(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('messageId', ParseUUIDPipe) messageId: string,
@@ -165,6 +232,11 @@ export class GatewayDialogsController {
 
   @Post(':id/messages/:messageId/edit/stream')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Edit a user message and stream the branched assistant reply over SSE' })
+  @ApiUuidParam('id', 'Dialog UUID')
+  @ApiUuidParam('messageId', 'Target user message UUID')
+  @ApiSseStreamResponse('Server-Sent Events stream for the branched turn')
+  @ApiStandardErrors({ badRequest: true, auth: true, forbidden: true, notFound: true })
   async streamEditMessage(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('messageId', ParseUUIDPipe) messageId: string,

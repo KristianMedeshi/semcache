@@ -617,4 +617,32 @@ describe('API Gateway (e2e)', () => {
       SERVICE_TCP_PATTERNS.CACHE_CLEAR_ALL,
     ]);
   });
+
+  it('serves OpenAPI JSON at /docs-json and Swagger UI at /docs/', async () => {
+    const jsonRes = await request(app.getHttpServer()).get('/docs-json').expect(200);
+    expect(jsonRes.body.openapi).toMatch(/^3\./);
+    expect(jsonRes.body.info?.title).toBe('SemCache API Gateway');
+    expect(jsonRes.body.components?.securitySchemes?.sessionCookie).toMatchObject({
+      type: 'apiKey',
+      in: 'cookie',
+    });
+    expect(jsonRes.body.paths['/docs-json']).toBeDefined();
+    expect(jsonRes.body.paths['/health']).toBeDefined();
+    expect(jsonRes.body.paths['/metrics']).toBeDefined();
+    expect(jsonRes.body.paths['/auth/login']).toBeDefined();
+    expect(jsonRes.body.paths['/dialogs/{id}/messages/stream']).toBeDefined();
+    expect(jsonRes.body.paths['/knowledge-base/documents']).toBeDefined();
+    expect(jsonRes.body.paths['/admin/semantic-cache/settings']).toBeDefined();
+    expect(Object.keys(jsonRes.body.components?.schemas ?? {})).toEqual(
+      expect.arrayContaining([
+        'GatewayRegisterDto',
+        'UserResponseSwaggerDto',
+        'SendMessageResponseSwaggerDto',
+        'SemanticCacheSettingsResponseSwaggerDto',
+      ]),
+    );
+
+    const uiRes = await request(app.getHttpServer()).get('/docs/').expect(200);
+    expect(uiRes.text).toContain('Swagger UI');
+  });
 });
