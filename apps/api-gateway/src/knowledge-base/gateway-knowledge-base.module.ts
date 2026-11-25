@@ -3,6 +3,7 @@ import type { ClientProxy } from '@nestjs/microservices';
 import { createTcpClientProvider } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
 import { GatewayAuthModule } from '../auth/gateway-auth.module';
+import { MetricsModule } from '../metrics/metrics.module';
 import { GatewayKnowledgeBaseController } from './gateway-knowledge-base.controller';
 import {
   KNOWLEDGE_BASE_SERVICE_CLIENT,
@@ -10,7 +11,7 @@ import {
 } from './knowledge-base-proxy.service';
 
 @Module({
-  imports: [GatewayAuthModule],
+  imports: [GatewayAuthModule, MetricsModule],
   controllers: [GatewayKnowledgeBaseController],
   providers: [
     createTcpClientProvider(KNOWLEDGE_BASE_SERVICE_CLIENT, ServiceName.KNOWLEDGE_BASE_SERVICE),

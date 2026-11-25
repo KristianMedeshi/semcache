@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import {
   ConfigService,
   buildCorsOptions,
@@ -7,6 +8,11 @@ import {
 import type { GatewayEnv } from './config/gateway.env';
 
 export function configureGatewayApp(app: INestApplication): void {
+  const expressApp = app as Partial<NestExpressApplication>;
+  if (typeof expressApp.set === 'function') {
+    expressApp.set('trust proxy', 1);
+  }
+
   const config = app.get<ConfigService<GatewayEnv, true>>(ConfigService);
   const corsOrigin = config.getOrThrow('CORS_ORIGIN');
   app.enableCors(buildCorsOptions(corsOrigin));

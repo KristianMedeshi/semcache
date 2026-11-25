@@ -1,7 +1,9 @@
 import {
   type ArgumentsHost,
   Catch,
+  ConsoleLogger,
   HttpException,
+  type NestApplicationOptions,
   type Provider,
   type Type,
   ValidationPipe,
@@ -132,6 +134,23 @@ export function createTcpClientProvider(provide: symbol | string, service: Servi
 }
 
 /**
+ * Returns NestJS logger options emitting redacted JSON logs to stdout in production.
+ */
+export function createProductionLoggerOptions(): Pick<NestApplicationOptions, 'logger'> {
+  if (process.env.NODE_ENV !== 'production') {
+    return {};
+  }
+
+  return {
+    logger: new ConsoleLogger({
+      json: true,
+      logLevels: ['log', 'warn', 'error', 'fatal'],
+      redact: ['password', 'authorization', 'cookie'],
+    }),
+  };
+}
+
+/**
  * Bootstraps a standalone NestJS TCP microservice with validated environment options
  * and graceful shutdown hooks.
  */
@@ -148,6 +167,7 @@ export async function bootstrapTcpMicroservice<TSchema extends z.ZodType<Record<
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(appModule, {
     transport: Transport.TCP,
     options: { host, port },
+    ...createProductionLoggerOptions(),
   });
   app.enableShutdownHooks();
   await app.listen();

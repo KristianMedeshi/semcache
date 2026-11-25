@@ -390,17 +390,30 @@ describe('API Gateway (e2e)', () => {
     process.env = { ...originalEnv };
   });
 
-  it('/health (GET)', () => {
-    return request(app.getHttpServer())
+  it('/health (GET) echoes valid X-Request-Id and generates one when missing or invalid', async () => {
+    const generated = await request(app.getHttpServer()).get('/health').expect(200);
+    expect(generated.body).toEqual({
+      service: ServiceName.API_GATEWAY,
+      status: 'ok',
+      timestamp: expect.any(String),
+    });
+    expect(generated.headers['x-request-id']).toMatch(/^[\w.-]{1,128}$/);
+
+    const echoed = await request(app.getHttpServer())
       .get('/health')
-      .expect(200)
-      .expect((res) => {
-        expect(res.body).toEqual({
-          service: ServiceName.API_GATEWAY,
-          status: 'ok',
-          timestamp: expect.any(String),
-        });
-      });
+      .set('x-request-id', 'trace-abc-123')
+      .expect(200);
+    expect(echoed.headers['x-request-id']).toBe('trace-abc-123');
+
+    const replaced = await request(app.getHttpServer())
+      .get('/health')
+      .set('x-request-id', 'invalid request id!')
+      .expect(200);
+    expect(replaced.headers['x-request-id']).not.toBe('invalid request id!');
+    expect(replaced.headers['x-request-id']).toMatch(/^[\w.-]{1,128}$/);
+
+    const unauth = await request(app.getHttpServer()).get('/dialogs').expect(401);
+    expect(unauth.headers['x-request-id']).toMatch(/^[\w.-]{1,128}$/);
   });
 
   it('proxies /auth/login over TCP and relays Set-Cookie header', async () => {

@@ -3,11 +3,12 @@ import type { ClientProxy } from '@nestjs/microservices';
 import { createTcpClientProvider } from '@semcache/shared-config';
 import { ServiceName } from '@semcache/shared-types';
 import { GatewayAuthModule } from '../auth/gateway-auth.module';
+import { MetricsModule } from '../metrics/metrics.module';
 import { DIALOG_SERVICE_CLIENT, DialogProxyService } from './dialog-proxy.service';
 import { GatewayDialogsController } from './gateway-dialogs.controller';
 
 @Module({
-  imports: [GatewayAuthModule],
+  imports: [GatewayAuthModule, MetricsModule],
   controllers: [GatewayDialogsController],
   providers: [
     createTcpClientProvider(DIALOG_SERVICE_CLIENT, ServiceName.DIALOG_SERVICE),
