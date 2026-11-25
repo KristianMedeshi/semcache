@@ -156,10 +156,14 @@ export class SemanticCacheService {
           );
         }
 
+        const categoryWeightsPatch = Object.fromEntries(
+          Object.entries(dto.categoryWeights ?? {}).filter(([, value]) => value !== undefined),
+        ) as Partial<SemanticCacheCategoryWeightsDto>;
+
         const mergedCategoryWeights: SemanticCacheCategoryWeightsDto = {
           ...DEFAULT_SEMANTIC_CACHE_CATEGORY_WEIGHTS,
           ...current.categoryWeights,
-          ...(dto.categoryWeights ?? {}),
+          ...categoryWeightsPatch,
         };
 
         return {

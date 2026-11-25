@@ -28,7 +28,7 @@ import { DialogPolicy } from './policies/dialog.policy';
     DialogGraphService,
     DialogsService,
   ],
-  exports: [DialogsService, DialogsRepository, DialogPolicy],
+  exports: [DialogsService],
 })
 export class DialogsModule implements OnModuleDestroy {
   constructor(

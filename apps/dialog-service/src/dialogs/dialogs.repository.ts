@@ -135,27 +135,28 @@ export class DialogsRepository {
     return toDialogMessageResponseDto(created);
   }
 
-  async updateDialogTitle(dialogId: string, title: string): Promise<DialogResponseDto> {
+  async updateDialogTitle(
+    dialogId: string,
+    userId: string,
+    title: string,
+  ): Promise<DialogResponseDto | null> {
     const rows = await this.db
       .update(dialogs)
       .set({
         title: title.trim(),
         updatedAt: new Date(),
       })
-      .where(eq(dialogs.id, dialogId))
+      .where(and(eq(dialogs.id, dialogId), eq(dialogs.userId, userId)))
       .returning();
 
     const updated = rows[0];
-    if (!updated) {
-      throw new Error('Failed to update dialog title');
-    }
-    return toDialogResponseDto(updated);
+    return updated ? toDialogResponseDto(updated) : null;
   }
 
-  async deleteDialog(dialogId: string): Promise<boolean> {
+  async deleteDialog(dialogId: string, userId: string): Promise<boolean> {
     const rows = await this.db
       .delete(dialogs)
-      .where(eq(dialogs.id, dialogId))
+      .where(and(eq(dialogs.id, dialogId), eq(dialogs.userId, userId)))
       .returning({ id: dialogs.id });
     return rows.length > 0;
   }

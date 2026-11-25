@@ -168,10 +168,14 @@ class InMemoryDialogsRepository {
     return msg;
   }
 
-  async updateDialogTitle(dialogId: string, title: string): Promise<DialogResponseDto> {
+  async updateDialogTitle(
+    dialogId: string,
+    userId: string,
+    title: string,
+  ): Promise<DialogResponseDto | null> {
     const dialog = this.dialogRows.get(dialogId);
-    if (!dialog) {
-      throw new Error('Dialog not found');
+    if (!dialog || dialog.userId !== userId) {
+      return null;
     }
     const updated: DialogResponseDto = {
       ...dialog,
@@ -182,7 +186,11 @@ class InMemoryDialogsRepository {
     return updated;
   }
 
-  async deleteDialog(dialogId: string): Promise<boolean> {
+  async deleteDialog(dialogId: string, userId: string): Promise<boolean> {
+    const dialog = this.dialogRows.get(dialogId);
+    if (!dialog || dialog.userId !== userId) {
+      return false;
+    }
     this.messageRows.delete(dialogId);
     return this.dialogRows.delete(dialogId);
   }

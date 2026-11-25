@@ -17,6 +17,6 @@ import { ThresholdCalculatorService } from './threshold-calculator.service';
     SemanticCacheRepository,
     SemanticCacheService,
   ],
-  exports: [SemanticCacheService, SemanticCacheRepository, SemanticCachePolicy],
+  exports: [SemanticCacheService],
 })
 export class SemanticCacheModule {}

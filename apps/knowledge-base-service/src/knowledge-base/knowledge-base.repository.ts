@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type {
   KnowledgeChunkResponseDto,
   KnowledgeDocumentResponseDto,
@@ -105,7 +105,7 @@ export class KnowledgeBaseRepository {
 
     const updated = rows[0];
     if (!updated) {
-      throw new Error(`Knowledge base document ${documentId} not found`);
+      throw new NotFoundException(`Knowledge base document ${documentId} not found`);
     }
     return updated;
   }

@@ -26,7 +26,7 @@ import {
     KnowledgeBaseRepository,
     KnowledgeBaseService,
   ],
-  exports: [KnowledgeBaseService, KnowledgeBaseRepository, KnowledgeBasePolicy],
+  exports: [KnowledgeBaseService],
 })
 export class KnowledgeBaseModule implements OnModuleDestroy {
   constructor(

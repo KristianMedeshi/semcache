@@ -42,12 +42,19 @@ export class DialogsService {
     dto: UpdateDialogRequestDto,
   ): Promise<DialogResponseDto> {
     await this.requireOwnedDialog(userId, dialogId);
-    return this.dialogsRepository.updateDialogTitle(dialogId, dto.title);
+    const updated = await this.dialogsRepository.updateDialogTitle(dialogId, userId, dto.title);
+    if (!updated) {
+      throw new NotFoundException('Dialog not found');
+    }
+    return updated;
   }
 
   async deleteDialog(userId: string, dialogId: string): Promise<DeleteDialogResponseDto> {
     await this.requireOwnedDialog(userId, dialogId);
-    await this.dialogsRepository.deleteDialog(dialogId);
+    const deleted = await this.dialogsRepository.deleteDialog(dialogId, userId);
+    if (!deleted) {
+      throw new NotFoundException('Dialog not found');
+    }
     return { id: dialogId, deleted: true };
   }
 

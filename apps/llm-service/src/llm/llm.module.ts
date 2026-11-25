@@ -95,6 +95,6 @@ export function createLmStudioProvider(
     LlmService,
     LlmPolicy,
   ],
-  exports: [LlmService, LlmPolicy],
+  exports: [LlmService],
 })
 export class LlmModule {}

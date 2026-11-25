@@ -130,7 +130,7 @@ describe('DialogsService', () => {
       findDialogByIdForUser: jest.fn(async (id, owner) =>
         id === dialog.id && owner === userId ? dialog : null,
       ),
-      updateDialogTitle: jest.fn(async (_id, title) => ({
+      updateDialogTitle: jest.fn(async (_id, _owner, title) => ({
         ...dialog,
         title,
         updatedAt: '2026-01-01T00:05:00.000Z',
@@ -149,7 +149,7 @@ describe('DialogsService', () => {
 
     const deleted = await service.deleteDialog(userId, dialogId);
     expect(deleted).toEqual({ id: dialogId, deleted: true });
-    expect(mockRepo.deleteDialog).toHaveBeenCalledWith(dialogId);
+    expect(mockRepo.deleteDialog).toHaveBeenCalledWith(dialogId, userId);
   });
 
   it('creates a sibling branch when editing a user message and sends only ancestor history to LLM', async () => {
