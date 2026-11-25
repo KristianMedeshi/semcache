@@ -6,6 +6,7 @@ import {
   isTestSecurityBypassEnabled,
 } from '@semcache/shared-config';
 import type { GatewayEnv } from './config/gateway.env';
+import { setupSwagger } from './swagger';
 
 export function configureGatewayApp(app: INestApplication): void {
   const expressApp = app as Partial<NestExpressApplication>;
@@ -24,4 +25,6 @@ export function configureGatewayApp(app: INestApplication): void {
   if (!bypassSecurity) {
     app.enableCsrfProtection({ trustedOrigins: corsOrigin });
   }
+
+  setupSwagger(app);
 }

@@ -30,6 +30,7 @@
     "@nestjs/core": "^12.0.1",
     "@nestjs/microservices": "^12.6.0",
     "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/swagger": "^12.1.2",
     "@semcache/shared-config": "workspace:*",
     "@semcache/shared-dtos": "workspace:*",
     "@semcache/shared-types": "workspace:*",
