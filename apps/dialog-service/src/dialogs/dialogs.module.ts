@@ -6,6 +6,7 @@ import { InternalIdentityAuth } from '../auth/internal-identity.provider';
 import { DatabaseModule } from '../db/database.module';
 import {
   DialogGraphService,
+  EMBEDDING_SERVICE_CLIENT,
   KNOWLEDGE_BASE_SERVICE_CLIENT,
   LLM_SERVICE_CLIENT,
   SEMANTIC_CACHE_SERVICE_CLIENT,
@@ -20,6 +21,7 @@ import { DialogPolicy } from './policies/dialog.policy';
   controllers: [DialogsController],
   providers: [
     createTcpClientProvider(LLM_SERVICE_CLIENT, ServiceName.LLM_SERVICE),
+    createTcpClientProvider(EMBEDDING_SERVICE_CLIENT, ServiceName.EMBEDDING_SERVICE),
     createTcpClientProvider(KNOWLEDGE_BASE_SERVICE_CLIENT, ServiceName.KNOWLEDGE_BASE_SERVICE),
     createTcpClientProvider(SEMANTIC_CACHE_SERVICE_CLIENT, ServiceName.SEMANTIC_CACHE_SERVICE),
     InternalIdentityAuth,
@@ -33,6 +35,7 @@ import { DialogPolicy } from './policies/dialog.policy';
 export class DialogsModule implements OnModuleDestroy {
   constructor(
     @Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy,
+    @Inject(EMBEDDING_SERVICE_CLIENT) private readonly embeddingClient: ClientProxy,
     @Inject(KNOWLEDGE_BASE_SERVICE_CLIENT) private readonly kbClient: ClientProxy,
     @Inject(SEMANTIC_CACHE_SERVICE_CLIENT) private readonly semanticCacheClient: ClientProxy,
   ) {}
@@ -40,6 +43,7 @@ export class DialogsModule implements OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     await Promise.all([
       this.llmClient.close(),
+      this.embeddingClient.close(),
       this.kbClient.close(),
       this.semanticCacheClient.close(),
     ]);

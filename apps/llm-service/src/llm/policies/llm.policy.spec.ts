@@ -7,10 +7,9 @@ describe('LlmPolicy', () => {
     policy = new LlmPolicy();
   });
 
-  it('allows internal completion, streaming, and embedding operations', () => {
+  it('allows internal completion and streaming operations', () => {
     expect(policy.generateCompletion(null)).toBe(true);
     expect(policy.streamCompletion(null)).toBe(true);
-    expect(policy.generateEmbeddings(null)).toBe(true);
   });
 
   it('permits only free OpenRouter models', () => {

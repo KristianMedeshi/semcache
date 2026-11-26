@@ -9,8 +9,8 @@ import { DocumentProcessorService } from './document-processor.service';
 import { KnowledgeBaseController } from './knowledge-base.controller';
 import { KnowledgeBaseRepository } from './knowledge-base.repository';
 import {
+  EMBEDDING_SERVICE_CLIENT,
   KnowledgeBaseService,
-  LLM_SERVICE_CLIENT,
   SEMANTIC_CACHE_SERVICE_CLIENT,
 } from './knowledge-base.service';
 
@@ -18,7 +18,7 @@ import {
   imports: [DatabaseModule],
   controllers: [KnowledgeBaseController],
   providers: [
-    createTcpClientProvider(LLM_SERVICE_CLIENT, ServiceName.LLM_SERVICE),
+    createTcpClientProvider(EMBEDDING_SERVICE_CLIENT, ServiceName.EMBEDDING_SERVICE),
     createTcpClientProvider(SEMANTIC_CACHE_SERVICE_CLIENT, ServiceName.SEMANTIC_CACHE_SERVICE),
     InternalIdentityAuth,
     KnowledgeBasePolicy,
@@ -30,11 +30,11 @@ import {
 })
 export class KnowledgeBaseModule implements OnModuleDestroy {
   constructor(
-    @Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy,
+    @Inject(EMBEDDING_SERVICE_CLIENT) private readonly embeddingClient: ClientProxy,
     @Inject(SEMANTIC_CACHE_SERVICE_CLIENT) private readonly semanticCacheClient: ClientProxy,
   ) {}
 
   async onModuleDestroy(): Promise<void> {
-    await Promise.all([this.llmClient.close(), this.semanticCacheClient.close()]);
+    await Promise.all([this.embeddingClient.close(), this.semanticCacheClient.close()]);
   }
 }

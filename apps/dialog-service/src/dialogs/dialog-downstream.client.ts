@@ -15,9 +15,9 @@ import type {
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
   DialogResponseDto,
+  GenerateEmbeddingsRequestDto,
+  GenerateEmbeddingsResponseDto,
   KnowledgeBaseTcpRequestDto,
-  LlmGenerateEmbeddingsRequestDto,
-  LlmGenerateEmbeddingsResponseDto,
   RetrieveKnowledgeContextRequestDto,
   RetrieveKnowledgeContextResponseDto,
   SemanticCacheEntryResponseDto,
@@ -76,12 +76,12 @@ export function translateLlmRpcError(
 export async function lookupDialogSemanticCache(
   state: DialogTurnStateType,
   deps: {
-    llmClient: ClientProxy;
+    embeddingClient?: ClientProxy;
     semanticCacheClient?: ClientProxy;
     logger: Logger;
   },
 ): Promise<Partial<DialogTurnStateType>> {
-  if (!deps.semanticCacheClient) {
+  if (!deps.semanticCacheClient || !deps.embeddingClient) {
     return { cacheLookup: null, cacheHit: false, queryEmbedding: null };
   }
 
@@ -107,9 +107,9 @@ export async function lookupDialogSemanticCache(
   const startedAt = performance.now();
   try {
     const embeddingResponse = await firstValueFrom(
-      deps.llmClient
-        .send<LlmGenerateEmbeddingsResponseDto, LlmGenerateEmbeddingsRequestDto>(
-          SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS,
+      deps.embeddingClient
+        .send<GenerateEmbeddingsResponseDto, GenerateEmbeddingsRequestDto>(
+          SERVICE_TCP_PATTERNS.EMBEDDINGS_GENERATE,
           { texts: [state.userContent] },
         )
         .pipe(timeout(CACHE_EMBEDDING_TIMEOUT_MS)),

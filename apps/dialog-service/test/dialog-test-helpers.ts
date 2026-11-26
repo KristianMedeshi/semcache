@@ -32,6 +32,7 @@ export function createMockDialogMessage(
 export function createInMemoryDialogHarness(options?: {
   initialMessages?: DialogMessageResponseDto[];
   sendImpl?: jest.Mock;
+  embeddingSendImpl?: jest.Mock;
   kbSendImpl?: jest.Mock;
   cacheSendImpl?: jest.Mock;
 }) {
@@ -70,6 +71,10 @@ export function createInMemoryDialogHarness(options?: {
 
   const sendMock = options?.sendImpl ?? jest.fn();
   const mockLlmClient = { send: sendMock } as unknown as ClientProxy;
+  const embeddingSendMock = options?.embeddingSendImpl;
+  const mockEmbeddingClient = embeddingSendMock
+    ? ({ send: embeddingSendMock } as unknown as ClientProxy)
+    : undefined;
   const kbSendMock = options?.kbSendImpl;
   const mockKbClient = kbSendMock ? ({ send: kbSendMock } as unknown as ClientProxy) : undefined;
   const cacheSendMock = options?.cacheSendImpl;
@@ -82,6 +87,7 @@ export function createInMemoryDialogHarness(options?: {
     mockKbClient,
     undefined,
     mockCacheClient,
+    mockEmbeddingClient,
   );
   const service = new DialogsService(mockRepo as DialogsRepository, graphService);
 
@@ -90,6 +96,7 @@ export function createInMemoryDialogHarness(options?: {
     dialogId: TEST_DIALOG_ID,
     service,
     sendMock,
+    embeddingSendMock,
     kbSendMock,
     cacheSendMock,
   };

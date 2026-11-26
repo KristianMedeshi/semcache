@@ -58,6 +58,11 @@ export const SERVICE_TCP_ENV_KEYS: Record<
     portKey: 'KNOWLEDGE_BASE_SERVICE_PORT',
     urlKey: 'KNOWLEDGE_BASE_SERVICE_URL',
   },
+  [ServiceName.EMBEDDING_SERVICE]: {
+    hostKey: 'EMBEDDING_SERVICE_HOST',
+    portKey: 'EMBEDDING_SERVICE_PORT',
+    urlKey: 'EMBEDDING_SERVICE_URL',
+  },
 };
 
 /**

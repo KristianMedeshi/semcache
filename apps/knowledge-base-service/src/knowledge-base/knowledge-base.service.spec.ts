@@ -13,7 +13,7 @@ import type { KnowledgeBaseRepository } from './knowledge-base.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
 
 function createKnowledgeBaseHarness(options?: {
-  llmSendImpl?: jest.Mock;
+  embeddingSendImpl?: jest.Mock;
   cacheSendImpl?: jest.Mock;
 }) {
   const mockRepo = new InMemoryKnowledgeBaseRepository();
@@ -43,8 +43,8 @@ function createKnowledgeBaseHarness(options?: {
     }),
   };
 
-  const llmSendMock =
-    options?.llmSendImpl ??
+  const embeddingSendMock =
+    options?.embeddingSendImpl ??
     jest.fn((_pattern: string, payload: { texts: string[] }) =>
       of({
         embeddings: payload.texts.map(() => Array.from({ length: 384 }, () => 0.05)),
@@ -55,7 +55,7 @@ function createKnowledgeBaseHarness(options?: {
       }),
     );
 
-  const llmClient = { send: llmSendMock } as unknown as ClientProxy;
+  const embeddingClient = { send: embeddingSendMock } as unknown as ClientProxy;
   const cacheSendMock =
     options?.cacheSendImpl ??
     jest.fn(() => of({ invalidatedCount: 1, scope: 'sources', documentIds: [] }));
@@ -64,7 +64,7 @@ function createKnowledgeBaseHarness(options?: {
   const service = new KnowledgeBaseService(
     spyRepo as KnowledgeBaseRepository,
     processor,
-    llmClient,
+    embeddingClient,
     undefined,
     semanticCacheClient,
   );
@@ -72,7 +72,7 @@ function createKnowledgeBaseHarness(options?: {
   return {
     service,
     mockRepo: spyRepo,
-    llmSendMock,
+    embeddingSendMock,
     cacheSendMock,
     docs: mockRepo.docs,
     chunksByDoc: mockRepo.chunksByDoc,
@@ -81,7 +81,7 @@ function createKnowledgeBaseHarness(options?: {
 
 describe('KnowledgeBaseService', () => {
   it('uploads, extracts, chunks, embeds, and marks a document as READY', async () => {
-    const { service, llmSendMock } = createKnowledgeBaseHarness();
+    const { service, embeddingSendMock } = createKnowledgeBaseHarness();
 
     const doc = await service.uploadDocument(
       {
@@ -98,13 +98,13 @@ describe('KnowledgeBaseService', () => {
     expect(doc.chunkCount).toBe(1);
     expect(doc.chunks).toHaveLength(1);
     expect(doc.errorMessage).toBeNull();
-    expect(llmSendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS, {
+    expect(embeddingSendMock).toHaveBeenCalledWith(SERVICE_TCP_PATTERNS.EMBEDDINGS_GENERATE, {
       texts: [expect.stringContaining('Scan the QR code')],
     });
   });
 
   it('tracks FAILED status and errorMessage when embedding generation fails, and recovers on reprocess', async () => {
-    const llmSendMock = jest
+    const embeddingSendMock = jest
       .fn()
       .mockReturnValueOnce(throwError(() => new Error('Embedding TCP timeout')))
       .mockReturnValueOnce(
@@ -117,7 +117,7 @@ describe('KnowledgeBaseService', () => {
         }),
       );
 
-    const { service } = createKnowledgeBaseHarness({ llmSendImpl: llmSendMock });
+    const { service } = createKnowledgeBaseHarness({ embeddingSendImpl: embeddingSendMock });
 
     const failedDoc = await service.uploadDocument({
       title: 'Billing FAQ',
@@ -235,11 +235,13 @@ describe('KnowledgeBaseService', () => {
   });
 
   it('skips unlinked cache invalidation when upload processing fails', async () => {
-    const llmSendMock = jest.fn().mockReturnValueOnce(throwError(() => new Error('LLM offline')));
+    const embeddingSendMock = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('Embedding service offline')));
     const cacheSendMock = jest.fn();
 
     const { service } = createKnowledgeBaseHarness({
-      llmSendImpl: llmSendMock,
+      embeddingSendImpl: embeddingSendMock,
       cacheSendImpl: cacheSendMock,
     });
 

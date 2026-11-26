@@ -1,9 +1,9 @@
-import { KNOWLEDGE_BASE_VALIDATION_LIMITS } from '@semcache/shared-dtos';
+import { EMBEDDING_VALIDATION_LIMITS } from '@semcache/shared-dtos';
 import {
   DEFAULT_LOCAL_EMBEDDING_MODEL,
   computeDeterministicEmbedding,
   computeTransformersEmbeddings,
-} from './deterministic-embedding.util';
+} from './transformers-embedding.util';
 
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
@@ -22,7 +22,7 @@ describe('computeDeterministicEmbedding (@huggingface/transformers multilingual)
     const vector = await computeDeterministicEmbedding(
       '5G Unlimited Plan includes EU roaming data',
     );
-    expect(vector).toHaveLength(KNOWLEDGE_BASE_VALIDATION_LIMITS.EMBEDDING_DIMENSIONS);
+    expect(vector).toHaveLength(EMBEDDING_VALIDATION_LIMITS.DIMENSIONS);
 
     const norm = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
     expect(norm).toBeCloseTo(1, 5);

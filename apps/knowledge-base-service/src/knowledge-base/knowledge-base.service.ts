@@ -12,13 +12,13 @@ import { ConfigService } from '@semcache/shared-config';
 import {
   type CacheInvalidationResponseDto,
   type DeleteKnowledgeDocumentResponseDto,
+  type GenerateEmbeddingsRequestDto,
+  type GenerateEmbeddingsResponseDto,
   type InvalidateCacheBySourcesRequestDto,
   KNOWLEDGE_BASE_VALIDATION_LIMITS,
   type KnowledgeDocumentDetailResponseDto,
   type KnowledgeDocumentResponseDto,
   type ListKnowledgeDocumentsQueryDto,
-  type LlmGenerateEmbeddingsRequestDto,
-  type LlmGenerateEmbeddingsResponseDto,
   type RetrieveKnowledgeContextRequestDto,
   type RetrieveKnowledgeContextResponseDto,
   type SemanticCacheTcpRequestDto,
@@ -45,7 +45,7 @@ import {
   toKnowledgeDocumentResponseDto,
 } from './knowledge-base.repository';
 
-export const LLM_SERVICE_CLIENT = Symbol('LLM_SERVICE_CLIENT');
+export const EMBEDDING_SERVICE_CLIENT = Symbol('EMBEDDING_SERVICE_CLIENT');
 export const SEMANTIC_CACHE_SERVICE_CLIENT = Symbol('SEMANTIC_CACHE_SERVICE_CLIENT');
 const CACHE_INVALIDATION_TIMEOUT_MS = 3_000;
 
@@ -56,7 +56,7 @@ export class KnowledgeBaseService {
   constructor(
     private readonly repository: KnowledgeBaseRepository,
     private readonly processor: DocumentProcessorService,
-    @Inject(LLM_SERVICE_CLIENT) private readonly llmClient: ClientProxy,
+    @Inject(EMBEDDING_SERVICE_CLIENT) private readonly embeddingClient: ClientProxy,
     @Optional() private readonly config?: ConfigService<KnowledgeBaseEnv, true>,
     @Optional()
     @Inject(SEMANTIC_CACHE_SERVICE_CLIENT)
@@ -312,8 +312,8 @@ export class KnowledgeBaseService {
       const batch = texts.slice(i, i + batchSize);
       try {
         const response = await firstValueFrom(
-          this.llmClient.send<LlmGenerateEmbeddingsResponseDto, LlmGenerateEmbeddingsRequestDto>(
-            SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS,
+          this.embeddingClient.send<GenerateEmbeddingsResponseDto, GenerateEmbeddingsRequestDto>(
+            SERVICE_TCP_PATTERNS.EMBEDDINGS_GENERATE,
             { texts: batch },
           ),
         );

@@ -7,17 +7,18 @@ This document defines mandatory architectural principles, constraints, and code 
 ## 1. System Architecture Rules
 
 1. **Microservice Isolation**:
-   - Every backend service in `apps/` (`api-gateway`, `auth-service`, `dialog-service`, `semantic-cache-service`, `llm-service`, `knowledge-base-service`) is an **independent NestJS application** with its own entry point, configuration, and lifecycle.
+   - Every backend service in `apps/` (`api-gateway`, `auth-service`, `dialog-service`, `semantic-cache-service`, `llm-service`, `knowledge-base-service`, `embedding-service`) is an **independent NestJS application** with its own entry point, configuration, and lifecycle.
 2. **Single Responsibility**:
    - `api-gateway` — strictly external request routing, input validation, and response aggregation.
    - `auth-service` — authentication, authorization, and user profile management.
    - `dialog-service` — dialog session management, message history persistence, and client request flow orchestration.
    - `semantic-cache-service` — storing and retrieving cached responses by embedding vectors, computing local cluster density, and calculating adaptive similarity thresholds.
-   - `llm-service` — LLM provider integration, response generation, and embedding vector generation.
+   - `llm-service` — LLM provider integration and response generation.
    - `knowledge-base-service` — managing knowledge base articles/documents and vector context retrieval.
+   - `embedding-service` — local multilingual embedding vector generation (`@huggingface/transformers`).
 3. **Inter-Service Communication**:
    - External client communication with `api-gateway` uses HTTP/REST (`http://localhost:3000`).
-   - Communication between internal microservices (`auth-service`, `dialog-service`, `semantic-cache-service`, `llm-service`, `knowledge-base-service`) and from `api-gateway` to internal microservices happens **exclusively synchronously via NestJS TCP transport** (`@nestjs/microservices`, `Transport.TCP`) using canonical message patterns (`SERVICE_TCP_PATTERNS`).
+   - Communication between internal microservices (`auth-service`, `dialog-service`, `semantic-cache-service`, `llm-service`, `knowledge-base-service`, `embedding-service`) and from `api-gateway` to internal microservices happens **exclusively synchronously via NestJS TCP transport** (`@nestjs/microservices`, `Transport.TCP`) using canonical message patterns (`SERVICE_TCP_PATTERNS`).
    - **Prohibited**: adding message brokers (RabbitMQ, Kafka, Redis Pub/Sub, etc.) unless explicitly approved by an architecture change.
 
 ---

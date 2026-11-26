@@ -11,10 +11,6 @@ export class LlmPolicy {
     return true;
   }
 
-  generateEmbeddings(_user: unknown): boolean {
-    return true;
-  }
-
   useModel(_user: unknown, model?: string): boolean {
     return model === undefined || model.trim() === '' || isFreeOpenRouterModel(model);
   }

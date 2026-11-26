@@ -41,6 +41,7 @@ export {
 } from './dialog-turn.helpers';
 
 export const LLM_SERVICE_CLIENT = Symbol('LLM_SERVICE_CLIENT');
+export const EMBEDDING_SERVICE_CLIENT = Symbol('EMBEDDING_SERVICE_CLIENT');
 export const KNOWLEDGE_BASE_SERVICE_CLIENT = Symbol('KNOWLEDGE_BASE_SERVICE_CLIENT');
 export const SEMANTIC_CACHE_SERVICE_CLIENT = Symbol('SEMANTIC_CACHE_SERVICE_CLIENT');
 
@@ -59,6 +60,9 @@ export class DialogGraphService {
     @Optional()
     @Inject(SEMANTIC_CACHE_SERVICE_CLIENT)
     private readonly semanticCacheClient?: ClientProxy,
+    @Optional()
+    @Inject(EMBEDDING_SERVICE_CLIENT)
+    private readonly embeddingClient?: ClientProxy,
   ) {
     this.compiledGraph = new StateGraph(DialogTurnState)
       .addNode('record_user_message', (state) => this.recordUserMessage(state))
@@ -301,7 +305,7 @@ export class DialogGraphService {
 
   private lookupSemanticCache(state: DialogTurnStateType): Promise<Partial<DialogTurnStateType>> {
     return lookupDialogSemanticCache(state, {
-      llmClient: this.llmClient,
+      embeddingClient: this.embeddingClient,
       semanticCacheClient: this.semanticCacheClient,
       logger: this.logger,
     });

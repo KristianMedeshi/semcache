@@ -17,8 +17,9 @@ semcache/
 │   ├── auth-service/             # Authentication and user management service
 │   ├── dialog-service/           # Dialog orchestration and conversation history service
 │   ├── semantic-cache-service/   # Semantic caching service (pgvector, HNSW, adaptive threshold)
-│   ├── llm-service/              # LLM provider integration and embedding generation service
+│   ├── llm-service/              # LLM provider integration and response generation service
 │   ├── knowledge-base-service/   # Knowledge base and contextual search (RAG) service
+│   ├── embedding-service/        # Local multilingual embedding vector generation service
 │   └── frontend/                 # User web interface and analytics dashboard (React + Vite)
 │
 ├── packages/
@@ -64,8 +65,9 @@ semcache/
 | **Auth Service**           | `@semcache/auth-service`           |    `3001`    | Manages user accounts, sessions, and access permissions.                                                                                                     |
 | **Dialog Service**         | `@semcache/dialog-service`         |    `3002`    | Orchestrates client dialogs, persists message history, and coordinates query processing.                                                                     |
 | **Semantic Cache Service** | `@semcache/semantic-cache-service` |    `3003`    | Searches semantically similar queries in PostgreSQL (`pgvector`, HNSW, Cosine distance), calculates local cluster density, and computes adaptive thresholds. |
-| **LLM Service**            | `@semcache/llm-service`            |    `3004`    | Integrates with LLM providers to generate responses and embedding vectors.                                                                                   |
+| **LLM Service**            | `@semcache/llm-service`            |    `3004`    | Integrates with LLM providers to generate chat responses.                                                                                                    |
 | **Knowledge Base Service** | `@semcache/knowledge-base-service` |    `3005`    | Manages support documentation and retrieves relevant context.                                                                                                |
+| **Embedding Service**      | `@semcache/embedding-service`      |    `3006`    | Generates 384-dimensional L2-normalized multilingual embedding vectors locally via `@huggingface/transformers`.                                              |
 | **Frontend**               | `@semcache/frontend`               |    `5173`    | Client web application built with React, TypeScript, and Vite.                                                                                               |
 
 ---

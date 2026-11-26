@@ -23,5 +23,5 @@ export function formatEmbeddingRpcError(error: unknown): string {
   if (rpcError) {
     return formatRpcErrorMessage(rpcError, 'Embedding service error');
   }
-  return error instanceof Error ? error.message : 'LLM embedding service unavailable';
+  return error instanceof Error ? error.message : 'Embedding service unavailable';
 }

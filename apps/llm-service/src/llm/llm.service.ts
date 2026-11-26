@@ -2,7 +2,6 @@ import type { OpenAICompatibleProvider } from '@ai-sdk/openai-compatible';
 import { AiService } from '@nestjs/ai';
 import {
   BadGatewayException,
-  BadRequestException,
   HttpException,
   Inject,
   Injectable,
@@ -10,22 +9,13 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@semcache/shared-config';
-import {
-  KNOWLEDGE_BASE_VALIDATION_LIMITS,
-  type LlmChatCompletionRequestDto,
-  type LlmChatCompletionResponseDto,
-  type LlmChatStreamEventDto,
-  type LlmGenerateEmbeddingsRequestDto,
-  type LlmGenerateEmbeddingsResponseDto,
+import type {
+  LlmChatCompletionRequestDto,
+  LlmChatCompletionResponseDto,
+  LlmChatStreamEventDto,
 } from '@semcache/shared-dtos';
 import { Observable } from 'rxjs';
 import type { LlmEnv } from '../config/llm.env';
-import {
-  DEFAULT_LOCAL_EMBEDDING_MODEL,
-  computeTransformersEmbeddings,
-  estimateTokenCount,
-  resolveLocalEmbeddingModelId,
-} from './deterministic-embedding.util';
 import {
   buildLlmCompletionResponse,
   formatProviderErrorLog,
@@ -126,35 +116,6 @@ export class LlmService {
         abortStream?.();
       };
     });
-  }
-
-  async generateEmbeddings(
-    dto: LlmGenerateEmbeddingsRequestDto,
-  ): Promise<LlmGenerateEmbeddingsResponseDto> {
-    if (!Array.isArray(dto.texts) || dto.texts.length === 0) {
-      throw new BadRequestException('At least one text is required for embedding generation');
-    }
-
-    const configuredModel =
-      this.config.get('OPENROUTER_EMBEDDING_MODEL') ?? DEFAULT_LOCAL_EMBEDDING_MODEL;
-    const requestedModel = dto.model?.trim() || configuredModel;
-    const startedAt = performance.now();
-    const targetDimensions = KNOWLEDGE_BASE_VALIDATION_LIMITS.EMBEDDING_DIMENSIONS;
-
-    const resolvedLocalModel = resolveLocalEmbeddingModelId(requestedModel);
-    const embeddings = await computeTransformersEmbeddings(
-      dto.texts,
-      targetDimensions,
-      resolvedLocalModel,
-    );
-    const totalTokens = dto.texts.reduce((sum, text) => sum + estimateTokenCount(text), 0);
-    return {
-      embeddings,
-      model: resolvedLocalModel,
-      dimensions: targetDimensions,
-      latencyMs: Math.max(1, Math.round(performance.now() - startedAt)),
-      usage: { totalTokens },
-    };
   }
 
   private toProviderException(error: unknown, targetModel: string): HttpException {

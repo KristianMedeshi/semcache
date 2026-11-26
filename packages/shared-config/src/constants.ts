@@ -49,6 +49,7 @@ export const DEFAULT_SERVICE_PORTS: Record<ServiceName, number> = {
   [ServiceName.SEMANTIC_CACHE_SERVICE]: 3003,
   [ServiceName.LLM_SERVICE]: 3004,
   [ServiceName.KNOWLEDGE_BASE_SERVICE]: 3005,
+  [ServiceName.EMBEDDING_SERVICE]: 3006,
 };
 
 export interface ExtractedRpcErrorPayload {

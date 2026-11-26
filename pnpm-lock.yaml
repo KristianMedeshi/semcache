@@ -545,6 +545,118 @@ importers:
         specifier: ^6.0.2
         version: 6.0.3
 
+  apps/embedding-service:
+    dependencies:
+      '@huggingface/transformers':
+        specifier: ^4.3.2
+        version: 4.3.2(@types/node@24.19.2)
+      '@nestjs/authentication':
+        specifier: ^0.1.6
+        version: 0.1.6(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/microservices@12.6.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/authorization':
+        specifier: ^0.1.4
+        version: 0.1.4(@nestjs/authentication@0.1.6(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/microservices@12.6.0)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/microservices@12.6.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/common':
+        specifier: ^12.0.1
+        version: 12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: ^12.1.1
+        version: 12.1.1(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^12.0.1
+        version: 12.5.1(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/microservices@12.6.0)(@nestjs/platform-express@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/microservices':
+        specifier: ^12.6.0
+        version: 12.6.0(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^12.0.1
+        version: 12.5.1(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@semcache/shared-config':
+        specifier: workspace:*
+        version: link:../../packages/shared-config
+      '@semcache/shared-dtos':
+        specifier: workspace:*
+        version: link:../../packages/shared-dtos
+      '@semcache/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.15.1
+        version: 0.15.1
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@nestjs/cli':
+        specifier: ^12.0.0
+        version: 12.0.13(@types/node@24.19.2)(prettier@3.10.1)(ts-loader@9.6.2(typescript@6.0.3)(webpack@5.112.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.33)(sharp@0.35.5(@types/node@24.19.2))(uglify-js@3.19.3)))(webpack@5.112.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.33)(sharp@0.35.5(@types/node@24.19.2))(uglify-js@3.19.3))
+      '@nestjs/mau':
+        specifier: ^0.2.6
+        version: 0.2.9
+      '@nestjs/schematics':
+        specifier: ^12.0.0
+        version: 12.0.13(chokidar@5.0.0)(prettier@3.10.1)(typescript@6.0.3)
+      '@nestjs/testing':
+        specifier: ^12.0.1
+        version: 12.5.1(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/microservices@12.6.0)(@nestjs/platform-express@12.5.1)
+      '@semcache/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/jest':
+        specifier: ^30.0.0
+        version: 30.0.0
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      '@types/supertest':
+        specifier: ^7.0.0
+        version: 7.2.1
+      jest:
+        specifier: ^30.0.0
+        version: 30.5.2(@types/node@24.19.2)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@24.19.2)(typescript@6.0.3))
+      oxlint:
+        specifier: ^1.58.0
+        version: 1.94.0(oxlint-tsgolint@7.0.2007)
+      oxlint-tsgolint:
+        specifier: ^7.0.2001
+        version: 7.0.2007
+      prettier:
+        specifier: ^3.4.2
+        version: 3.10.1
+      source-map-support:
+        specifier: ^0.5.21
+        version: 0.5.21
+      supertest:
+        specifier: ^7.0.0
+        version: 7.3.2(supports-color@8.1.1)
+      ts-jest:
+        specifier: ^29.4.0
+        version: 29.4.15(@babel/core@7.29.13(supports-color@8.1.1))(@jest/transform@30.5.2(supports-color@8.1.1))(@jest/types@30.5.1)(babel-jest@30.5.2(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(esbuild@0.28.2)(jest-util@30.5.1)(jest@30.5.2(@types/node@24.19.2)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@24.19.2)(typescript@6.0.3)))(typescript@6.0.3)
+      ts-loader:
+        specifier: ^9.5.2
+        version: 9.6.2(typescript@6.0.3)(webpack@5.112.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.33)(sharp@0.35.5(@types/node@24.19.2))(uglify-js@3.19.3))
+      ts-node:
+        specifier: ^10.9.2
+        version: 10.9.2(@types/node@24.19.2)(typescript@6.0.3)
+      tsconfig-paths:
+        specifier: ^4.2.0
+        version: 4.2.0
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+
   apps/frontend:
     dependencies:
       '@hookform/resolvers':
@@ -828,9 +940,6 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^3.0.93
         version: 3.0.93(zod@4.6.7)
-      '@huggingface/transformers':
-        specifier: ^4.3.2
-        version: 4.3.2(@types/node@24.19.2)
       '@nestjs/ai':
         specifier: ^0.0.2
         version: 0.0.2(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/resilience@0.0.3(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/microservices@12.6.0)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/testing@12.5.1(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/microservices@12.6.0)(@nestjs/platform-express@12.5.1))(ai@7.0.177(zod@4.6.7))(reflect-metadata@0.2.2)(rxjs@7.8.2)

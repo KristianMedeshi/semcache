@@ -598,17 +598,26 @@ export const KNOWLEDGE_BASE_VALIDATION_LIMITS = {
 } as const;
 
 /**
- * DTO contract for requesting embedding vectors from `llm-service` (`llm.embeddings`).
+ * Validation limits for embedding vector generation requests.
  */
-export interface LlmGenerateEmbeddingsRequestDto {
+export const EMBEDDING_VALIDATION_LIMITS = {
+  DIMENSIONS: 384,
+  MAX_BATCH_SIZE: 128,
+  MODEL_MAX_LENGTH: 120,
+} as const;
+
+/**
+ * DTO contract for requesting embedding vectors from `embedding-service` (`embeddings.generate`).
+ */
+export interface GenerateEmbeddingsRequestDto {
   texts: string[];
   model?: string;
 }
 
 /**
- * DTO contract for embedding vectors returned by `llm-service`.
+ * DTO contract for embedding vectors returned by `embedding-service`.
  */
-export interface LlmGenerateEmbeddingsResponseDto {
+export interface GenerateEmbeddingsResponseDto {
   embeddings: number[][];
   model: string;
   dimensions: number;

@@ -87,10 +87,13 @@ describe('DialogGraphService (RAG & Semantic Cache orchestration)', () => {
 
   it('short-circuits KB and LLM on semantic cache HIT with zero tokens', async () => {
     const sendMock = jest.fn((pattern: string) => {
-      if (pattern === SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS) {
+      throw new Error(`Unexpected LLM call: ${pattern}`);
+    });
+    const embeddingSendMock = jest.fn((pattern: string) => {
+      if (pattern === SERVICE_TCP_PATTERNS.EMBEDDINGS_GENERATE) {
         return createMockEmbeddingResponse();
       }
-      throw new Error(`Unexpected LLM call: ${pattern}`);
+      throw new Error(`Unexpected embedding call: ${pattern}`);
     });
     const kbSendMock = jest.fn();
     const cacheSendMock = jest.fn((pattern: string) => {
@@ -116,6 +119,7 @@ describe('DialogGraphService (RAG & Semantic Cache orchestration)', () => {
 
     const { userId, dialogId, service } = createInMemoryDialogHarness({
       sendImpl: sendMock,
+      embeddingSendImpl: embeddingSendMock,
       kbSendImpl: kbSendMock,
       cacheSendImpl: cacheSendMock,
     });
@@ -134,20 +138,24 @@ describe('DialogGraphService (RAG & Semantic Cache orchestration)', () => {
     });
     expect(turn.cache?.status).toBe(CacheHitStatus.HIT);
     expect(kbSendMock).not.toHaveBeenCalled();
-    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(embeddingSendMock).toHaveBeenCalledTimes(1);
   });
 
   it('stores response with KB source IDs on semantic cache MISS and skips store on DISABLED', async () => {
-    const sendMock = jest.fn((pattern: string) => {
-      if (pattern === SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS) {
-        return createMockEmbeddingResponse();
-      }
-      return of({
+    const sendMock = jest.fn(() =>
+      of({
         content: 'Autopay gives a 3% discount.',
         model: 'support-llm',
         latencyMs: 120,
         usage: { promptTokens: 20, completionTokens: 10, totalTokens: 30 },
-      });
+      }),
+    );
+    const embeddingSendMock = jest.fn((pattern: string) => {
+      if (pattern === SERVICE_TCP_PATTERNS.EMBEDDINGS_GENERATE) {
+        return createMockEmbeddingResponse();
+      }
+      throw new Error(`Unexpected embedding call: ${pattern}`);
     });
     const kbSendMock = jest.fn(() =>
       of({
@@ -186,6 +194,7 @@ describe('DialogGraphService (RAG & Semantic Cache orchestration)', () => {
 
     const { userId, dialogId, service } = createInMemoryDialogHarness({
       sendImpl: sendMock,
+      embeddingSendImpl: embeddingSendMock,
       kbSendImpl: kbSendMock,
       cacheSendImpl: cacheSendMock,
     });

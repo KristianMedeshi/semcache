@@ -78,7 +78,7 @@ Every lookup uses the persisted global `mode` by default, with optional per-requ
 
 - `knowledge-base-service` notifies `semantic-cache-service` (`cache.invalidate.bySources`) whenever a Knowledge Base document is reprocessed (`kb.documents.reprocess`, which also accepts optional updated `content`/`title`/`metadata`) or deleted (`kb.documents.delete`), ensuring stale cached answers referencing updated or removed documents are purged automatically.
 - `knowledge-base-service` also calls `cache.invalidate.unlinked` whenever a Knowledge Base document is uploaded (`kb.documents.upload`) or reprocessed (`kb.documents.reprocess`) to `READY` status, purging previously ungrounded cached answers (entries with zero rows in `semantic_cache_entry_sources`) so future queries can use the new KB context.
-- `dialog-service` (`DialogGraphService`) embeds incoming queries via `llm.embeddings`, performs `cache.lookup` before RAG/LLM execution, short-circuits on `HIT` (returning `cache: SemanticCacheTurnMetadataDto` on `SendMessageResponseDto` and `X-Cache-Status` / `X-Cache-Mode` headers on `api-gateway`), and persists `MISS` responses via `cache.store` with linked `knowledgeSourceIds`.
+- `dialog-service` (`DialogGraphService`) embeds incoming queries via `embeddings.generate` (`embedding-service`), performs `cache.lookup` before RAG/LLM execution, short-circuits on `HIT` (returning `cache: SemanticCacheTurnMetadataDto` on `SendMessageResponseDto` and `X-Cache-Status` / `X-Cache-Mode` headers on `api-gateway`), and persists `MISS` responses via `cache.store` with linked `knowledgeSourceIds`.
 
 ---
 

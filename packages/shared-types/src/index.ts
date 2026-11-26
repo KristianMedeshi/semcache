@@ -8,6 +8,7 @@ export enum ServiceName {
   SEMANTIC_CACHE_SERVICE = 'semantic-cache-service',
   LLM_SERVICE = 'llm-service',
   KNOWLEDGE_BASE_SERVICE = 'knowledge-base-service',
+  EMBEDDING_SERVICE = 'embedding-service',
 }
 
 /**
@@ -164,7 +165,7 @@ export const SERVICE_TCP_PATTERNS = {
   DIALOGS_MESSAGES_EDIT_STREAM: 'dialogs.messages.edit.stream',
   LLM_CHAT: 'llm.chat',
   LLM_CHAT_STREAM: 'llm.chat.stream',
-  LLM_EMBEDDINGS: 'llm.embeddings',
+  EMBEDDINGS_GENERATE: 'embeddings.generate',
   KB_DOCUMENTS_UPLOAD: 'kb.documents.upload',
   KB_DOCUMENTS_LIST: 'kb.documents.list',
   KB_DOCUMENTS_GET: 'kb.documents.get',

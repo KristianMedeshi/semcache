@@ -9,8 +9,8 @@ import {
 } from '@semcache/shared-config/testing';
 import type {
   DeleteKnowledgeDocumentResponseDto,
+  GenerateEmbeddingsResponseDto,
   KnowledgeDocumentDetailResponseDto,
-  LlmGenerateEmbeddingsResponseDto,
   RetrieveKnowledgeContextResponseDto,
 } from '@semcache/shared-dtos';
 import {
@@ -31,9 +31,9 @@ import {
 } from './in-memory-knowledge-base.repository';
 
 @Controller()
-class MockLlmEmbeddingController {
-  @MessagePattern(SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS)
-  embed(@Payload() payload: { texts: string[] }): LlmGenerateEmbeddingsResponseDto {
+class MockEmbeddingController {
+  @MessagePattern(SERVICE_TCP_PATTERNS.EMBEDDINGS_GENERATE)
+  embed(@Payload() payload: { texts: string[] }): GenerateEmbeddingsResponseDto {
     return {
       embeddings: payload.texts.map(embedTextDeterministic),
       model: 'local/deterministic-384',
@@ -45,26 +45,27 @@ class MockLlmEmbeddingController {
 }
 
 @Module({
-  controllers: [MockLlmEmbeddingController],
+  controllers: [MockEmbeddingController],
 })
-class MockLlmEmbeddingModule {}
+class MockEmbeddingModule {}
 
 describe('Knowledge Base Service (TCP e2e)', () => {
   let app: INestMicroservice;
   let client: ClientProxy;
-  let mockLlmApp: INestMicroservice;
+  let mockEmbeddingApp: INestMicroservice;
   let cacheSendMock: jest.Mock;
   const originalEnv = { ...process.env };
   const secret = 'test-internal-service-secret-32-chars';
 
   beforeAll(async () => {
-    let llmPort: number;
-    ({ app: mockLlmApp, port: llmPort } = await startMockTcpMicroservice(MockLlmEmbeddingModule));
+    let embeddingPort: number;
+    ({ app: mockEmbeddingApp, port: embeddingPort } =
+      await startMockTcpMicroservice(MockEmbeddingModule));
 
     process.env.NODE_ENV = 'test';
     process.env.INTERNAL_SERVICE_SECRET = secret;
-    process.env.LLM_SERVICE_HOST = '127.0.0.1';
-    process.env.LLM_SERVICE_PORT = String(llmPort);
+    process.env.EMBEDDING_SERVICE_HOST = '127.0.0.1';
+    process.env.EMBEDDING_SERVICE_PORT = String(embeddingPort);
 
     cacheSendMock = jest.fn(() => of({ invalidatedCount: 0, scope: 'unlinked' }));
 
@@ -85,7 +86,7 @@ describe('Knowledge Base Service (TCP e2e)', () => {
   afterAll(async () => {
     await client.close();
     await app.close();
-    await mockLlmApp.close();
+    await mockEmbeddingApp.close();
     process.env = { ...originalEnv };
   });
 

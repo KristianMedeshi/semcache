@@ -15,6 +15,7 @@ export const dialogEnvSchema = baseEnvSchema
     DIALOG_SERVICE_PORT: positiveInt('DIALOG_SERVICE_PORT').optional(),
     DATABASE_URL: defaultString(''),
     ...serviceTcpEnvFields('LLM_SERVICE'),
+    ...serviceTcpEnvFields('EMBEDDING_SERVICE'),
     ...serviceTcpEnvFields('KNOWLEDGE_BASE_SERVICE'),
     ...serviceTcpEnvFields('SEMANTIC_CACHE_SERVICE'),
     KB_RAG_TOP_K: positiveInt('KB_RAG_TOP_K').default(4),

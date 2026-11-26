@@ -126,21 +126,4 @@ describe('LLM Service (TCP e2e)', () => {
   it('llm.chat.stream rejects paid models with 400 Bad Request RPC error', async () => {
     await expectPaidModelRejected(SERVICE_TCP_PATTERNS.LLM_CHAT_STREAM, true);
   });
-
-  it('llm.embeddings returns normalized 384-dim embeddings over TCP', async () => {
-    const res = await firstValueFrom(
-      client.send(SERVICE_TCP_PATTERNS.LLM_EMBEDDINGS, {
-        texts: ['eSIM QR code activation guide', 'Monthly billing cycle'],
-      }),
-    );
-
-    expect(res).toEqual({
-      embeddings: [expect.any(Array), expect.any(Array)],
-      model: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
-      dimensions: 384,
-      latencyMs: expect.any(Number),
-      usage: { totalTokens: expect.any(Number) },
-    });
-    expect(res.embeddings[0]).toHaveLength(384);
-  });
 });
