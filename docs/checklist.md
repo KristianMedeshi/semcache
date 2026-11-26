@@ -2,55 +2,91 @@
 
 ## 1. Microservices Architecture (NestJS / TypeScript)
 
-- [ ] **API Gateway:** Single entry point and REST request routing to internal services.
-- [ ] **Dialog Service:** Stores conversation history and orchestrates message processing (cache lookup -> LLM call if needed -> store result).
-- [ ] **LLM Service:** Integrates with free cloud models for response generation and vector embedding computation.
-- [ ] **Knowledge Base Service:** CRUD operations for support articles/documents (tourism or telecom domain) and retrieval of relevant context.
-- [ ] **Semantic Cache Service:** Implemented as a dedicated microservice with its own API for cache lookup, insertion, and invalidation.
-- [ ] **Database:** PostgreSQL deployed with the `pgvector` extension enabled and vector indexes configured for fast similarity search.
+- [x] **API Gateway:** Single entry point and REST request routing to internal services. — Done (`apps/api-gateway/src/app.module.ts`, `apps/api-gateway/src/auth/gateway-auth.controller.ts`, `apps/api-gateway/src/dialogs/gateway-dialogs.controller.ts`, `apps/api-gateway/src/knowledge-base/gateway-knowledge-base.controller.ts`, `apps/api-gateway/src/semantic-cache/gateway-semantic-cache.controller.ts`, `apps/api-gateway/src/swagger.ts`; routes REST/SSE to internal services over NestJS TCP with signed internal identity headers, RBAC, and validation).
+- [x] **Dialog Service:** Stores conversation history and orchestrates message processing (cache lookup -> LLM call if needed -> store result). — Done (`apps/dialog-service/src/dialogs/dialog-graph.service.ts`, `apps/dialog-service/src/dialogs/dialog-downstream.client.ts`, `apps/dialog-service/src/dialogs/dialogs.service.ts`, `apps/dialog-service/src/dialogs/dialogs.repository.ts`, `apps/dialog-service/src/db/schema.ts`; LangGraph `StateGraph` + SSE streaming with cache short-circuit, RAG retrieval, LLM call, cache store, and PostgreSQL history).
+- [x] **LLM Service:** Integrates with free cloud models for response generation and vector embedding computation. — Done (`apps/llm-service/src/llm/llm.module.ts`, `apps/llm-service/src/llm/llm.service.ts`, `apps/llm-service/src/llm/llm-call-builder.ts` integrate free OpenRouter cloud models and optional local LM Studio for chat/streaming; vector embedding computation was extracted into the dedicated `apps/embedding-service/src/embedding/embedding.service.ts` + `transformers-embedding.util.ts` using local `@huggingface/transformers`).
+- [x] **Knowledge Base Service:** CRUD operations for support articles/documents (tourism or telecom domain) and retrieval of relevant context. — Done (`apps/knowledge-base-service/src/knowledge-base/knowledge-base.controller.ts`, `knowledge-base.service.ts`, `knowledge-base.repository.ts`, `document-processor.service.ts`, `apps/knowledge-base-service/src/db/schema.ts`, `docs/telecom-knowledge-base.md`; upload/list/get/reprocess-update/delete for TXT/MD/HTML/JSON/PDF/DOCX and pgvector cosine RAG search).
+- [x] **Semantic Cache Service:** Implemented as a dedicated microservice with its own API for cache lookup, insertion, and invalidation. — Done (`apps/semantic-cache-service/src/semantic-cache/semantic-cache.controller.ts`, `semantic-cache.service.ts`, `semantic-cache.repository.ts`, `apps/api-gateway/src/semantic-cache/gateway-semantic-cache.controller.ts`; TCP API for lookup, store, invalidation by sources/category/unlinked/all, settings, and stats).
+- [x] **Database:** PostgreSQL deployed with the `pgvector` extension enabled and vector indexes configured for fast similarity search. — Done (`infrastructure/docker/docker-compose.yml` with `pgvector/pgvector:pg17`, `infrastructure/postgres/init.sql`, Drizzle schemas & migrations with `vector(384)` and HNSW `vector_cosine_ops` indexes in `apps/semantic-cache-service/drizzle/0000_create_semantic_cache.sql` and `apps/knowledge-base-service/drizzle/0000_create_knowledge_base.sql`).
 
 ## 2. Research Component: Adaptive Threshold & Cache Invalidation
 
-- [ ] **Fixed Threshold Mode:** Baseline vector search with a hardcoded similarity threshold (including `0.9` for comparison).
-- [ ] **Adaptive Threshold Mode:** Dynamic threshold calculation accounting for:
+- [x] **Fixed Threshold Mode:** Baseline vector search with a hardcoded similarity threshold (including `0.9` for comparison). — Done (`apps/semantic-cache-service/src/semantic-cache/threshold-calculator.service.ts`, `packages/shared-dtos/src/index.ts` `DEFAULT_FIXED_THRESHOLD = 0.9`, `apps/semantic-cache-service/src/db/schema.ts`).
+- [x] **Adaptive Threshold Mode:** Dynamic threshold calculation accounting for: — Done (`apps/semantic-cache-service/src/semantic-cache/threshold-calculator.service.ts` `computeLocalClusterDensity` + `computeAdaptiveThreshold`, `apps/semantic-cache-service/src/semantic-cache/semantic-cache.service.ts`, `apps/dialog-service/src/dialogs/dialog-turn.helpers.ts` `classifyQueryCategory`, `packages/shared-dtos/src/index.ts` `DEFAULT_SEMANTIC_CACHE_CATEGORY_WEIGHTS`).
   - incoming query category (intent);
   - local cluster density in the embedding space.
-- [ ] **Mode Switching:** Ability to easily toggle between _no cache_, _fixed threshold_, and _adaptive threshold_ modes for reproducible experiments.
-- [ ] **Source Binding:** Each cached entry stores references (IDs) to the specific knowledge base documents used to generate the answer.
-- [ ] **Cache Invalidation:** Editing or deleting a document in the knowledge base automatically removes or invalidates all linked entries in the semantic cache.
+- [x] **Mode Switching:** Ability to easily toggle between _no cache_, _fixed threshold_, and _adaptive threshold_ modes for reproducible experiments. — Done (`apps/api-gateway/src/semantic-cache/gateway-semantic-cache.controller.ts` `GET/PATCH /admin/semantic-cache/settings` persists `disabled` / `fixed` / `adaptive`, plus per-request `cacheMode` and `fixedThresholdOverride` in `apps/dialog-service/src/dialogs/dialog-downstream.client.ts` and `apps/semantic-cache-service/src/semantic-cache/semantic-cache.service.ts`).
+- [x] **Source Binding:** Each cached entry stores references (IDs) to the specific knowledge base documents used to generate the answer. — Done (`apps/semantic-cache-service/src/db/schema.ts` `semantic_cache_entry_sources` table, `apps/semantic-cache-service/src/semantic-cache/semantic-cache.repository.ts` `createEntry`, `apps/dialog-service/src/dialogs/dialog-downstream.client.ts` `storeDialogSemanticCache`).
+- [x] **Cache Invalidation:** Editing or deleting a document in the knowledge base automatically removes or invalidates all linked entries in the semantic cache. — Done (`apps/knowledge-base-service/src/knowledge-base/knowledge-base.service.ts` calls `cache.invalidate.bySources` on `reprocessDocument`/`deleteDocument` and `cache.invalidate.unlinked` on `uploadDocument`/`reprocessDocument`, wired to `apps/semantic-cache-service/src/semantic-cache/semantic-cache.repository.ts` `invalidateByDocumentIds`/`invalidateUnlinked`).
 
 ## 3. Web Interface (React / Vite / TypeScript)
 
-- [ ] **Client Chat:** Real-time interface for submitting customer support queries and receiving responses.
-- [ ] **Operator Admin Panel:** Interface for managing the knowledge base (adding/updating documents to trigger invalidation) and viewing cache/dialog statistics and status.
+- [x] **Client Chat:** Real-time interface for submitting customer support queries and receiving responses. — Done (`apps/frontend/src/features/chat/ui/chat-workspace.tsx`, `chat-composer.tsx`, `chat-message-item.tsx`, `apps/frontend/src/features/chat/model/use-chat-workspace.ts`, `apps/frontend/src/features/chat/api/chat.client.ts`; real-time SSE streaming, message branching/editing, conversation history sidebar, markdown rendering).
+- [ ] **Operator Admin Panel:** Interface for managing the knowledge base (adding/updating documents to trigger invalidation) and viewing cache/dialog statistics and status. — Partial (`apps/frontend/src/features/knowledge-base/ui/knowledge-base-workspace.tsx` supports KB upload/list/inspect/delete/RAG-search/failed-retry and `apps/frontend/src/features/auth/ui/admin-operator-dialog.tsx` manages users; Missing: KB document content edit/update UI on reprocess, any semantic cache settings/stats/invalidation UI wired to `/admin/semantic-cache/*`, and an operator dialog statistics view).
 
 ## 4. Infrastructure, Testing & Monitoring
 
-- [ ] **Containerization:** `Dockerfile` for each service and a `docker-compose.yml` to spin up the full stack (backend, frontend, PostgreSQL + pgvector, monitoring).
-- [ ] **Monitoring (Prometheus + Grafana):** Metric collection configured across services with Grafana dashboards visualizing performance.
-- [ ] **Unit & Integration Tests (Jest):** Test coverage for core business logic, specifically the adaptive threshold formula, vector search, and cache invalidation flows.
-- [ ] **Load Testing (k6):** Scripts to evaluate stability and latency under gradually increasing RPS.
+- [ ] **Containerization:** `Dockerfile` for each service and a `docker-compose.yml` to spin up the full stack (backend, frontend, PostgreSQL + pgvector, monitoring). — Partial (`infrastructure/docker/docker-compose.yml` runs PostgreSQL + pgvector, Prometheus, and Grafana; Missing: `Dockerfile`s for all 7 backend microservices and `apps/frontend`, plus full-stack app service definitions in `docker-compose.yml`).
+- [ ] **Monitoring (Prometheus + Grafana):** Metric collection configured across services with Grafana dashboards visualizing performance. — Partial (`apps/api-gateway/src/metrics/` exposes `/metrics`, `infrastructure/monitoring/prometheus/prometheus.yml` scrapes `api-gateway`, and `infrastructure/monitoring/grafana/dashboards/semcache-overview.json` is provisioned; Missing: metrics instrumentation/scraping for the 6 internal microservices and cache/token metrics recording on SSE streaming turns in `apps/api-gateway/src/dialogs/dialog-proxy.service.ts` `createDialogStream`).
+- [ ] **Unit & Integration Tests (Jest):** Test coverage for core business logic, specifically the adaptive threshold formula, vector search, and cache invalidation flows. — Partial (36 Jest unit suites and isolated TCP/HTTP E2E suites pass across all 7 backend services and `packages/shared-config`, covering `threshold-calculator.service.spec.ts`, `semantic-cache.service.spec.ts`, `knowledge-base.service.spec.ts`, and `dialog-graph.service.spec.ts`; Missing: root `tests/integration/` and `tests/e2e/` contain only `.gitkeep`, and all DB/vector search tests use in-memory repository fakes rather than real PostgreSQL + `pgvector` or live multi-service integration tests).
+- [ ] **Load Testing (k6):** Scripts to evaluate stability and latency under gradually increasing RPS. — Partial (`tests/load/loadtest.js` implements a full 2,000-query 3-mode benchmark with latency/cache/cost/invalidation metrics; Missing: a ramping-RPS load profile such as `ramping-arrival-rate` or staged `ramping-vus` — currently fixed to `shared-iterations` with constant `VUS=4`).
 
 ## 5. Dataset, Experiments & Hypothesis Validation
 
-- [ ] **Labeled Dataset:** Sample of customer support queries labeled by category and semantic intent (including paraphrases and lexically similar but contextually distinct queries to test false hits).
-- [ ] **Comparative Runs:** Identical test scenarios executed across all three configurations (_no cache_, _fixed threshold 0.9_, _adaptive threshold_).
-- [ ] **All 6 Metrics Collected:**
+- [x] **Labeled Dataset:** Sample of customer support queries labeled by category and semantic intent (including paraphrases and lexically similar but contextually distinct queries to test false hits). — Done (`datasets/labeled/dataset_2000.jsonl` with 2,000 UK/EN labeled telecom queries including 84 canonical seeds, 1,332 paraphrases, 168 near-duplicate traps, and 416 unique edge cases; `datasets/labeled/kb_updates.json` with 21 KB sources & 5 invalidation scenarios; deterministic generator in `tests/load/generate-dataset.ts` + `dataset-content.ts`).
+- [ ] **Comparative Runs:** Identical test scenarios executed across all three configurations (_no cache_, _fixed threshold 0.9_, _adaptive threshold_). — Missing: benchmark harness exists in `tests/load/loadtest.js`, but no executed run outputs or comparative result artifacts exist in the repository.
+- [ ] **All 6 Metrics Collected:** — Partial/Missing: no experimental result data is recorded in the repository; additionally, `tests/load/loadtest.js` instruments 5 of 6 metrics (hit rate, false-hit rate/precision, token/cost savings, latency p50/p95/p99, throughput RPS) but does not measure overall system answer accuracy across the 2,000-query run.
   - Hit rate
   - False-hit rate (cache precision)
   - Token / cost savings
   - Latency (`p50` / `p95` / `p99`)
   - Throughput (`RPS`)
   - Overall system answer accuracy
-- [ ] **Hypothesis Validation:** Verified whether target benchmarks are met:
+- [ ] **Hypothesis Validation:** Verified whether target benchmarks are met: — Missing: no comparative run results, statistical verification, or hypothesis validation report exists in the repository.
   - Adaptive threshold hit rate ≥ fixed threshold `0.9`;
   - False-hit rate reduced by at least 2x;
   - LLM call costs reduced by at least 40%.
-- [ ] **Invalidation Test:** Documented verification that updating facts in the knowledge base prevents the system from serving stale cached responses.
+- [ ] **Invalidation Test:** Documented verification that updating facts in the knowledge base prevents the system from serving stale cached responses. — Partial: automated invalidation checks exist in mocked service tests (`apps/knowledge-base-service/src/knowledge-base/knowledge-base.service.spec.ts`) and in `tests/load/loadtest.js` `teardown()`, but no documented live verification run or report exists in `docs/`.
 
 ## 6. Results & Dissemination
 
-- [ ] **Data Visualization:** Tables and charts prepared (including the "cost savings vs. false-hit rate" trade-off and latency graphs from k6/Grafana).
-- [ ] **Practical Recommendations:** Actionable conclusions formulated on reducing LLM system costs based on experimental findings.
-- [ ] **GitHub Repository:** Open-source release of all microservices, the dataset, and experiment scripts with a clear `README.md`.
-- [ ] **Publication:** Article prepared or submitted to a specialized peer-reviewed journal.
+- [ ] **Data Visualization:** Tables and charts prepared (including the "cost savings vs. false-hit rate" trade-off and latency graphs from k6/Grafana). — Missing: no generated comparison tables, plotting scripts, or chart image assets exist in the repository (only the live Grafana dashboard template in `infrastructure/monitoring/grafana/dashboards/semcache-overview.json`).
+- [ ] **Practical Recommendations:** Actionable conclusions formulated on reducing LLM system costs based on experimental findings. — Missing: no experimental analysis or recommendations document exists in `docs/` or `README.md`.
+- [ ] **GitHub Repository:** Open-source release of all microservices, the dataset, and experiment scripts with a clear `README.md`. — Partial: all 7 microservices, frontend, labeled dataset, k6 script, and `README.md` are pushed to `origin` (`github.com:KristianMedeshi/semcache.git`); Missing: open-source `LICENSE` file, experiment analysis/plotting scripts, full-stack containerization, and final experimental results.
+- [ ] **Publication:** Article prepared or submitted to a specialized peer-reviewed journal. — Missing: no manuscript, draft paper, or submission artifacts exist in the repository.
+
+---
+
+## Audit Summary
+
+- **Overall Completion:** **13 / 26** checklist items done (`50.0%`).
+  - Section 1 (Microservices Architecture): **6 / 6**
+  - Section 2 (Research Component): **5 / 5**
+  - Section 3 (Web Interface): **1 / 2**
+  - Section 4 (Infrastructure, Testing & Monitoring): **0 / 4**
+  - Section 5 (Dataset, Experiments & Hypothesis Validation): **1 / 5**
+  - Section 6 (Results & Dissemination): **0 / 4**
+
+### Per-Service, Frontend & Shared Packages Readiness
+
+| Component                                                                      | Status                 | Key Findings                                                                                                                                                                                                                                                                                                   |
+| :----------------------------------------------------------------------------- | :--------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api-gateway`                                                             | **Ready (minor gaps)** | Full REST/SSE routing over TCP, RBAC, Swagger `/docs`, and Prometheus `/metrics`; missing cache/token metrics on SSE streaming turns (`createDialogStream`) and `Dockerfile`.                                                                                                                                  |
+| `apps/auth-service`                                                            | **Ready (infra gap)**  | Additional microservice (not listed separately in checklist): full session cookie auth, RBAC, throttling, Drizzle migrations, unit & TCP E2E tests; missing metrics & `Dockerfile`.                                                                                                                            |
+| `apps/dialog-service`                                                          | **Ready (infra gap)**  | Full LangGraph orchestration + SSE streaming, cache lookup/store with KB source binding, RAG fallback, branched history persistence, unit & TCP E2E tests; missing metrics & `Dockerfile`.                                                                                                                     |
+| `apps/semantic-cache-service`                                                  | **Ready (infra gap)**  | Dedicated TCP service with `pgvector` HNSW index, fixed/adaptive/disabled modes, cluster density + category-weighted threshold calculator, source/category/unlinked/all invalidation, persisted settings, stats, unit & TCP E2E tests; missing real-pgvector integration tests, metrics & `Dockerfile`.        |
+| `apps/llm-service`                                                             | **Ready (infra gap)**  | Free OpenRouter cloud integration (`@nestjs/ai`) + optional local LM Studio, streaming & non-streaming chat completions, unit & TCP E2E tests; missing metrics & `Dockerfile`.                                                                                                                                 |
+| `apps/embedding-service`                                                       | **Ready (infra gap)**  | Dedicated 7th microservice extracted from `llm-service`: local 384-d L2-normalized multilingual embeddings via `@huggingface/transformers`, unit & TCP E2E tests; missing metrics & `Dockerfile`.                                                                                                              |
+| `apps/knowledge-base-service`                                                  | **Ready (infra gap)**  | Multi-format ingestion (TXT/MD/HTML/JSON/PDF/DOCX), chunking, `pgvector` HNSW RAG search, automatic cache invalidation on upload/reprocess/delete, unit & TCP E2E tests; missing real-pgvector integration tests, metrics & `Dockerfile`.                                                                      |
+| `apps/frontend`                                                                | **Partial**            | Auth, real-time SSE client chat (branching/editing/history), KB upload/list/inspect/delete/RAG-tester, and admin user directory are implemented; missing KB document edit/reprocess UI, semantic cache admin controls/stats UI (`/admin/semantic-cache/*`), operator dialog statistics view, and `Dockerfile`. |
+| `packages/*` (`shared-types`, `shared-dtos`, `shared-config`, `oxlint-config`) | **Ready**              | Clean shared enums/TCP patterns, DTO contracts + validation limits, env/TCP/Drizzle helpers, and Oxlint presets with zero business logic leakage and passing unit tests.                                                                                                                                       |
+
+### Top Remaining Implementation Gaps (Dependency Order)
+
+1. **Operator Admin Panel completion (`apps/frontend`):** Add semantic cache settings/mode-toggle/stats/invalidation UI wired to `/admin/semantic-cache/*`, add inline KB document content editing (sending updated content to `POST /knowledge-base/documents/:id/reprocess`), and add operator dialog statistics visibility.
+2. **Real PostgreSQL/`pgvector` & Cross-Service Integration Tests (`tests/integration/`):** Add Jest integration suites testing real `pgvector` HNSW vector search, adaptive threshold behavior, and live KB-update -> cache-invalidation -> dialog flows without in-memory repository fakes.
+3. **Monitoring & Streaming Metrics Parity (`apps/api-gateway`, internal services, `infrastructure/monitoring/`):** Record cache/token metrics on SSE streaming turns (`DialogProxyService.createDialogStream`), expose metrics across internal services, and add scrape targets in `prometheus.yml`.
+4. **Full-Stack Containerization (`apps/*/Dockerfile`, `infrastructure/docker/docker-compose.yml`):** Add production `Dockerfile`s for all 7 microservices and `apps/frontend`, and wire the full stack into `docker-compose.yml`.
+5. **Load Test Ramping & Answer Accuracy Instrumentation (`tests/load/loadtest.js`):** Add a ramping-RPS (`ramping-arrival-rate` / staged) scenario and an automated overall answer accuracy evaluation step to complete all 6 thesis metrics.
+6. **Execute Comparative Experiments & Invalidation Verification:** Run identical `no-cache`, `fixed (0.9)`, and `adaptive` benchmarks plus live KB invalidation verification, saving structured outputs (`results/*.json`) and documenting the results.
+7. **Data Visualization, Hypothesis Validation, Recommendations & Dissemination (`docs/`, `LICENSE`):** Generate thesis tables/charts, verify the three target hypotheses, document actionable recommendations, add an open-source `LICENSE` file, and prepare the journal publication.
