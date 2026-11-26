@@ -30,7 +30,7 @@
       "command(sudo)",
       "write_file(.env)",
       "write_file(.git/)",
-      "write_file(.agents/agy-settings.json)"
+      "write_file(.agents/settings.json)"
     ]
   }
 }
