@@ -26,7 +26,7 @@ semcache/
 │   ├── shared-types/             # Shared domain TypeScript types and enums
 │   ├── shared-dtos/              # Contracts and DTOs for HTTP gateway and TCP inter-service communication
 │   ├── shared-config/            # Shared configuration utilities and port constants
-│   └── eslint-config/            # Shared linter configurations (Oxlint)
+│   └── oxlint-config/            # Shared linter configurations (Oxlint)
 │
 ├── infrastructure/
 │   ├── docker/                   # Docker Compose PostgreSQL 17 + pgvector environment & .env.example
@@ -77,7 +77,7 @@ semcache/
 - **`@semcache/shared-types`** — contains shared immutable enums (`ServiceName`, `QueryCategory`, `CacheHitStatus`), canonical TCP patterns (`SERVICE_TCP_PATTERNS`), and base interfaces for semantic evaluation metadata.
 - **`@semcache/shared-dtos`** — contains exclusively data contracts (DTOs) and format-inference helpers (`inferKnowledgeDocumentFormat`) for HTTP API Gateway endpoints and TCP inter-service communication (`AuthTcpRequestDto`, `AuthTcpResponseDto`, `DialogTcpRequestDto`, `RpcErrorPayloadDto`), plus a backend-only `@semcache/shared-dtos/validation` subpath exporting `class-validator`/`class-transformer` DTO classes shared between `api-gateway` and internal microservices.
 - **`@semcache/shared-config`** — contains helper functions for safely reading environment variables (`getRequiredEnv`, `getOptionalEnv`, `getNumericEnv`) and the default service port mapping.
-- **`@semcache/eslint-config`** — contains shared static code analysis (**Oxlint**) configurations for base packages (`base.json`), NestJS services (`nestjs.json`), and the React application (`react.json`).
+- **`@semcache/oxlint-config`** — contains shared static code analysis (**Oxlint**) configurations for base packages (`base.json`), NestJS services (`nestjs.json`), and the React application (`react.json`).
 
 ---
 

@@ -41,7 +41,7 @@ This document defines mandatory architectural principles, constraints, and code 
 ## 3. Shared Packages (`packages/`) Rules
 
 1. **Minimalism and Zero Business Logic**:
-   - Packages in `packages/` (`@semcache/shared-types`, `@semcache/shared-dtos`, `@semcache/shared-config`, `@semcache/eslint-config`) exist **strictly** to avoid duplicating types, communication contracts, and technical configuration.
+   - Packages in `packages/` (`@semcache/shared-types`, `@semcache/shared-dtos`, `@semcache/shared-config`, `@semcache/oxlint-config`) exist **strictly** to avoid duplicating types, communication contracts, and technical configuration.
    - **Prohibited**: moving business logic, NestJS services, repositories, or threshold calculation algorithms into shared packages.
 2. **Contracts and API Change Documentation**:
    - Any change to inter-service DTOs in `@semcache/shared-dtos` or shared types in `@semcache/shared-types` is considered an API contract change.
@@ -55,7 +55,7 @@ This document defines mandatory architectural principles, constraints, and code 
    - All packages and services extend `tsconfig.base.json` with `strict: true`, `noImplicitAny: true`, and `strictNullChecks: true` enabled.
    - Avoid using `any`. Use concrete types, generics, or `unknown` followed by type narrowing.
 2. **Linter and Formatting**:
-   - **Oxlint** (`.oxlintrc.json`, presets in `@semcache/eslint-config`) is used for static analysis, including the `--type-aware` flag for backend services.
+   - **Oxlint** (`.oxlintrc.json`, presets in `@semcache/oxlint-config`) is used for static analysis, including the `--type-aware` flag for backend services.
    - **Prettier** (`.prettierrc`) is used for code formatting.
    - No changes are considered complete if `pnpm lint`, `pnpm typecheck`, or `pnpm build` fails.
 3. **Configuration and Secrets**:

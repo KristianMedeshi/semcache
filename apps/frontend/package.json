@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
-    "@semcache/eslint-config": "workspace:*",
+    "@semcache/oxlint-config": "workspace:*",
     "@tailwindcss/vite": "^4.3.5",
     "@tanstack/react-query-devtools": "^5.107.2",
     "@tanstack/react-router-devtools": "^1.167.3",
