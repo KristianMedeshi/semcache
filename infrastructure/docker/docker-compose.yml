@@ -1,10 +1,17 @@
 name: semcache
 
+x-backend-common: &backend-common
+  restart: unless-stopped
+  networks:
+    - semcache-net
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
     container_name: semcache-postgres
     restart: unless-stopped
+    networks:
+      - semcache-net
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-semcache}
       POSTGRES_USER: ${POSTGRES_USER:-semcache_user}
@@ -22,10 +29,196 @@ services:
       retries: 5
       start_period: 10s
 
+  embedding-service:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: apps/embedding-service/Dockerfile
+    container_name: semcache-embedding-service
+    environment:
+      NODE_ENV: ${APP_NODE_ENV:-production}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-replace_with_at_least_32_char_random_secret}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-Xenova/paraphrase-multilingual-MiniLM-L12-v2}
+      EMBEDDING_SERVICE_HOST: 0.0.0.0
+      EMBEDDING_SERVICE_PORT: 3006
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: 9106
+    volumes:
+      - huggingface_cache:/app/.cache/huggingface
+
+  llm-service:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: apps/llm-service/Dockerfile
+    container_name: semcache-llm-service
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      NODE_ENV: ${APP_NODE_ENV:-production}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-replace_with_at_least_32_char_random_secret}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-replace_with_your_openrouter_api_key}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_DEFAULT_MODEL: ${OPENROUTER_DEFAULT_MODEL:-openrouter/free}
+      LM_STUDIO_BASE_URL: ${LM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      LM_STUDIO_DEFAULT_MODEL: ${LM_STUDIO_DEFAULT_MODEL:-support-llm}
+      LLM_SERVICE_HOST: 0.0.0.0
+      LLM_SERVICE_PORT: 3004
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: 9104
+
+  auth-service:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: semcache-auth-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${APP_NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-semcache_user}:${POSTGRES_PASSWORD:-change_me_in_local_env}@postgres:5432/${POSTGRES_DB:-semcache}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-replace_with_at_least_32_char_random_secret}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-semcache_sid}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:8080}
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
+      AUTH_SERVICE_HOST: 0.0.0.0
+      AUTH_SERVICE_PORT: 3001
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: 9101
+
+  semantic-cache-service:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: apps/semantic-cache-service/Dockerfile
+    container_name: semcache-semantic-cache-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${APP_NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-semcache_user}:${POSTGRES_PASSWORD:-change_me_in_local_env}@postgres:5432/${POSTGRES_DB:-semcache}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-replace_with_at_least_32_char_random_secret}
+      SEMANTIC_CACHE_SERVICE_HOST: 0.0.0.0
+      SEMANTIC_CACHE_SERVICE_PORT: 3003
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: 9103
+
+  knowledge-base-service:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: apps/knowledge-base-service/Dockerfile
+    container_name: semcache-knowledge-base-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      embedding-service:
+        condition: service_started
+      semantic-cache-service:
+        condition: service_started
+    environment:
+      NODE_ENV: ${APP_NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-semcache_user}:${POSTGRES_PASSWORD:-change_me_in_local_env}@postgres:5432/${POSTGRES_DB:-semcache}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-replace_with_at_least_32_char_random_secret}
+      EMBEDDING_SERVICE_HOST: embedding-service
+      EMBEDDING_SERVICE_PORT: 3006
+      SEMANTIC_CACHE_SERVICE_HOST: semantic-cache-service
+      SEMANTIC_CACHE_SERVICE_PORT: 3003
+      KNOWLEDGE_BASE_SERVICE_HOST: 0.0.0.0
+      KNOWLEDGE_BASE_SERVICE_PORT: 3005
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: 9105
+
+  dialog-service:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: apps/dialog-service/Dockerfile
+    container_name: semcache-dialog-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      llm-service:
+        condition: service_started
+      embedding-service:
+        condition: service_started
+      knowledge-base-service:
+        condition: service_started
+      semantic-cache-service:
+        condition: service_started
+    environment:
+      NODE_ENV: ${APP_NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-semcache_user}:${POSTGRES_PASSWORD:-change_me_in_local_env}@postgres:5432/${POSTGRES_DB:-semcache}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-replace_with_at_least_32_char_random_secret}
+      LLM_SERVICE_HOST: llm-service
+      LLM_SERVICE_PORT: 3004
+      EMBEDDING_SERVICE_HOST: embedding-service
+      EMBEDDING_SERVICE_PORT: 3006
+      KNOWLEDGE_BASE_SERVICE_HOST: knowledge-base-service
+      KNOWLEDGE_BASE_SERVICE_PORT: 3005
+      SEMANTIC_CACHE_SERVICE_HOST: semantic-cache-service
+      SEMANTIC_CACHE_SERVICE_PORT: 3003
+      DIALOG_SERVICE_HOST: 0.0.0.0
+      DIALOG_SERVICE_PORT: 3002
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: 9102
+
+  api-gateway:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: apps/api-gateway/Dockerfile
+    container_name: semcache-api-gateway
+    depends_on:
+      auth-service:
+        condition: service_started
+      dialog-service:
+        condition: service_started
+      knowledge-base-service:
+        condition: service_started
+      semantic-cache-service:
+        condition: service_started
+    ports:
+      - '${API_GATEWAY_PORT:-3000}:3000'
+    environment:
+      NODE_ENV: ${APP_NODE_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 3000
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-replace_with_at_least_32_char_random_secret}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-semcache_sid}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:8080}
+      AUTH_SERVICE_HOST: auth-service
+      AUTH_SERVICE_PORT: 3001
+      DIALOG_SERVICE_HOST: dialog-service
+      DIALOG_SERVICE_PORT: 3002
+      SEMANTIC_CACHE_SERVICE_HOST: semantic-cache-service
+      SEMANTIC_CACHE_SERVICE_PORT: 3003
+      KNOWLEDGE_BASE_SERVICE_HOST: knowledge-base-service
+      KNOWLEDGE_BASE_SERVICE_PORT: 3005
+
+  frontend:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
+    container_name: semcache-frontend
+    depends_on:
+      - api-gateway
+    ports:
+      - '${FRONTEND_PORT:-8080}:80'
+
   prometheus:
     image: prom/prometheus:v3.2.1
     container_name: semcache-prometheus
     restart: unless-stopped
+    networks:
+      - semcache-net
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -35,13 +228,15 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:
-      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${PROMETHEUS_CONFIG_FILE:-../monitoring/prometheus/prometheus.yml}:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
 
   grafana:
     image: grafana/grafana:11.5.2
     container_name: semcache-grafana
     restart: unless-stopped
+    networks:
+      - semcache-net
     depends_on:
       - prometheus
     environment:
@@ -55,6 +250,11 @@ services:
       - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
 
+networks:
+  semcache-net:
+    name: semcache-net
+    driver: bridge
+
 volumes:
   postgres_data:
     name: semcache_postgres_data
@@ -62,3 +262,5 @@ volumes:
     name: semcache_prometheus_data
   grafana_data:
     name: semcache_grafana_data
+  huggingface_cache:
+    name: semcache_huggingface_cache

@@ -20,8 +20,10 @@
     "db:logs": "docker compose -f infrastructure/docker/docker-compose.yml logs -f postgres",
     "monitoring:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d prometheus grafana",
     "monitoring:down": "docker compose -f infrastructure/docker/docker-compose.yml stop prometheus grafana",
-    "infra:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
-    "infra:down": "docker compose -f infrastructure/docker/docker-compose.yml down"
+    "infra:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d postgres prometheus grafana",
+    "infra:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
+    "stack:up": "PROMETHEUS_CONFIG_FILE=../monitoring/prometheus/prometheus.docker.yml docker compose -f infrastructure/docker/docker-compose.yml up -d --build",
+    "stack:down": "docker compose -f infrastructure/docker/docker-compose.yml down"
   },
   "engines": {
     "node": ">=20.0.0",
