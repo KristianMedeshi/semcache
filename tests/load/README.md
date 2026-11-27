@@ -71,22 +71,30 @@ for mode in no-cache fixed adaptive; do
   CACHE_MODE=$mode THRESHOLD=0.90 API_BASE_URL=http://localhost:3000 \
     SUMMARY_OUT=results/$mode.json k6 run tests/load/loadtest.js
 done
+
+# Ramping-RPS stability profile (ramping-arrival-rate)
+LOAD_PROFILE=ramping-arrival-rate CACHE_MODE=adaptive \
+  RAMP_STAGES="20s:1,30s:2,30s:4,30s:6,30s:8,20s:0" \
+  SUMMARY_OUT=results/ramping-rps-adaptive.json k6 run tests/load/loadtest.js
 ```
 
-| Variable                                                 | Default                 | Meaning                                                          |
-| :------------------------------------------------------- | :---------------------- | :--------------------------------------------------------------- |
-| `CACHE_MODE`                                             | `adaptive`              | `no-cache` \| `fixed` \| `adaptive`                              |
-| `API_BASE_URL`                                           | `http://localhost:3000` | Gateway URL                                                      |
-| `THRESHOLD`                                              | `0.90`                  | Fixed cosine threshold (`fixed` only)                            |
-| `MODEL`                                                  | empty                   | Optional model override (e.g., `support-llm`, `qwen/qwen3-1.7b`) |
-| `VUS`                                                    | `4`                     | Concurrency = LM Studio `parallel`                               |
-| `TOTAL_REQUESTS`                                         | `2000`                  | Capped at dataset size                                           |
-| `CLEAR_CACHE_ON_START`                                   | `true`                  | Clears `semantic_cache_entries` before the run                   |
-| `SEED_KB_ON_START`                                       | `true`                  | Idempotently seeds/restores the 21 KB sources (`v1`)             |
-| `RESTORE_KB_AFTER_TEST`                                  | `true`                  | Restores updated KB docs to `v1` after `teardown()`              |
-| `RUN_KB_INVALIDATION`, `KB_INVALIDATION_TIMEOUT`         | `true`, `5m`            | Post-load phase toggle and teardown timeout                      |
-| `AUTH_TOKEN`, `ADMIN_TOKEN`, `SESSION_COOKIE`, `API_KEY` | empty                   | Optional credentials when not running in `NODE_ENV=test`         |
-| `SUMMARY_OUT`                                            | empty                   | Write structured JSON report to this path                        |
+| Variable                                                  | Default                         | Meaning                                                          |
+| :-------------------------------------------------------- | :------------------------------ | :--------------------------------------------------------------- |
+| `LOAD_PROFILE`                                            | `fixed-iterations`              | `fixed-iterations` \| `ramping-vus` \| `ramping-arrival-rate`    |
+| `RAMP_STAGES`                                             | `30s:1,45s:2,45s:4,45s:6,30s:0` | Comma-separated `<duration>:<target>` stages for ramping modes   |
+| `START_RATE`, `TIME_UNIT`, `PRE_ALLOCATED_VUS`, `MAX_VUS` | `0.5`, `1s`, `8`, `16`          | `ramping-arrival-rate` executor parameters                       |
+| `CACHE_MODE`                                              | `adaptive`                      | `no-cache` \| `fixed` \| `adaptive`                              |
+| `API_BASE_URL`                                            | `http://localhost:3000`         | Gateway URL                                                      |
+| `THRESHOLD`                                               | `0.90`                          | Fixed cosine threshold (`fixed` only)                            |
+| `MODEL`                                                   | empty                           | Optional model override (e.g., `support-llm`, `qwen/qwen3-1.7b`) |
+| `VUS`                                                     | `4`                             | Concurrency = LM Studio `parallel`                               |
+| `TOTAL_REQUESTS`                                          | `2000`                          | Capped at dataset size                                           |
+| `CLEAR_CACHE_ON_START`                                    | `true`                          | Clears `semantic_cache_entries` before the run                   |
+| `SEED_KB_ON_START`                                        | `true`                          | Idempotently seeds/restores the 21 KB sources (`v1`)             |
+| `RESTORE_KB_AFTER_TEST`                                   | `true`                          | Restores updated KB docs to `v1` after `teardown()`              |
+| `RUN_KB_INVALIDATION`, `KB_INVALIDATION_TIMEOUT`          | `true`, `5m`                    | Post-load phase toggle and teardown timeout                      |
+| `AUTH_TOKEN`, `ADMIN_TOKEN`, `SESSION_COOKIE`, `API_KEY`  | empty                           | Optional credentials when not running in `NODE_ENV=test`         |
+| `SUMMARY_OUT`                                             | empty                           | Write structured JSON report to this path                        |
 
 ## 4. Metrics
 
@@ -97,4 +105,5 @@ done
 | Hit rate                 | `cache_hit_rate`, `cache_hits_total`; paraphrase recall: `cache_paraphrase_recall_rate`                                    |
 | False-hit rate/precision | `cache_false_hit_rate`, `cache_false_hits_total`, `cache_trap_false_hits_total`, `cache_miss_required_false_positive_rate` |
 | Token / cost savings     | `llm_*_tokens_total`, `cache_tokens_saved_total`, `llm_estimated_cost_usd`, `cache_estimated_cost_saved_usd`               |
+| Overall answer accuracy  | `answer_accuracy_rate`, `answer_accurate_total`, `answer_language_match_rate`, `answer_kb_grounded_rate`                   |
 | Stale-answer prevention  | `kb_invalidation_miss_rate`, `kb_stale_answer_prevented_rate`, `kb_reverify_hit_rate`, `kb_fresh_fact_rate`                |

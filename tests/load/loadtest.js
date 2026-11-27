@@ -46,12 +46,18 @@ const CACHE_CLEAR_ENDPOINT = __ENV.CACHE_CLEAR_ENDPOINT || '/admin/semantic-cach
 // slot busy without queueing requests inside LM Studio (which would inflate latency numbers).
 const VUS = Number.parseInt(__ENV.VUS || '4', 10);
 const REQUESTED_TOTAL = Number.parseInt(__ENV.TOTAL_REQUESTS || '2000', 10);
+const LOAD_PROFILE = (__ENV.LOAD_PROFILE || 'fixed-iterations').toLowerCase();
+const RAMP_STAGES_RAW = __ENV.RAMP_STAGES || '30s:1,45s:2,45s:4,45s:6,30s:0';
+const START_RATE = Number.parseInt(__ENV.START_RATE || '1', 10);
+const TIME_UNIT = __ENV.TIME_UNIT || '1s';
+const PRE_ALLOCATED_VUS = Number.parseInt(__ENV.PRE_ALLOCATED_VUS || '8', 10);
+const MAX_VUS = Number.parseInt(__ENV.MAX_VUS || '16', 10);
 const MAX_DURATION = __ENV.MAX_DURATION || '90m';
 const REQUEST_TIMEOUT = __ENV.REQUEST_TIMEOUT || '90s';
 const KB_INVALIDATION_TIMEOUT = __ENV.KB_INVALIDATION_TIMEOUT || '5m';
 const RUN_KB_INVALIDATION = (__ENV.RUN_KB_INVALIDATION || 'true').toLowerCase() === 'true';
 const CLEAR_CACHE_ON_START = (__ENV.CLEAR_CACHE_ON_START || 'true').toLowerCase() === 'true';
-const SEED_KB_ON_START = (__ENV.SEED_KB_ON_START || 'false').toLowerCase() === 'true';
+const SEED_KB_ON_START = (__ENV.SEED_KB_ON_START || 'true').toLowerCase() === 'true';
 const RESTORE_KB_AFTER_TEST = (__ENV.RESTORE_KB_AFTER_TEST || 'true').toLowerCase() === 'true';
 const KB_PROPAGATION_MS = Number.parseInt(__ENV.KB_PROPAGATION_MS || '250', 10);
 const THINK_TIME_MS = Number.parseInt(__ENV.THINK_TIME_MS || '50', 10);
@@ -73,8 +79,28 @@ const SUMMARY_OUT = __ENV.SUMMARY_OUT || '';
 if (!['no-cache', 'fixed', 'adaptive'].includes(CACHE_MODE)) {
   throw new Error(`CACHE_MODE must be one of no-cache|fixed|adaptive, got "${CACHE_MODE}"`);
 }
+if (!['fixed-iterations', 'ramping-vus', 'ramping-arrival-rate'].includes(LOAD_PROFILE)) {
+  throw new Error(
+    `LOAD_PROFILE must be one of fixed-iterations|ramping-vus|ramping-arrival-rate, got "${LOAD_PROFILE}"`,
+  );
+}
 if (!(THRESHOLD > 0 && THRESHOLD <= 1)) {
   throw new Error(`THRESHOLD must be in (0, 1], got "${__ENV.THRESHOLD}"`);
+}
+
+function parseRampStages(raw) {
+  return raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .map((part) => {
+      const [duration, targetStr] = part.split(':').map((s) => s.trim());
+      const target = Number.parseInt(targetStr, 10);
+      if (!duration || Number.isNaN(target) || target < 0) {
+        throw new Error(`Invalid RAMP_STAGES segment "${part}"; expected "<duration>:<target>"`);
+      }
+      return { duration, target };
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +116,7 @@ const dataset = new SharedArray('telecom_dataset_2000', () =>
 const kbData = new SharedArray('kb_updates_data', () => [JSON.parse(open(KB_UPDATES_PATH))]);
 const kbSources = kbData[0].kb_sources;
 const scenarios = kbData[0].invalidation_scenarios;
+const kbBySourceId = Object.fromEntries(kbSources.map((src) => [src.kb_source_id, src]));
 
 const TOTAL_REQUESTS = Math.min(REQUESTED_TOTAL, dataset.length);
 
@@ -131,6 +158,12 @@ const kbStalePrevented = new Rate('kb_stale_answer_prevented_rate');
 const kbReverifyHit = new Rate('kb_reverify_hit_rate');
 const kbFreshFact = new Rate('kb_fresh_fact_rate');
 
+const answerAccuracyRate = new Rate('answer_accuracy_rate');
+const answerAccurateTotal = new Counter('answer_accurate_total');
+const answerInaccurateTotal = new Counter('answer_inaccurate_total');
+const answerLanguageMatchRate = new Rate('answer_language_match_rate');
+const answerKbGroundedRate = new Rate('answer_kb_grounded_rate');
+
 // ---------------------------------------------------------------------------
 // k6 options
 // ---------------------------------------------------------------------------
@@ -143,8 +176,32 @@ if (RUN_KB_INVALIDATION && CACHE_MODE !== 'no-cache') {
   thresholds.kb_stale_answer_prevented_rate = ['rate>=0.95'];
 }
 
-export const options = {
-  scenarios: {
+function buildScenarioOptions() {
+  if (LOAD_PROFILE === 'ramping-vus') {
+    return {
+      telecom_support_load: {
+        executor: 'ramping-vus',
+        startVUs: 1,
+        stages: parseRampStages(RAMP_STAGES_RAW),
+        gracefulRampDown: '30s',
+        gracefulStop: '2m',
+      },
+    };
+  }
+  if (LOAD_PROFILE === 'ramping-arrival-rate') {
+    return {
+      telecom_support_load: {
+        executor: 'ramping-arrival-rate',
+        startRate: START_RATE,
+        timeUnit: TIME_UNIT,
+        preAllocatedVUs: PRE_ALLOCATED_VUS,
+        maxVUs: MAX_VUS,
+        stages: parseRampStages(RAMP_STAGES_RAW),
+        gracefulStop: '2m',
+      },
+    };
+  }
+  return {
     telecom_support_load: {
       executor: 'shared-iterations',
       vus: VUS,
@@ -152,7 +209,11 @@ export const options = {
       maxDuration: MAX_DURATION,
       gracefulStop: '2m',
     },
-  },
+  };
+}
+
+export const options = {
+  scenarios: buildScenarioOptions(),
   thresholds,
   setupTimeout: '5m',
   teardownTimeout: KB_INVALIDATION_TIMEOUT,
@@ -299,6 +360,104 @@ function containsMarker(text, marker) {
 
 const anyMarker = (text, markers) => markers.some((m) => containsMarker(text, m));
 
+const DOMAIN_FALLBACK_TERMS = [
+  'plan',
+  'tariff',
+  'roam',
+  'sim',
+  'esim',
+  'bill',
+  'autopay',
+  'payment',
+  'refund',
+  'router',
+  'wi-fi',
+  'wifi',
+  '5g',
+  'lte',
+  'apn',
+  'contract',
+  'support',
+  'тариф',
+  'роумінг',
+  'рахунок',
+  'автоплат',
+  'оплат',
+  'поверн',
+  'роутер',
+  'контракт',
+  'підтрим',
+  'застосун',
+  'перевір',
+  'номер',
+  'послуг',
+];
+
+function stripThinkBlocks(text) {
+  return String(text || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, ' ')
+    .trim();
+}
+
+function checkLanguageMatch(visibleAnswer, expectedLanguage) {
+  const cyrillicMatches = visibleAnswer.match(/[а-яіїєґА-ЯІЇЄҐ]/g) || [];
+  const latinMatches = visibleAnswer.match(/[a-zA-Z]/g) || [];
+  if (expectedLanguage === 'uk') {
+    return cyrillicMatches.length >= 3;
+  }
+  return latinMatches.length > cyrillicMatches.length && latinMatches.length >= 5;
+}
+
+function extractKbSalientTokens(src) {
+  if (!src) return [];
+  const combined = `${src.content_en || ''} ${src.content_uk || ''}`;
+  const tokens = new Set();
+  const numberMatches = combined.match(/[*#]?\d+(?:[.,]\d+)?%?/g) || [];
+  for (const m of numberMatches) {
+    if (m.length >= 1) tokens.add(m.toLowerCase());
+  }
+  const keywordMatches =
+    combined.match(
+      /\b(?:autopay|dispute|refund|pdf|roaming|eur|uah|gb|mbps|ussd|esim|sim|puk|pin|lte|5g|apn|volte|vowifi|pppoe|unlimited|hotspot|contract)\b/gi,
+    ) || [];
+  for (const m of keywordMatches) {
+    tokens.add(m.toLowerCase());
+  }
+  const ukMatches =
+    combined.match(
+      /(?:автоплат|оскарж|поверн|роумінг|безліміт|хотспот|роздач|контракт|рахунок|пакет|знижк)/gi,
+    ) || [];
+  for (const m of ukMatches) {
+    tokens.add(m.toLowerCase());
+  }
+  return [...tokens];
+}
+
+function evaluateAnswerAccuracy(item, parsed, isHit, mustMiss) {
+  const visible = stripThinkBlocks(parsed.answer);
+  const languageMatch = checkLanguageMatch(visible, item.language);
+  const substantive = visible.length >= 20 && !/^error[:\s]/i.test(visible);
+
+  if (isHit && mustMiss) {
+    return { accurate: false, languageMatch, kbGrounded: false };
+  }
+
+  const src = kbBySourceId[item.kb_source_id];
+  const kbTokens = extractKbSalientTokens(src);
+  const lowerVisible = visible.toLowerCase();
+  const hasKbToken = kbTokens.some((tok) => containsMarker(visible, tok));
+  const hasDomainTerm = DOMAIN_FALLBACK_TERMS.some((term) => lowerVisible.includes(term));
+
+  const isSeedOrParaphrase =
+    item.query_type === 'canonical_seed' || item.query_type === 'paraphrase';
+  const kbGrounded = isSeedOrParaphrase
+    ? hasKbToken || hasDomainTerm
+    : substantive && (hasKbToken || hasDomainTerm);
+
+  const accurate = substantive && languageMatch && kbGrounded;
+  return { accurate, languageMatch, kbGrounded };
+}
+
 function formatKbV1Content(src) {
   return `${src.content_en}\n\n${src.content_uk}`;
 }
@@ -367,7 +526,7 @@ function seedKnowledgeBase(headers) {
 // ---------------------------------------------------------------------------
 export function setup() {
   console.log(
-    `[semcache] mode=${CACHE_MODE} threshold=${CACHE_MODE === 'fixed' ? THRESHOLD : 'n/a'} ` +
+    `[semcache] profile=${LOAD_PROFILE} mode=${CACHE_MODE} threshold=${CACHE_MODE === 'fixed' ? THRESHOLD : 'n/a'} ` +
       `vus=${VUS} requests=${TOTAL_REQUESTS}/${dataset.length} api=${API_BASE_URL}`,
   );
   const health = http.get(`${API_BASE_URL}/health`, { timeout: '5s', tags: { name: 'health' } });
@@ -404,8 +563,9 @@ export function setup() {
   const kbSourceIdToUuid = SEED_KB_ON_START ? seedKnowledgeBase(adminHeaders) : {};
 
   const dialogIds = [];
+  const dialogCount = LOAD_PROFILE === 'fixed-iterations' ? VUS : Math.max(VUS, MAX_VUS);
   const userHeaders = buildHeaders(AUTH_TOKEN);
-  for (let i = 0; i < VUS; i += 1) {
+  for (let i = 0; i < dialogCount; i += 1) {
     const res = http.post(
       `${API_BASE_URL}${DIALOGS_ENDPOINT}`,
       JSON.stringify({ title: `k6 Benchmark VU ${i + 1}` }),
@@ -426,7 +586,7 @@ export function setup() {
 }
 
 export default function (data) {
-  const item = dataset[exec.scenario.iterationInTest];
+  const item = dataset[exec.scenario.iterationInTest % dataset.length];
   const dialogId = data.dialogIds[(exec.vu.idInTest - 1) % data.dialogIds.length];
 
   const { res, parsed } = sendMessage(dialogId, item.prompt, item.category, {
@@ -472,6 +632,13 @@ export default function (data) {
       if (item.query_type === 'near_duplicate_trap') trapFalseHits.add(1);
     }
   }
+
+  const acc = evaluateAnswerAccuracy(item, parsed, isHit, mustMiss);
+  answerAccuracyRate.add(acc.accurate);
+  answerLanguageMatchRate.add(acc.languageMatch);
+  answerKbGroundedRate.add(acc.kbGrounded);
+  if (acc.accurate) answerAccurateTotal.add(1);
+  else answerInaccurateTotal.add(1);
 
   if (isHit) {
     const saved =
@@ -726,6 +893,7 @@ export function handleSummary(data) {
 
   const report = {
     run: {
+      load_profile: LOAD_PROFILE,
       cache_mode: CACHE_MODE,
       threshold: CACHE_MODE === 'fixed' ? THRESHOLD : null,
       vus: VUS,
@@ -763,6 +931,13 @@ export function handleSummary(data) {
         baselineCost > 0 ? count('cache_estimated_cost_saved_usd') / baselineCost : 0,
       usage_missing_responses: count('llm_usage_missing_total'),
     },
+    accuracy: {
+      overall_accuracy: rate('answer_accuracy_rate'),
+      accurate_count: count('answer_accurate_total'),
+      inaccurate_count: count('answer_inaccurate_total'),
+      language_match_rate: rate('answer_language_match_rate'),
+      kb_grounded_rate: rate('answer_kb_grounded_rate'),
+    },
     kb_invalidation: {
       enabled: RUN_KB_INVALIDATION,
       updates: count('kb_update_requests_total'),
@@ -796,6 +971,8 @@ export function handleSummary(data) {
     `tokens: llm_total=${report.tokens_and_cost.llm_total_tokens}  saved_est=${report.tokens_and_cost.tokens_saved_estimated}  ` +
       `cost=$${f(report.tokens_and_cost.llm_cost_usd, 4)}  saved=$${f(report.tokens_and_cost.cost_saved_usd, 4)} ` +
       `(${pct(report.tokens_and_cost.savings_vs_uncached_baseline)} vs uncached)`,
+    `accuracy: overall=${pct(report.accuracy.overall_accuracy)}  lang_match=${pct(report.accuracy.language_match_rate)}  ` +
+      `kb_grounded=${pct(report.accuracy.kb_grounded_rate)}  (${report.accuracy.accurate_count}/${requests})`,
     RUN_KB_INVALIDATION
       ? `kb invalidation: updates_ok=${pct(report.kb_invalidation.update_success_rate)}  not_hit=${pct(report.kb_invalidation.invalidation_miss_rate)}  ` +
         `stale_prevented=${pct(report.kb_invalidation.stale_answer_prevented_rate)}  reverify_hit=${pct(report.kb_invalidation.reverify_hit_rate)}  ` +
