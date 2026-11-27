@@ -10,6 +10,7 @@ import {
   durationToMs,
   isTestSecurityBypassEnabled,
 } from '@semcache/shared-config';
+import { ServiceName } from '@semcache/shared-types';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import './auth/auth-types';
@@ -100,7 +101,7 @@ import { UsersModule } from './users/users.module';
   controllers: [AppController],
   providers: [
     AppService,
-    ...createRpcGlobalProviders(),
+    ...createRpcGlobalProviders(ServiceName.AUTH_SERVICE),
     RpcThrottlerGuard,
     {
       provide: APP_GUARD,

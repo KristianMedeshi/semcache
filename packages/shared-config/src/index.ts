@@ -4,5 +4,6 @@ export * from './constants';
 export * from './drizzle.helpers';
 export * from './env.validation';
 export * from './internal-identity.auth';
+export * from './metrics.helpers';
 export * from './shared-config.module';
 export * from './tcp-microservice.helpers';

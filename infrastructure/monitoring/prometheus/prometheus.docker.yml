@@ -1,0 +1,43 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
+
+  - job_name: 'semcache-api-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['api-gateway:3000']
+
+  - job_name: 'semcache-auth-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['auth-service:9101']
+
+  - job_name: 'semcache-dialog-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['dialog-service:9102']
+
+  - job_name: 'semcache-semantic-cache-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['semantic-cache-service:9103']
+
+  - job_name: 'semcache-llm-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['llm-service:9104']
+
+  - job_name: 'semcache-knowledge-base-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['knowledge-base-service:9105']
+
+  - job_name: 'semcache-embedding-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['embedding-service:9106']

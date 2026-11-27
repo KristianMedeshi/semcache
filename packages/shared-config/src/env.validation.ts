@@ -186,6 +186,9 @@ export const baseEnvSchema = z.object({
   NODE_ENV: nodeEnvSchema,
   HOST: defaultString(DEFAULT_SERVICE_HOST),
   PORT: positiveInt('PORT').optional(),
+  METRICS_HOST: optionalString(),
+  METRICS_PORT: positiveInt('METRICS_PORT').optional(),
+  METRICS_ENABLED: optionalBooleanEnvSchema(),
   TEST_BYPASS_SECURITY: optionalBooleanEnvSchema(),
 });
 

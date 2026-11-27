@@ -9,7 +9,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { APP_FILTER, APP_PIPE, NestFactory } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE, NestFactory } from '@nestjs/core';
 import {
   BaseRpcExceptionFilter,
   type ClientProxy,
@@ -22,7 +22,17 @@ import {
 import { type HealthCheckStatus, SERVICE_TCP_PATTERNS, ServiceName } from '@semcache/shared-types';
 import type { Observable } from 'rxjs';
 import type { z } from 'zod';
-import { resolveMicroserviceTcpOptions, resolveServiceTcpEndpoint } from './shared-config.module';
+import { DEFAULT_METRICS_PORTS } from './constants';
+import {
+  RpcMetricsInterceptor,
+  SERVICE_NAME_TOKEN,
+  startMetricsHttpServer,
+} from './metrics.helpers';
+import {
+  createValidatedConfigService,
+  resolveMicroserviceTcpOptions,
+  resolveServiceTcpEndpoint,
+} from './shared-config.module';
 
 export const SERVICE_TCP_ENV_KEYS: Record<
   ServiceName,
@@ -105,10 +115,11 @@ export function createStrictValidationPipe(): ValidationPipe {
 }
 
 /**
- * Returns the standard global filter and validation pipe providers for TCP microservices.
+ * Returns the standard global filter, validation pipe, and optional RPC metrics interceptor
+ * providers for TCP microservices.
  */
-export function createRpcGlobalProviders(): Provider[] {
-  return [
+export function createRpcGlobalProviders(service?: ServiceName): Provider[] {
+  const providers: Provider[] = [
     {
       provide: APP_FILTER,
       useClass: HttpToRpcExceptionFilter,
@@ -118,6 +129,19 @@ export function createRpcGlobalProviders(): Provider[] {
       useValue: createStrictValidationPipe(),
     },
   ];
+  if (service) {
+    providers.push(
+      {
+        provide: SERVICE_NAME_TOKEN,
+        useValue: service,
+      },
+      {
+        provide: APP_INTERCEPTOR,
+        useClass: RpcMetricsInterceptor,
+      },
+    );
+  }
+  return providers;
 }
 
 /**
@@ -177,6 +201,29 @@ export async function bootstrapTcpMicroservice<TSchema extends z.ZodType<Record<
   });
   app.enableShutdownHooks();
   await app.listen();
+
+  const envConfig = createValidatedConfigService(envSchema, { loadEnvFiles: false });
+  const metricsEnabled = envConfig.get<boolean | undefined>('METRICS_ENABLED') !== false;
+  if (
+    metricsEnabled &&
+    process.env.JEST_WORKER_ID === undefined &&
+    service !== ServiceName.API_GATEWAY
+  ) {
+    const metricsHost =
+      envConfig.get<string | undefined>('METRICS_HOST')?.trim() || host || '0.0.0.0';
+    const metricsPort =
+      envConfig.get<number | undefined>('METRICS_PORT') ?? DEFAULT_METRICS_PORTS[service];
+    const metricsServer = await startMetricsHttpServer({
+      service,
+      host: metricsHost,
+      port: metricsPort,
+    });
+    const closeMetrics = () => {
+      metricsServer.close();
+    };
+    process.once('SIGINT', closeMetrics);
+    process.once('SIGTERM', closeMetrics);
+  }
 }
 
 /**

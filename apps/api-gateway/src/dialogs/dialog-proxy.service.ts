@@ -8,7 +8,7 @@ import {
 import { AuthenticationContext } from '@nestjs/authentication';
 import { ClientProxy } from '@nestjs/microservices';
 import type { DialogMessageStreamEventDto, DialogTcpRequestDto } from '@semcache/shared-dtos';
-import { type Observable, Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { type Observable, Subject, catchError, takeUntil, tap, throwError } from 'rxjs';
 import { AuthProxyService } from '../auth/auth-proxy.service';
 import { BaseTcpProxyService } from '../common/base-tcp-proxy.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -100,9 +100,21 @@ export class DialogProxyService extends BaseTcpProxyService implements BeforeApp
     options?: { dialogId?: string; messageId?: string; body?: TBody },
   ): Promise<Observable<DialogMessageStreamEventDto>> {
     const payload = await this.buildAuthenticatedDialogPayload(cookieHeader, options);
+    const startedAt = performance.now();
 
     return this.dialogClient.send<DialogMessageStreamEventDto>(pattern, payload).pipe(
       takeUntil(this.shutdown$),
+      tap((event) => {
+        if (event.type === 'done' && event.cache?.status && this.metricsService) {
+          this.metricsService.recordCacheTurn({
+            status: event.cache.status,
+            mode: event.cache.mode ?? 'unknown',
+            category: event.cache.category ?? 'general',
+            durationSeconds: (performance.now() - startedAt) / 1000,
+            usage: event.assistantMessage?.usage,
+          });
+        }
+      }),
       catchError((error: unknown) =>
         throwError(() =>
           this.mapRpcError(

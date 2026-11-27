@@ -1,6 +1,6 @@
 import { BadGatewayException, UnauthorizedException } from '@nestjs/common';
 import type { ClientProxy } from '@nestjs/microservices';
-import { SERVICE_TCP_PATTERNS, UserRole } from '@semcache/shared-types';
+import { CacheHitStatus, CacheMode, QueryCategory, SERVICE_TCP_PATTERNS, UserRole } from '@semcache/shared-types';
 import { Subject, firstValueFrom, of, throwError, toArray } from 'rxjs';
 import {
   createGatewayAuthProxyMock,
@@ -8,6 +8,7 @@ import {
   expectSignedInternalHeaders,
   useTestGatewayEnv,
 } from '../common/proxy-test-helpers';
+import type { MetricsService } from '../metrics/metrics.service';
 import { DialogProxyService } from './dialog-proxy.service';
 
 const TEST_USER = createTestGatewayUser(UserRole.CUSTOMER);
@@ -15,13 +16,14 @@ const TEST_USER = createTestGatewayUser(UserRole.CUSTOMER);
 function createDialogProxyHarness(options?: {
   user?: typeof TEST_USER | null;
   dialogSendMock?: jest.Mock;
+  metricsService?: MetricsService;
 }) {
   const authProxy = createGatewayAuthProxyMock(
     options?.user === undefined ? TEST_USER : options.user,
   );
   const dialogSendMock = options?.dialogSendMock ?? jest.fn();
   const dialogClient = { send: dialogSendMock } as unknown as ClientProxy;
-  const proxy = new DialogProxyService(authProxy, dialogClient);
+  const proxy = new DialogProxyService(authProxy, dialogClient, undefined, options?.metricsService);
   return { proxy, dialogSendMock };
 }
 
@@ -118,6 +120,49 @@ describe('DialogProxyService', () => {
         dialogId: 'dialog-1',
         messageId: 'msg-1',
         body: { content: 'Edited' },
+      }),
+    );
+  });
+
+  it('records cache and token metrics on SSE done events in createDialogStream', async () => {
+    const recordCacheTurn = jest.fn();
+    const metricsService = { recordCacheTurn } as unknown as MetricsService;
+    const dialogSendMock = jest.fn(() =>
+      of(
+        { type: 'delta', delta: 'Cached reply' },
+        {
+          type: 'done',
+          dialog: { id: 'dialog-1' },
+          userMessage: { id: 'u-1' },
+          assistantMessage: {
+            id: 'a-1',
+            usage: { promptTokens: 120, completionTokens: 40, totalTokens: 160 },
+          },
+          cache: {
+            status: CacheHitStatus.MISS,
+            mode: CacheMode.ADAPTIVE,
+            category: QueryCategory.BILLING,
+          },
+        },
+      ),
+    );
+    const { proxy } = createDialogProxyHarness({ dialogSendMock, metricsService });
+
+    const stream$ = await proxy.createDialogStream(
+      'semcache_sid=abc',
+      SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_STREAM,
+      { dialogId: 'dialog-1', body: { content: 'My bill is wrong' } },
+    );
+    await firstValueFrom(stream$.pipe(toArray()));
+
+    expect(recordCacheTurn).toHaveBeenCalledTimes(1);
+    expect(recordCacheTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: CacheHitStatus.MISS,
+        mode: CacheMode.ADAPTIVE,
+        category: QueryCategory.BILLING,
+        durationSeconds: expect.any(Number),
+        usage: { promptTokens: 120, completionTokens: 40, totalTokens: 160 },
       }),
     );
   });

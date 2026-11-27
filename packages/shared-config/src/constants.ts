@@ -52,6 +52,18 @@ export const DEFAULT_SERVICE_PORTS: Record<ServiceName, number> = {
   [ServiceName.EMBEDDING_SERVICE]: 3006,
 };
 
+/**
+ * Default Prometheus `/metrics` HTTP ports for internal TCP microservices.
+ */
+export const DEFAULT_METRICS_PORTS: Record<Exclude<ServiceName, ServiceName.API_GATEWAY>, number> = {
+  [ServiceName.AUTH_SERVICE]: 9101,
+  [ServiceName.DIALOG_SERVICE]: 9102,
+  [ServiceName.SEMANTIC_CACHE_SERVICE]: 9103,
+  [ServiceName.LLM_SERVICE]: 9104,
+  [ServiceName.KNOWLEDGE_BASE_SERVICE]: 9105,
+  [ServiceName.EMBEDDING_SERVICE]: 9106,
+};
+
 export interface ExtractedRpcErrorPayload {
   statusCode?: number;
   message?: string | string[];

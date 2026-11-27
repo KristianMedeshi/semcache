@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
 import { SharedConfigModule, createRpcGlobalProviders } from '@semcache/shared-config';
+import { ServiceName } from '@semcache/shared-types';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import './auth/knowledge-base-auth-types';
@@ -18,6 +19,6 @@ import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
     KnowledgeBaseModule,
   ],
   controllers: [AppController],
-  providers: [AppService, ...createRpcGlobalProviders()],
+  providers: [AppService, ...createRpcGlobalProviders(ServiceName.KNOWLEDGE_BASE_SERVICE)],
 })
 export class AppModule {}
