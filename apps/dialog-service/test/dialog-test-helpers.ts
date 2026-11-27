@@ -59,6 +59,24 @@ export function createInMemoryDialogHarness(options?: {
     }),
     findMessagesByDialog: jest.fn(async () => [...storedMessages]),
     deleteAllDialogsByUser: jest.fn(async (owner) => (owner === TEST_USER_ID ? 1 : 0)),
+    getStats: jest.fn(async () => ({
+      totalDialogs: 1,
+      activeUsersCount: 1,
+      totalMessages: storedMessages.length,
+      userMessages: storedMessages.filter((m) => m.role === ChatMessageRole.USER).length,
+      assistantMessages: storedMessages.filter((m) => m.role === ChatMessageRole.ASSISTANT).length,
+      cachedAssistantMessages: 0,
+      llmAssistantMessages: storedMessages.filter((m) => m.role === ChatMessageRole.ASSISTANT)
+        .length,
+      cacheHitRate: 0,
+      averageLatencyMs: null,
+      averageCachedLatencyMs: null,
+      averageLlmLatencyMs: null,
+      totalTokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      recentDialogs: [],
+    })),
     touchDialog: jest.fn(async (_id, title) => {
       dialog = {
         ...dialog,

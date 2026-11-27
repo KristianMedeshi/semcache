@@ -55,6 +55,10 @@ export class DialogPolicy implements PolicyBefore<AuthenticatedUser, Ability<Dia
     return dialog.userId === user.id;
   }
 
+  viewStats(user: AuthenticatedUser | null): boolean {
+    return user !== null && user.role === UserRole.ADMIN;
+  }
+
   private isAuthenticatedUser(user: AuthenticatedUser | null): boolean {
     return user !== null && (user.role === UserRole.CUSTOMER || user.role === UserRole.ADMIN);
   }

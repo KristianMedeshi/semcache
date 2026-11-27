@@ -9,6 +9,7 @@ import {
   Moon,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Sun,
   Trash2,
   Users,
@@ -174,6 +175,12 @@ export function SidebarAccountFooter({
               <DropdownMenuItem onSelect={onOpenAdminDirectory}>
                 <Users className="size-4 text-muted-foreground" />
                 Operator directory
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/admin">
+                  <SlidersHorizontal className="size-4 text-muted-foreground" />
+                  Admin Panel
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/knowledge-base">

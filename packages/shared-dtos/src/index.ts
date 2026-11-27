@@ -435,6 +435,38 @@ export interface DeleteAllDialogsResponseDto {
 }
 
 /**
+ * Compact summary of a recently active dialog thread for operator analytics.
+ */
+export interface DialogRecentActivityDto {
+  id: string;
+  userId: string;
+  title: string;
+  messageCount: number;
+  updatedAt: string;
+}
+
+/**
+ * Aggregate operational statistics for dialogs, messages, cache hits, latency, and token usage.
+ */
+export interface DialogStatsResponseDto {
+  totalDialogs: number;
+  activeUsersCount: number;
+  totalMessages: number;
+  userMessages: number;
+  assistantMessages: number;
+  cachedAssistantMessages: number;
+  llmAssistantMessages: number;
+  cacheHitRate: number;
+  averageLatencyMs: number | null;
+  averageCachedLatencyMs: number | null;
+  averageLlmLatencyMs: number | null;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  recentDialogs: DialogRecentActivityDto[];
+}
+
+/**
  * DTO representing a user dialog thread.
  */
 export interface DialogResponseDto {

@@ -50,5 +50,8 @@ describe('GatewayAccessPolicy', () => {
     expect(policy.manageSemanticCache(customer)).toBe(false);
     expect(policy.manageSemanticCache(admin)).toBe(true);
     expect(policy.manageSemanticCache(null)).toBe(false);
+    expect(policy.viewDialogStats(customer)).toBe(false);
+    expect(policy.viewDialogStats(admin)).toBe(true);
+    expect(policy.viewDialogStats(null)).toBe(false);
   });
 });

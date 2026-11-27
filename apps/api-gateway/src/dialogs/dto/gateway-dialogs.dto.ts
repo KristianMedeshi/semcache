@@ -5,7 +5,9 @@ import {
   type DeleteAllDialogsResponseDto,
   type DeleteDialogResponseDto,
   type DialogMessageResponseDto,
+  type DialogRecentActivityDto,
   type DialogResponseDto,
+  type DialogStatsResponseDto,
   type LlmTokenUsageDto,
   type SemanticCacheTurnMetadataDto,
   type SendMessageResponseDto,
@@ -203,4 +205,68 @@ export class DeleteAllDialogsResponseSwaggerDto implements DeleteAllDialogsRespo
 
   @ApiProperty({ example: true })
   deleted!: true;
+}
+
+export class DialogRecentActivitySwaggerDto implements DialogRecentActivityDto {
+  @ApiProperty({ format: 'uuid', example: '22222222-2222-4222-8222-222222222222' })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid', example: '11111111-1111-4111-8111-111111111111' })
+  userId!: string;
+
+  @ApiProperty({ example: 'EU Roaming Allowance Inquiry' })
+  title!: string;
+
+  @ApiProperty({ example: 6 })
+  messageCount!: number;
+
+  @ApiProperty({ format: 'date-time', example: '2026-01-01T00:05:00.000Z' })
+  updatedAt!: string;
+}
+
+export class DialogStatsResponseSwaggerDto implements DialogStatsResponseDto {
+  @ApiProperty({ example: 24 })
+  totalDialogs!: number;
+
+  @ApiProperty({ example: 8 })
+  activeUsersCount!: number;
+
+  @ApiProperty({ example: 96 })
+  totalMessages!: number;
+
+  @ApiProperty({ example: 48 })
+  userMessages!: number;
+
+  @ApiProperty({ example: 48 })
+  assistantMessages!: number;
+
+  @ApiProperty({ example: 28 })
+  cachedAssistantMessages!: number;
+
+  @ApiProperty({ example: 20 })
+  llmAssistantMessages!: number;
+
+  @ApiProperty({ example: 0.5833 })
+  cacheHitRate!: number;
+
+  @ApiProperty({ type: Number, nullable: true, example: 215 })
+  averageLatencyMs!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: 14 })
+  averageCachedLatencyMs!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: 496 })
+  averageLlmLatencyMs!: number | null;
+
+  @ApiProperty({ example: 12480 })
+  totalTokens!: number;
+
+  @ApiProperty({ example: 8920 })
+  promptTokens!: number;
+
+  @ApiProperty({ example: 3560 })
+  completionTokens!: number;
+
+  @ApiProperty({ type: [DialogRecentActivitySwaggerDto] })
+  recentDialogs!: DialogRecentActivitySwaggerDto[];
 }

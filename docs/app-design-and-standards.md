@@ -127,7 +127,10 @@ When starting a new session or empty conversation, customers see:
 - **Profile & Operator Dialogs**:
   - `ProfileSettingsDialog` integrates with `PATCH /users/:id`.
   - `AdminOperatorDialog` integrates with `GET /admin/users` and `DELETE /admin/users/:id/sessions` for `ADMIN` operators.
-- No backend authentication or dialog API contracts are altered.
+- **Operator Admin Panel (`/admin`, `UserRole.ADMIN` only)**:
+  - `OperatorAdminPage` / `OperatorAdminWorkspace` provides dialog & inference analytics (`GET /admin/dialogs/stats` via `DialogStatsPanel`), semantic cache mode switching and adaptive threshold tuning (`GET/PATCH /admin/semantic-cache/settings` via `SemanticCacheSettingsPanel`), and cache inventory/invalidation controls (`GET /admin/semantic-cache/stats`, `POST /admin/semantic-cache/invalidate/sources`, `DELETE /admin/semantic-cache/entries/category/:category`, `DELETE /admin/semantic-cache/entries` via `SemanticCacheStatsPanel`).
+- **Knowledge Base Management (`/knowledge-base`, `UserRole.ADMIN` only)**:
+  - `KnowledgeBasePage` / `KnowledgeBaseWorkspace` provides document upload, search/filtering, RAG retrieval testing, deletion, and inline **Edit & Reprocess** (`POST /knowledge-base/documents/:id/reprocess` in `KnowledgeBaseDetailDialog`) that regenerates vector chunks and automatically invalidates linked semantic cache entries.
 
 ---
 

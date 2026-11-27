@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { BookOpen, Loader2, ShieldAlert, Users } from 'lucide-react';
+import { BookOpen, Loader2, ShieldAlert, SlidersHorizontal, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { listUsers, revokeUserSessions } from '@/features/auth/api/auth.client';
 import { queryKeys } from '@/shared/api/query-client';
@@ -55,16 +55,24 @@ export function AdminOperatorDialog({ open, onOpenChange }: AdminOperatorDialogP
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center justify-between rounded-xl border bg-accent/40 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-accent/40 px-3 py-2">
           <span className="text-xs text-muted-foreground">
-            Manage RAG documents used by the AI Support Service
+            Manage RAG documents and Semantic Cache controls
           </span>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/knowledge-base">
-              <BookOpen className="size-3.5 text-primary" />
-              Knowledge Base
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin">
+                <SlidersHorizontal className="size-3.5 text-primary" />
+                Admin Panel
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/knowledge-base">
+                <BookOpen className="size-3.5 text-primary" />
+                Knowledge Base
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <div className="max-h-80 space-y-2 overflow-y-auto pr-1">

@@ -15,12 +15,18 @@ export const queryKeys = {
     all: ['dialogs'] as const,
     list: () => [...queryKeys.dialogs.all, 'list'] as const,
     messages: (dialogId: string) => [...queryKeys.dialogs.all, 'messages', dialogId] as const,
+    stats: () => [...queryKeys.dialogs.all, 'stats'] as const,
   },
   knowledgeBase: {
     all: ['knowledge-base'] as const,
     list: (filters?: { category?: string; status?: string }) =>
       [...queryKeys.knowledgeBase.all, 'list', filters ?? {}] as const,
     detail: (documentId: string) => [...queryKeys.knowledgeBase.all, 'detail', documentId] as const,
+  },
+  semanticCache: {
+    all: ['semantic-cache'] as const,
+    settings: () => [...queryKeys.semanticCache.all, 'settings'] as const,
+    stats: () => [...queryKeys.semanticCache.all, 'stats'] as const,
   },
 } as const;
 

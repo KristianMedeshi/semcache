@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { UserResponseDto } from '@semcache/shared-dtos';
-import { BookOpen, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { BookOpen, Menu, PanelLeftClose, PanelLeftOpen, SlidersHorizontal } from 'lucide-react';
 import { isAdmin } from '@/features/auth/api/auth.client';
 import { Badge } from '@/shared/ui/badge';
 import { BrandLogo } from '@/shared/ui/brand-logo';
@@ -77,6 +77,17 @@ export function ChatHeader({
 
       {adminUser ? (
         <AppHeader.Right>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="hidden rounded-lg border-border/90 text-xs font-medium md:inline-flex"
+          >
+            <Link to="/admin">
+              <SlidersHorizontal className="size-3.5 text-primary" />
+              <span>Admin Panel</span>
+            </Link>
+          </Button>
           <Button
             asChild
             variant="outline"

@@ -62,6 +62,10 @@ export class GatewayAccessPolicy implements PolicyBefore<
     return user !== null && user.role === UserRole.ADMIN;
   }
 
+  viewDialogStats(user: UserResponseDto | null): boolean {
+    return user !== null && user.role === UserRole.ADMIN;
+  }
+
   private isAllowedUser(user: UserResponseDto | null): boolean {
     return user !== null && (user.role === UserRole.CUSTOMER || user.role === UserRole.ADMIN);
   }

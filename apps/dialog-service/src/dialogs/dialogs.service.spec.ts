@@ -243,4 +243,17 @@ describe('DialogsService', () => {
 
     expect(result).toEqual({ deletedCount: 1, deleted: true });
   });
+
+  it('returns aggregate dialog statistics from repository', async () => {
+    const { service } = createInMemoryDialogHarness();
+
+    const stats = await service.getStats();
+
+    expect(stats).toMatchObject({
+      totalDialogs: 1,
+      activeUsersCount: 1,
+      totalMessages: 0,
+      cacheHitRate: 0,
+    });
+  });
 });

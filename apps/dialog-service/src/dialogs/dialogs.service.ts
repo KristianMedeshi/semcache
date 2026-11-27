@@ -8,6 +8,7 @@ import type {
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
   DialogResponseDto,
+  DialogStatsResponseDto,
   EditMessageRequestDto,
   SendMessageRequestDto,
   SendMessageResponseDto,
@@ -61,6 +62,10 @@ export class DialogsService {
   async deleteAllDialogs(userId: string): Promise<DeleteAllDialogsResponseDto> {
     const deletedCount = await this.dialogsRepository.deleteAllDialogsByUser(userId);
     return { deletedCount, deleted: true };
+  }
+
+  async getStats(): Promise<DialogStatsResponseDto> {
+    return this.dialogsRepository.getStats();
   }
 
   async getDialogMessages(userId: string, dialogId: string): Promise<DialogMessageResponseDto[]> {

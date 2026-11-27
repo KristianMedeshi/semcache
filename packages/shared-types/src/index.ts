@@ -163,6 +163,7 @@ export const SERVICE_TCP_PATTERNS = {
   DIALOGS_MESSAGES_STREAM: 'dialogs.messages.stream',
   DIALOGS_MESSAGES_EDIT: 'dialogs.messages.edit',
   DIALOGS_MESSAGES_EDIT_STREAM: 'dialogs.messages.edit.stream',
+  DIALOGS_STATS_GET: 'dialogs.stats.get',
   LLM_CHAT: 'llm.chat',
   LLM_CHAT_STREAM: 'llm.chat.stream',
   EMBEDDINGS_GENERATE: 'embeddings.generate',

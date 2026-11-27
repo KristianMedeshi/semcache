@@ -5,11 +5,12 @@ import { ServiceName } from '@semcache/shared-types';
 import { GatewayAuthModule } from '../auth/gateway-auth.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { DIALOG_SERVICE_CLIENT, DialogProxyService } from './dialog-proxy.service';
+import { GatewayAdminDialogsController } from './gateway-admin-dialogs.controller';
 import { GatewayDialogsController } from './gateway-dialogs.controller';
 
 @Module({
   imports: [GatewayAuthModule, MetricsModule],
-  controllers: [GatewayDialogsController],
+  controllers: [GatewayDialogsController, GatewayAdminDialogsController],
   providers: [
     createTcpClientProvider(DIALOG_SERVICE_CLIENT, ServiceName.DIALOG_SERVICE),
     DialogProxyService,

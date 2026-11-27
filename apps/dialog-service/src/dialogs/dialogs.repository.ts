@@ -2,10 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import type {
   DialogMessageResponseDto,
   DialogResponseDto,
+  DialogStatsResponseDto,
   LlmTokenUsageDto,
 } from '@semcache/shared-dtos';
 import { ChatMessageRole } from '@semcache/shared-types';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { DIALOG_DRIZZLE, type DialogDatabase } from '../db/database.module';
 import { type DialogMessageRecord, type DialogRecord, dialogMessages, dialogs } from '../db/schema';
 
@@ -190,5 +191,84 @@ export class DialogsRepository {
       throw new Error('Failed to update dialog timestamp');
     }
     return toDialogResponseDto(updated);
+  }
+
+  async getStats(): Promise<DialogStatsResponseDto> {
+    const [dialogTotalsRows, messageTotalsRows, recentRows] = await Promise.all([
+      this.db
+        .select({
+          totalDialogs: sql<number>`count(*)::int`,
+          activeUsersCount: sql<number>`count(distinct ${dialogs.userId})::int`,
+        })
+        .from(dialogs),
+      this.db
+        .select({
+          totalMessages: sql<number>`count(*)::int`,
+          userMessages: sql<number>`count(*) filter (where ${dialogMessages.role} = 'user')::int`,
+          assistantMessages: sql<number>`count(*) filter (where ${dialogMessages.role} = 'assistant')::int`,
+          cachedAssistantMessages: sql<number>`count(*) filter (where ${dialogMessages.role} = 'assistant' and ${dialogMessages.model} = 'semantic-cache')::int`,
+          llmAssistantMessages: sql<number>`count(*) filter (where ${dialogMessages.role} = 'assistant' and (${dialogMessages.model} is null or ${dialogMessages.model} <> 'semantic-cache'))::int`,
+          averageLatencyMs: sql<
+            number | null
+          >`round(avg(${dialogMessages.latencyMs}) filter (where ${dialogMessages.role} = 'assistant' and ${dialogMessages.latencyMs} is not null))::int`,
+          averageCachedLatencyMs: sql<
+            number | null
+          >`round(avg(${dialogMessages.latencyMs}) filter (where ${dialogMessages.role} = 'assistant' and ${dialogMessages.model} = 'semantic-cache' and ${dialogMessages.latencyMs} is not null))::int`,
+          averageLlmLatencyMs: sql<
+            number | null
+          >`round(avg(${dialogMessages.latencyMs}) filter (where ${dialogMessages.role} = 'assistant' and (${dialogMessages.model} is null or ${dialogMessages.model} <> 'semantic-cache') and ${dialogMessages.latencyMs} is not null))::int`,
+          totalTokens: sql<number>`coalesce(sum(${dialogMessages.totalTokens}), 0)::int`,
+          promptTokens: sql<number>`coalesce(sum(${dialogMessages.promptTokens}), 0)::int`,
+          completionTokens: sql<number>`coalesce(sum(${dialogMessages.completionTokens}), 0)::int`,
+        })
+        .from(dialogMessages),
+      this.db
+        .select({
+          id: dialogs.id,
+          userId: dialogs.userId,
+          title: dialogs.title,
+          messageCount: sql<number>`count(${dialogMessages.id})::int`,
+          updatedAt: dialogs.updatedAt,
+        })
+        .from(dialogs)
+        .leftJoin(dialogMessages, eq(dialogMessages.dialogId, dialogs.id))
+        .groupBy(dialogs.id)
+        .orderBy(desc(dialogs.updatedAt))
+        .limit(5),
+    ]);
+
+    const dialogTotals = dialogTotalsRows[0];
+    const messageTotals = messageTotalsRows[0];
+    const assistantMessages = Number(messageTotals?.assistantMessages ?? 0);
+    const cachedAssistantMessages = Number(messageTotals?.cachedAssistantMessages ?? 0);
+    const toNullableInt = (val: number | null | undefined): number | null =>
+      val === null || val === undefined ? null : Number(val);
+
+    return {
+      totalDialogs: Number(dialogTotals?.totalDialogs ?? 0),
+      activeUsersCount: Number(dialogTotals?.activeUsersCount ?? 0),
+      totalMessages: Number(messageTotals?.totalMessages ?? 0),
+      userMessages: Number(messageTotals?.userMessages ?? 0),
+      assistantMessages,
+      cachedAssistantMessages,
+      llmAssistantMessages: Number(messageTotals?.llmAssistantMessages ?? 0),
+      cacheHitRate:
+        assistantMessages > 0
+          ? Number((cachedAssistantMessages / assistantMessages).toFixed(4))
+          : 0,
+      averageLatencyMs: toNullableInt(messageTotals?.averageLatencyMs),
+      averageCachedLatencyMs: toNullableInt(messageTotals?.averageCachedLatencyMs),
+      averageLlmLatencyMs: toNullableInt(messageTotals?.averageLlmLatencyMs),
+      totalTokens: Number(messageTotals?.totalTokens ?? 0),
+      promptTokens: Number(messageTotals?.promptTokens ?? 0),
+      completionTokens: Number(messageTotals?.completionTokens ?? 0),
+      recentDialogs: recentRows.map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        title: row.title,
+        messageCount: Number(row.messageCount),
+        updatedAt: row.updatedAt.toISOString(),
+      })),
+    };
   }
 }

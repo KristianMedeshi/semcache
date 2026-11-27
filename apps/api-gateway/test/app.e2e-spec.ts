@@ -115,6 +115,28 @@ class MockDialogController {
     return { deletedCount: 2, deleted: true };
   }
 
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_STATS_GET)
+  getDialogStats(@Payload() payload: DialogTcpRequestDto<unknown>) {
+    capturedDialogRequests.push({ pattern: SERVICE_TCP_PATTERNS.DIALOGS_STATS_GET, payload });
+    return {
+      totalDialogs: 5,
+      activeUsersCount: 2,
+      totalMessages: 14,
+      userMessages: 7,
+      assistantMessages: 7,
+      cachedAssistantMessages: 4,
+      llmAssistantMessages: 3,
+      cacheHitRate: 0.5714,
+      averageLatencyMs: 180,
+      averageCachedLatencyMs: 12,
+      averageLlmLatencyMs: 404,
+      totalTokens: 1250,
+      promptTokens: 850,
+      completionTokens: 400,
+      recentDialogs: [],
+    };
+  }
+
   @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT)
   editMessage(@Payload() payload: DialogTcpRequestDto<{ content: string }>) {
     capturedDialogRequests.push({ pattern: SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_EDIT, payload });
@@ -619,6 +641,25 @@ describe('API Gateway (e2e)', () => {
     ]);
   });
 
+  it('enforces ADMIN RBAC and proxies GET /admin/dialogs/stats over TCP', async () => {
+    await request(app.getHttpServer()).get('/admin/dialogs/stats').expect(401);
+
+    await request(app.getHttpServer())
+      .get('/admin/dialogs/stats')
+      .set('Cookie', 'semcache_sid=opaque-test-token')
+      .expect(403);
+
+    const statsRes = await request(app.getHttpServer())
+      .get('/admin/dialogs/stats')
+      .set('Cookie', 'semcache_sid=admin-test-token')
+      .expect(200);
+    expect(statsRes.body.totalDialogs).toBe(5);
+    expect(statsRes.body.cachedAssistantMessages).toBe(4);
+    expect(capturedDialogRequests.map((r) => r.pattern)).toEqual([
+      SERVICE_TCP_PATTERNS.DIALOGS_STATS_GET,
+    ]);
+  });
+
   it('serves OpenAPI JSON at /docs-json and Swagger UI at /docs/', async () => {
     const jsonRes = await request(app.getHttpServer()).get('/docs-json').expect(200);
     expect(jsonRes.body.openapi).toMatch(/^3\./);
@@ -634,12 +675,14 @@ describe('API Gateway (e2e)', () => {
     expect(jsonRes.body.paths['/dialogs/{id}/messages/stream']).toBeDefined();
     expect(jsonRes.body.paths['/knowledge-base/documents']).toBeDefined();
     expect(jsonRes.body.paths['/admin/semantic-cache/settings']).toBeDefined();
+    expect(jsonRes.body.paths['/admin/dialogs/stats']).toBeDefined();
     expect(Object.keys(jsonRes.body.components?.schemas ?? {})).toEqual(
       expect.arrayContaining([
         'GatewayRegisterDto',
         'UserResponseSwaggerDto',
         'SendMessageResponseSwaggerDto',
         'SemanticCacheSettingsResponseSwaggerDto',
+        'DialogStatsResponseSwaggerDto',
       ]),
     );
 

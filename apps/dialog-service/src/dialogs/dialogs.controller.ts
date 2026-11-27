@@ -8,6 +8,7 @@ import type {
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
   DialogResponseDto,
+  DialogStatsResponseDto,
   SendMessageResponseDto,
 } from '@semcache/shared-dtos';
 import { type AuthenticatedUser, SERVICE_TCP_PATTERNS } from '@semcache/shared-types';
@@ -111,5 +112,11 @@ export class DialogsController {
     @Payload('body') dto: EditMessageDto,
   ): Observable<DialogMessageStreamEventDto> {
     return this.dialogsService.streamEditMessage(user.id, id, messageId, dto);
+  }
+
+  @Can(DialogPolicy, 'viewStats')
+  @MessagePattern(SERVICE_TCP_PATTERNS.DIALOGS_STATS_GET)
+  async getStats(): Promise<DialogStatsResponseDto> {
+    return this.dialogsService.getStats();
   }
 }

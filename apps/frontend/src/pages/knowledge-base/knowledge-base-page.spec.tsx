@@ -96,6 +96,11 @@ function renderKnowledgeBasePage() {
     path: '/knowledge-base',
     component: KnowledgeBasePage,
   });
+  const adminRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/admin',
+    component: () => <div>Admin</div>,
+  });
   const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/',
@@ -107,7 +112,7 @@ function renderKnowledgeBasePage() {
     component: () => <div>Sign In</div>,
   });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([kbRoute, indexRoute, signInRoute]),
+    routeTree: rootRoute.addChildren([kbRoute, adminRoute, indexRoute, signInRoute]),
     history: createMemoryHistory({ initialEntries: ['/knowledge-base'] }),
   });
 
@@ -371,5 +376,44 @@ describe('KnowledgeBasePage', () => {
 
     fireEvent.drop(dropzone, { dataTransfer });
     expect(await screen.findByDisplayValue('support faq')).toBeVisible();
+  });
+
+  it('allows inline editing and reprocessing of a knowledge base document', async () => {
+    const user = userEvent.setup();
+    setupAdminKnowledgeBaseTest(sampleDocs);
+
+    const detailDoc: KnowledgeDocumentDetailResponseDto = {
+      ...sampleDocs[0],
+      content: 'Original EU roaming policy text.',
+      chunks: [],
+    };
+    const updatedDoc: KnowledgeDocumentDetailResponseDto = {
+      ...detailDoc,
+      title: 'EU Roaming Guide 2026',
+      content: 'Updated EU roaming policy: 30 GB included.',
+    };
+    vi.mocked(kbClient.getKnowledgeDocument).mockResolvedValueOnce(detailDoc);
+    vi.mocked(kbClient.reprocessKnowledgeDocument).mockResolvedValueOnce(updatedDoc);
+
+    renderKnowledgeBasePage();
+
+    await user.click(await screen.findByRole('button', { name: 'Edit EU Roaming Guide' }));
+
+    const titleInput = await screen.findByLabelText('Document Title');
+    const contentInput = screen.getByLabelText('Document Content');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'EU Roaming Guide 2026');
+    await user.clear(contentInput);
+    await user.type(contentInput, 'Updated EU roaming policy: 30 GB included.');
+
+    await user.click(screen.getByRole('button', { name: 'Save & Reprocess' }));
+
+    await waitFor(() => {
+      expect(kbClient.reprocessKnowledgeDocument).toHaveBeenCalledWith('doc-ready-1', {
+        title: 'EU Roaming Guide 2026',
+        content: 'Updated EU roaming policy: 30 GB included.',
+        includeChunks: true,
+      });
+    });
   });
 });

@@ -3,6 +3,7 @@ import { UserRole } from '@semcache/shared-types';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter } from '@tanstack/react-router';
 import { RootLayout } from '@/app/root-layout';
+import { OperatorAdminPage } from '@/pages/admin/ui/operator-admin-page';
 import { ForgotPasswordPage } from '@/pages/forgot-password/ui/forgot-password-page';
 import { HomePage } from '@/pages/home/ui/home-page';
 import { KnowledgeBasePage } from '@/pages/knowledge-base/ui/knowledge-base-page';
@@ -72,12 +73,26 @@ const knowledgeBaseRoute = createRoute({
   component: KnowledgeBasePage,
 });
 
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin',
+  beforeLoad: async ({ context }) => {
+    const user = await context.getAuthUser();
+    requireRole(user, [UserRole.ADMIN], {
+      redirectTo: '/admin',
+      forbiddenHref: '/',
+    });
+  },
+  component: OperatorAdminPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   signInRoute,
   signUpRoute,
   forgotPasswordRoute,
   knowledgeBaseRoute,
+  adminRoute,
 ]);
 
 export function createAppRouter(context: RouterContext) {

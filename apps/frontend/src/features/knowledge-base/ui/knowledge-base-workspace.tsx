@@ -9,6 +9,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   UploadCloud,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -56,11 +57,11 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
   const [statusFilter, setStatusFilter] = useState<KnowledgeDocumentStatus | 'all'>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [pendingDroppedFiles, setPendingDroppedFiles] = useState<File[]>([]);
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<{ id: string; edit: boolean } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<KnowledgeDocumentResponseDto | null>(null);
 
   const { isDragging, dropZoneProps } = useFileDropZone({
-    disabled: uploadOpen || Boolean(selectedDocId) || Boolean(deleteTarget),
+    disabled: uploadOpen || Boolean(selectedDoc) || Boolean(deleteTarget),
     onDropFiles: (files) => {
       setPendingDroppedFiles(files);
       setUploadOpen(true);
@@ -105,8 +106,8 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
       toast.success(
         `Deleted "${deleteTarget.title}" and ${result.deletedChunksCount} indexed chunk(s).`,
       );
-      if (selectedDocId === deleteTarget.id) {
-        setSelectedDocId(null);
+      if (selectedDoc?.id === deleteTarget.id) {
+        setSelectedDoc(null);
       }
       setDeleteTarget(null);
     } catch (error) {
@@ -155,12 +156,20 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button asChild variant="outline" size="sm">
-            <Link to="/">
-              <ArrowLeft className="size-4" />
-              <span>Support Chat</span>
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/">
+                <ArrowLeft className="size-4" />
+                <span>Support Chat</span>
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin">
+                <SlidersHorizontal className="size-4 text-primary" />
+                <span>Admin Panel</span>
+              </Link>
+            </Button>
+          </div>
           <Button type="button" size="sm" onClick={() => setUploadOpen(true)}>
             <Plus className="size-4" />
             Upload Documents
@@ -249,7 +258,8 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
                         key={doc.id}
                         doc={doc}
                         isReprocessing={reprocessMutation.isPending}
-                        onSelect={() => setSelectedDocId(doc.id)}
+                        onSelect={() => setSelectedDoc({ id: doc.id, edit: false })}
+                        onEdit={() => setSelectedDoc({ id: doc.id, edit: true })}
                         onRetry={() => void handleRetry(doc.id)}
                         onDelete={() => setDeleteTarget(doc)}
                       />
@@ -274,10 +284,11 @@ export function KnowledgeBaseWorkspace({ user }: KnowledgeBaseWorkspaceProps) {
       />
 
       <KnowledgeBaseDetailDialog
-        documentId={selectedDocId}
+        documentId={selectedDoc?.id ?? null}
+        initialEditMode={selectedDoc?.edit ?? false}
         onOpenChange={(open) => {
           if (!open) {
-            setSelectedDocId(null);
+            setSelectedDoc(null);
           }
         }}
       />

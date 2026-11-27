@@ -3,6 +3,7 @@ import type {
   KnowledgeDocumentDetailResponseDto,
   KnowledgeDocumentResponseDto,
   ListKnowledgeDocumentsQueryDto,
+  ReprocessKnowledgeDocumentRequestDto,
   RetrieveKnowledgeContextRequestDto,
   RetrieveKnowledgeContextResponseDto,
   UploadKnowledgeDocumentRequestDto,
@@ -60,10 +61,12 @@ export async function uploadMultipleKnowledgeDocuments(
 
 export async function reprocessKnowledgeDocument(
   documentId: string,
+  dto?: ReprocessKnowledgeDocumentRequestDto,
 ): Promise<KnowledgeDocumentDetailResponseDto> {
-  const { data } = await apiClient.post<KnowledgeDocumentDetailResponseDto>(
-    `/knowledge-base/documents/${encodeURIComponent(documentId)}/reprocess`,
-  );
+  const url = `/knowledge-base/documents/${encodeURIComponent(documentId)}/reprocess`;
+  const { data } = dto
+    ? await apiClient.post<KnowledgeDocumentDetailResponseDto>(url, dto)
+    : await apiClient.post<KnowledgeDocumentDetailResponseDto>(url);
   return data;
 }
 

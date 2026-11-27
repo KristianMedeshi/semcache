@@ -106,6 +106,7 @@ Stream Events (`Observable<LlmChatStreamEventDto>` for `llm.chat.stream`):
   - `{ type: 'error', statusCode: number, message: string }` (if an error occurs after SSE headers are sent)
 - `POST /dialogs/:id/messages/:messageId/edit` -> `dialogs.messages.edit` — creates a sibling branch from an existing user message (`EditMessageRequestDto` -> `SendMessageResponseDto`) sharing `targetMessage.parentMessageId` and generates a new assistant reply using only the ancestor branch history.
 - `POST /dialogs/:id/messages/:messageId/edit/stream` -> `dialogs.messages.edit.stream` — streams a branched message edit turn over Server-Sent Events (`text/event-stream`).
+- `GET /admin/dialogs/stats` -> `dialogs.stats.get` (`ADMIN` only) — returns aggregate dialog, message, cache hit rate, average latency, token usage, and recent activity statistics (`DialogStatsResponseDto`).
 
 ---
 

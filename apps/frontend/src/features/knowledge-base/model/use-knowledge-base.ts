@@ -1,5 +1,6 @@
 import type {
   ListKnowledgeDocumentsQueryDto,
+  ReprocessKnowledgeDocumentRequestDto,
   RetrieveKnowledgeContextRequestDto,
   UploadKnowledgeDocumentRequestDto,
 } from '@semcache/shared-dtos';
@@ -62,17 +63,25 @@ export function useUploadKnowledgeDocumentsMutation() {
     }) => uploadMultipleKnowledgeDocuments(input.documents, input.onProgress),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
+      void client.invalidateQueries({ queryKey: queryKeys.semanticCache.all });
     },
   });
 }
+
+export type ReprocessKnowledgeDocumentInput =
+  string | { documentId: string; dto?: ReprocessKnowledgeDocumentRequestDto };
 
 export function useReprocessKnowledgeDocumentMutation() {
   const client = useQueryClient();
 
   return useMutation({
-    mutationFn: (documentId: string) => reprocessKnowledgeDocument(documentId),
+    mutationFn: (input: ReprocessKnowledgeDocumentInput) =>
+      typeof input === 'string'
+        ? reprocessKnowledgeDocument(input)
+        : reprocessKnowledgeDocument(input.documentId, input.dto),
     onSuccess: (updated) => {
       void client.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
+      void client.invalidateQueries({ queryKey: queryKeys.semanticCache.all });
       client.setQueryData(queryKeys.knowledgeBase.detail(updated.id), updated);
     },
   });
@@ -85,6 +94,7 @@ export function useDeleteKnowledgeDocumentMutation() {
     mutationFn: (documentId: string) => deleteKnowledgeDocument(documentId),
     onSuccess: (_result, documentId) => {
       void client.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
+      void client.invalidateQueries({ queryKey: queryKeys.semanticCache.all });
       client.removeQueries({ queryKey: queryKeys.knowledgeBase.detail(documentId) });
     },
   });

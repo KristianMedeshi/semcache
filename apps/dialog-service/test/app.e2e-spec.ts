@@ -19,6 +19,7 @@ import type {
   DialogMessageResponseDto,
   DialogMessageStreamEventDto,
   DialogResponseDto,
+  DialogStatsResponseDto,
   LlmChatCompletionResponseDto,
   LlmChatStreamEventDto,
   LlmTokenUsageDto,
@@ -209,6 +210,57 @@ class InMemoryDialogsRepository {
     };
     this.dialogRows.set(dialogId, updated);
     return updated;
+  }
+
+  async getStats(): Promise<DialogStatsResponseDto> {
+    const allDialogs = [...this.dialogRows.values()];
+    const allMessages = [...this.messageRows.values()].flat();
+    const userMessages = allMessages.filter((m) => m.role === ChatMessageRole.USER);
+    const assistantMessages = allMessages.filter((m) => m.role === ChatMessageRole.ASSISTANT);
+    const cachedAssistantMessages = assistantMessages.filter((m) => m.model === 'semantic-cache');
+    const llmAssistantMessages = assistantMessages.filter((m) => m.model !== 'semantic-cache');
+
+    const avg = (items: DialogMessageResponseDto[]): number | null => {
+      const latencies = items
+        .map((m) => m.latencyMs)
+        .filter((v): v is number => typeof v === 'number');
+      if (latencies.length === 0) {
+        return null;
+      }
+      return Math.round(latencies.reduce((sum, v) => sum + v, 0) / latencies.length);
+    };
+
+    const recentDialogs = [...allDialogs]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 5)
+      .map((d) => ({
+        id: d.id,
+        userId: d.userId,
+        title: d.title,
+        messageCount: (this.messageRows.get(d.id) ?? []).length,
+        updatedAt: d.updatedAt,
+      }));
+
+    return {
+      totalDialogs: allDialogs.length,
+      activeUsersCount: new Set(allDialogs.map((d) => d.userId)).size,
+      totalMessages: allMessages.length,
+      userMessages: userMessages.length,
+      assistantMessages: assistantMessages.length,
+      cachedAssistantMessages: cachedAssistantMessages.length,
+      llmAssistantMessages: llmAssistantMessages.length,
+      cacheHitRate:
+        assistantMessages.length > 0
+          ? Number((cachedAssistantMessages.length / assistantMessages.length).toFixed(4))
+          : 0,
+      averageLatencyMs: avg(assistantMessages),
+      averageCachedLatencyMs: avg(cachedAssistantMessages),
+      averageLlmLatencyMs: avg(llmAssistantMessages),
+      totalTokens: allMessages.reduce((sum, m) => sum + (m.usage?.totalTokens ?? 0), 0),
+      promptTokens: allMessages.reduce((sum, m) => sum + (m.usage?.promptTokens ?? 0), 0),
+      completionTokens: allMessages.reduce((sum, m) => sum + (m.usage?.completionTokens ?? 0), 0),
+      recentDialogs,
+    };
   }
 }
 
@@ -439,5 +491,48 @@ describe('Dialog Service (TCP e2e)', () => {
       }),
     );
     expect(deleted).toEqual({ id: createdDialog.id, deleted: true });
+  });
+
+  it('enforces ADMIN role on dialogs.stats.get and returns aggregate dialog statistics', async () => {
+    const customerHeaders = createCustomerHeaders();
+    const adminHeaders = createSignedInternalHeaders(
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        email: 'admin@example.com',
+        role: UserRole.ADMIN,
+        sessionId: 'admin-session-1',
+      },
+      secret,
+    );
+
+    let caughtError: unknown;
+    try {
+      await firstValueFrom(
+        client.send(SERVICE_TCP_PATTERNS.DIALOGS_STATS_GET, { headers: customerHeaders }),
+      );
+    } catch (error) {
+      caughtError = error;
+    }
+    expect(extractRpcErrorPayload(caughtError)?.statusCode).toBe(403);
+
+    const dialog = await createDialog(customerHeaders, 'Stats Check');
+    await firstValueFrom(
+      client.send<SendMessageResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_MESSAGES_SEND, {
+        headers: customerHeaders,
+        dialogId: dialog.id,
+        body: { content: 'Check stats' },
+      }),
+    );
+
+    const stats = await firstValueFrom(
+      client.send<DialogStatsResponseDto>(SERVICE_TCP_PATTERNS.DIALOGS_STATS_GET, {
+        headers: adminHeaders,
+      }),
+    );
+
+    expect(stats.totalDialogs).toBeGreaterThanOrEqual(1);
+    expect(stats.totalMessages).toBeGreaterThanOrEqual(2);
+    expect(stats.totalTokens).toBeGreaterThan(0);
+    expect(stats.recentDialogs[0]?.id).toBe(dialog.id);
   });
 });

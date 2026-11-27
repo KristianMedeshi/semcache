@@ -1,6 +1,6 @@
 import type { KnowledgeDocumentResponseDto } from '@semcache/shared-dtos';
 import { KnowledgeDocumentStatus } from '@semcache/shared-types';
-import { AlertTriangle, CheckCircle2, Eye, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eye, Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import {
   CATEGORY_LABELS,
   FORMAT_LABELS,
@@ -13,6 +13,7 @@ export interface KnowledgeBaseDocumentRowProps {
   doc: KnowledgeDocumentResponseDto;
   isReprocessing: boolean;
   onSelect: () => void;
+  onEdit: () => void;
   onRetry: () => void;
   onDelete: () => void;
 }
@@ -46,6 +47,7 @@ export function KnowledgeBaseDocumentRow({
   doc,
   isReprocessing,
   onSelect,
+  onEdit,
   onRetry,
   onDelete,
 }: KnowledgeBaseDocumentRowProps) {
@@ -76,6 +78,17 @@ export function KnowledgeBaseDocumentRow({
         <Button type="button" variant="outline" size="sm" onClick={onSelect}>
           <Eye className="size-3.5" />
           Details
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={`Edit ${doc.title}`}
+          onClick={onEdit}
+        >
+          <Pencil className="size-3.5" />
+          Edit
         </Button>
 
         {doc.status === KnowledgeDocumentStatus.FAILED ? (

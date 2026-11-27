@@ -52,6 +52,13 @@ describe('knowledge-base.client', () => {
     await reprocessKnowledgeDocument('doc-1');
     expect(apiClient.post).toHaveBeenCalledWith('/knowledge-base/documents/doc-1/reprocess');
 
+    vi.mocked(apiClient.post).mockResolvedValueOnce({ data: { id: 'doc-1', status: 'ready' } });
+    await reprocessKnowledgeDocument('doc-1', { title: 'Updated', content: 'New text' });
+    expect(apiClient.post).toHaveBeenCalledWith('/knowledge-base/documents/doc-1/reprocess', {
+      title: 'Updated',
+      content: 'New text',
+    });
+
     vi.mocked(apiClient.delete).mockResolvedValueOnce({
       data: { id: 'doc-1', deleted: true, deletedChunksCount: 3 },
     });
