@@ -1,0 +1,24 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "isolatedModules": true,
+    "types": ["node", "jest"],
+    "typeRoots": [
+      "../apps/semantic-cache-service/node_modules/@types",
+      "../node_modules/@types"
+    ],
+    "paths": {
+      "@semcache/shared-types": ["../packages/shared-types/src/index.ts"],
+      "@semcache/shared-dtos": ["../packages/shared-dtos/src/index.ts"],
+      "@semcache/shared-config": ["../packages/shared-config/src/index.ts"],
+      "@semcache/shared-config/testing": ["../packages/shared-config/src/testing.ts"],
+      "*": [
+        "../node_modules/*",
+        "../apps/semantic-cache-service/node_modules/*",
+        "../apps/knowledge-base-service/node_modules/*",
+        "../apps/dialog-service/node_modules/*"
+      ]
+    }
+  },
+  "include": ["integration/**/*.ts", "e2e/**/*.ts"]
+}

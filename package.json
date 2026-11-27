@@ -11,6 +11,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
+    "test:integration": "node --experimental-vm-modules ./apps/semantic-cache-service/node_modules/jest/bin/jest.js --config tests/integration/jest.config.cjs --runInBand",
+    "test:system-e2e": "node --experimental-vm-modules ./apps/semantic-cache-service/node_modules/jest/bin/jest.js --config tests/e2e/jest.config.cjs --runInBand",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,yaml,yml}\"",
     "db:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d postgres",
